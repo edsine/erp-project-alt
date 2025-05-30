@@ -1,15 +1,23 @@
 import { useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { useAuth } from "../context/AuthContext";
+
 
 const DashboardLayout = () => {
+  const { user, isAuthenticated, loading, error } = useAuth()
+  const defaultAvatar = 'https://randomuser.me/api/portraits/men/1.jpg';
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const navigate = useNavigate()
 
-  // Mock user data - replace with actual user data from context/state
-  const user = {
-    name: 'John Doe',
-    role: 'admin',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
+   if (loading) {
+    return <div>Loading...</div>; // Show a spinner/skeleton while auth checks complete
+  }
+
+
+    // Add this check - if not authenticated, redirect to login
+  if (!isAuthenticated || !user) {
+    navigate('/login');
+    return null; // or a loading spinner while redirecting
   }
 
   const handleLogout = () => {
@@ -77,7 +85,7 @@ const DashboardLayout = () => {
                 {sidebarOpen && <span className="ml-3">Requisitions</span>}
               </Link>
             </li>
-            {user.role === 'admin' && (
+            {user.role === 'staff' && (
               <li>
                 <Link
                   to="/tasks"
@@ -90,7 +98,7 @@ const DashboardLayout = () => {
                 </Link>
               </li>
             )}
-            {user.role === 'admin' && (
+            {user.role === 'staff' && (
               <li>
                 <Link
                   to="/users"
@@ -148,7 +156,11 @@ const DashboardLayout = () => {
               </button>
               <div className="relative">
                 <button className="flex items-center space-x-2 focus:outline-none">
-                  <img className="h-8 w-8 rounded-full" src={user.avatar} alt="User profile" />
+                  <img
+                    src={user?.avatar || defaultAvatar}
+                    alt="User Avatar"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
                   {sidebarOpen && <span className="text-sm font-medium text-gray-700">{user.name}</span>}
                 </button>
                 <div className="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">

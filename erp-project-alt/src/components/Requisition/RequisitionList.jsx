@@ -1,40 +1,39 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from "../../context/AuthContext";
 
 const RequisitionList = () => {
-  const [requisitions, setRequisitions] = useState([
-    {
-      id: 1,
-      title: 'Office Supplies Request',
-      department: 'Operations',
-      date: '2023-06-15',
-      status: 'pending',
-      amount: 1250.00,
-    },
-    {
-      id: 2,
-      title: 'Software License Renewal',
-      department: 'IT',
-      date: '2023-06-10',
-      status: 'approved',
-      amount: 3200.00,
-    },
-    {
-      id: 3,
-      title: 'Team Building Event',
-      department: 'HR',
-      date: '2023-06-05',
-      status: 'rejected',
-      amount: 5000.00,
-    },
-  ])
-
+  const [requisitions, setRequisitions] = useState([])
+  const { user } = useAuth()
   const [selectedRequisition, setSelectedRequisition] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetchRequisitions = async () => {
+      try {
+        const response = await fetch(`http://localhost:7000/api/requisitions/user/${user.id}`)
+        const data = await response.json()
+        
+        if (response.ok) {
+          setRequisitions(data.data)
+        } else {
+          throw new Error(data.message || 'Failed to fetch requisitions')
+        }
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRequisitions()
+  }, [user.id])
 
   const filteredRequisitions = requisitions.filter(req =>
     req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    req.department.toLowerCase().includes(searchTerm.toLowerCase())
+    req.description.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handleRequisitionClick = (requisition) => {
@@ -47,6 +46,75 @@ const RequisitionList = () => {
     ))
     setSelectedRequisition(null)
   }
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  if (loading) return <div className="text-center py-8">Loading requisitions...</div>
+  if (error) return <div className="text-center text-red-500 py-8">{error}</div>
+
+const handleApprove = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:7000/api/requisitions/${id}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to approve requisition');
+    }
+
+    // Update the requisitions list with new status
+    setRequisitions(prev =>
+      prev.map(req =>
+        req.id === id ? { ...req, status: 'approved' } : req
+      )
+    );
+
+    setSelectedRequisition(null);
+  } catch (error) {
+    console.error('Approve error:', error);
+    alert(error.message);
+  }
+};
+
+const handleReject = async (id) => {
+  try {
+    const response = await fetch(`http://localhost:7000/api/requisitions/${id}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to reject requisition');
+    }
+
+    setRequisitions(prev =>
+      prev.map(req =>
+        req.id === id ? { ...req, status: 'rejected' } : req
+      )
+    );
+
+    setSelectedRequisition(null);
+  } catch (error) {
+    console.error('Reject error:', error);
+    alert(error.message);
+  }
+};
+
+
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -96,9 +164,9 @@ const RequisitionList = () => {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">{req.department}</p>
-                  <p className="text-sm font-medium">${req.amount.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400">{req.date}</p>
+                  <p className="text-sm text-gray-500 line-clamp-1">{req.description}</p>
+                  <p className="text-sm font-medium">₦{parseFloat(req.total).toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">{formatDate(req.created_at)}</p>
                 </div>
               ))
             ) : (
@@ -114,8 +182,8 @@ const RequisitionList = () => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h2 className="text-xl font-bold">{selectedRequisition.title}</h2>
-                <p className="text-sm text-gray-500">Department: {selectedRequisition.department}</p>
-                <p className="text-xs text-gray-400">Date: {selectedRequisition.date}</p>
+                <p className="text-sm text-gray-500">Created: {formatDate(selectedRequisition.created_at)}</p>
+                <p className="text-xs text-gray-400">Last updated: {formatDate(selectedRequisition.updated_at)}</p>
               </div>
               <button
                 onClick={() => setSelectedRequisition(null)}
@@ -130,14 +198,13 @@ const RequisitionList = () => {
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Details</h3>
               <div className="bg-gray-50 p-4 rounded-md">
-                <p>Request for purchase of office supplies including stationery, printer ink, and other necessary items for daily operations.</p>
+                <p>{selectedRequisition.description}</p>
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">Items Requested:</h4>
                   <ul className="list-disc pl-5 space-y-1">
-                    <li>Printer Ink Cartridges (x10)</li>
-                    <li>A4 Paper (10 reams)</li>
-                    <li>Staplers (x5)</li>
-                    <li>Notepads (x20)</li>
+                    {selectedRequisition.items.split(',').map((item, index) => (
+                      <li key={index}>{item.trim()}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -145,8 +212,16 @@ const RequisitionList = () => {
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Requested Amount</h4>
-                <p className="text-lg font-semibold">${selectedRequisition.amount.toFixed(2)}</p>
+                <h4 className="text-sm font-medium text-gray-500">Quantity</h4>
+                <p className="text-lg font-semibold">{selectedRequisition.quantity}</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Unit Price</h4>
+                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.unit_price).toFixed(2)}</p>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Total Amount</h4>
+                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.total).toFixed(2)}</p>
               </div>
               <div>
                 <h4 className="text-sm font-medium text-gray-500">Status</h4>
@@ -154,17 +229,22 @@ const RequisitionList = () => {
               </div>
             </div>
 
-            <div className="mt-6 border-t pt-4">
-              <h4 className="text-sm font-medium mb-2">Attachments</h4>
-              <div className="flex items-center space-x-2">
-                <div className="flex items-center p-2 border rounded-md">
+            {selectedRequisition.attachment && (
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-sm font-medium mb-2">Attachment</h4>
+                <a 
+                  href={`http://localhost:7000/${selectedRequisition.attachment}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center p-2 border rounded-md hover:bg-gray-50"
+                >
                   <svg className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
-                  <span className="text-sm">quote.pdf</span>
-                </div>
+                  <span className="text-sm">View Attachment</span>
+                </a>
               </div>
-            </div>
+            )}
 
             {selectedRequisition.status === 'pending' && (
               <div className="mt-6 flex justify-end space-x-3">

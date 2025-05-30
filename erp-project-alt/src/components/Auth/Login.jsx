@@ -1,29 +1,20 @@
 import React from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-
+import { useAuth } from '../../context/AuthContext'
 const Login = () => {
+  const { login } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = async (e) => {
+   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-    
-    try {
-      // TODO: API call to login
-      // For now, simulate login
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 1000)
-    } catch (err) {
-      setError(err.message || 'Login failed')
-    } finally {
-      setLoading(false)
+    const result = await login({ email, password })
+    if (result.success) {
+      navigate('/dashboard')
     }
   }
 

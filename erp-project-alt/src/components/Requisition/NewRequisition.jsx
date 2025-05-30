@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-
+import { useAuth } from '../../context/AuthContext'
 const NewRequisition = () => {
+  const { user} = useAuth() 
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     title: '',
-    department: '',
+    
     amount: '',
     description: '',
-    items: [{ name: '', quantity: 1, unitPrice: '' }],
+    items: [],
     attachments: []
   })
   const [error, setError] = useState('')
@@ -78,29 +79,77 @@ const NewRequisition = () => {
     }, 0)
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
 
-    if (!formData.title || !formData.department || !formData.description || formData.items.some(item => !item.name || !item.unitPrice)) {
-      setError('Please fill all required fields')
-      setLoading(false)
-      return
-    }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    try {
-      // TODO: API call to create requisition
-      // For now, simulate creation
-      setTimeout(() => {
-        navigate('/requisitions')
-      }, 1000)
-    } catch (err) {
-      setError(err.message || 'Failed to create requisition')
-    } finally {
-      setLoading(false)
-    }
+  // Validate required fields
+  if (!formData.title || !formData.description) {
+    setError('Please fill all required fields');
+    setLoading(false);
+    return;
   }
+
+  if (formData.items.length === 0) {
+    setError('Please add at least one item');
+    setLoading(false);
+    return;
+  }
+
+  if (formData.items.some(item => !item.name || !item.quantity || !item.unitPrice)) {
+    setError('Please fill all item fields (name, quantity, and price)');
+    setLoading(false);
+    return;
+  }
+
+  // Add null check for user
+  if (!user) {
+    setError('You must be logged in to create a requisition');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const formDataToSend = new FormData();
+    
+    // Append basic fields
+    formDataToSend.append('title', formData.title);
+    formDataToSend.append('description', formData.description);
+    formDataToSend.append('created_by', user.id.toString()); // Use the user from component scope
+    
+    // Append items
+    const firstItem = formData.items[0];
+    formDataToSend.append('items', firstItem.name);
+    formDataToSend.append('quantity', firstItem.quantity.toString());
+    formDataToSend.append('unit_price', firstItem.unitPrice.toString());
+    
+    // Append file
+    if (formData.attachments.length > 0) {
+      formDataToSend.append('attachment', formData.attachments[0]);
+    }
+
+    const response = await fetch('http://localhost:7000/api/requisitions', {
+      method: 'POST',
+      body: formDataToSend,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create requisition');
+    }
+
+    const result = await response.json();
+    window.alert(`Requisition created successfully! ID: ${result.requisitionId}`);
+    navigate('/requisitions');
+  } catch (err) {
+    setError(err.message || 'Failed to create requisition');
+    console.error('Submission error:', err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -137,26 +186,9 @@ const NewRequisition = () => {
               required
             />
           </div>
-          <div>
-            <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
-              Department <span className="text-red-500">*</span>
-            </label>
-            <select
-              id="department"
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              required
-            >
-              <option value="">Select Department</option>
-              <option value="hr">Human Resources</option>
-              <option value="finance">Finance</option>
-              <option value="operations">Operations</option>
-              <option value="it">IT</option>
-              <option value="marketing">Marketing</option>
-            </select>
-          </div>
+
+         
+
         </div>
 
         <div className="mb-4">

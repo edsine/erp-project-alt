@@ -1,32 +1,7 @@
 import { useState } from 'react'
 
 const UserList = () => {
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      role: 'admin',
-      department: 'IT',
-      status: 'active',
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane.smith@example.com',
-      role: 'user',
-      department: 'HR',
-      status: 'active',
-    },
-    {
-      id: 3,
-      name: 'Mike Johnson',
-      email: 'mike.johnson@example.com',
-      role: 'user',
-      department: 'Finance',
-      status: 'inactive',
-    },
-  ])
+  const [users, setUsers] = useState([])
 
   const [newUser, setNewUser] = useState({
     name: '',
