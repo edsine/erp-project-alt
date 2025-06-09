@@ -1,62 +1,134 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
 
 const UserList = () => {
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-    role: 'user',
+     password: '',
+    role: 'staff',
     department: '',
-    status: 'active'
-  })
-  const [searchTerm, setSearchTerm] = useState('')
+    is_admin: 0
+  });
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Fetch users from API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('http://localhost:7000/api/users');
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        const data = await response.json();
+        setUsers(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setNewUser(prev => ({
       ...prev,
       [name]: value
-    }))
+    }));
+  };
+
+ const handleAddUser = async () => {
+  if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
+    setError('Please fill all required fields');
+    return;
   }
 
-  const handleAddUser = () => {
-    if (newUser.name && newUser.email && newUser.department) {
-      setUsers([...users, {
-        id: users.length + 1,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        department: newUser.department,
-        status: newUser.status
-      }])
-      setNewUser({
-        name: '',
-        email: '',
-        role: 'user',
-        department: '',
-        status: 'active'
-      })
+  try {
+    const response = await fetch('http://localhost:7000/api/users', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newUser)
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      throw new Error(responseData.message || 'Failed to add user');
     }
-  }
 
-  const handleStatusChange = (id) => {
-    setUsers(users.map(user =>
-      user.id === id ? { 
-        ...user, 
-        status: user.status === 'active' ? 'inactive' : 'active' 
-      } : user
-    ))
-  }
+    alert('User added successfully!');
 
-  const handleDeleteUser = (id) => {
-    setUsers(users.filter(user => user.id !== id))
+    setUsers([...users, { ...newUser, id: responseData.user_id }]); // Assumes your API returns { user_id: ... }
+
+    setNewUser({
+      name: '',
+      email: '',
+      password: '',
+      role: 'staff',
+      department: '',
+      is_admin: 0
+    });
+    setError(null);
+  } catch (err) {
+    setError(err.message);
   }
+};
+
+
+  const handleStatusChange = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    try {
+      const response = await fetch(`http://localhost:7000/api/users/${id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user status');
+      }
+
+      setUsers(users.map(user =>
+        user.id === id ? { ...user, status: newStatus } : user
+      ));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:7000/api/users/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      setUsers(users.filter(user => user.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading) return <div className="text-center py-8">Loading users...</div>;
+  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
@@ -97,6 +169,17 @@ const UserList = () => {
             />
           </div>
           <div>
+            <input
+              type="password"
+              name="password"
+              value={newUser.password}
+              onChange={handleInputChange}
+              placeholder="Password"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+
+          <div>
             <select
               name="department"
               value={newUser.department}
@@ -104,11 +187,10 @@ const UserList = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">Select Department</option>
-              <option value="hr">Human Resources</option>
-              <option value="finance">Finance</option>
-              <option value="operations">Operations</option>
-              <option value="it">IT</option>
-              <option value="marketing">Marketing</option>
+              <option value="ICT">ICT</option>
+              <option value="Finance">Finance</option>
+              <option value="Operations">Operations</option>
+              <option value="Executive">Executive</option>
             </select>
           </div>
           <div>
@@ -118,7 +200,10 @@ const UserList = () => {
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="user">User</option>
+              <option value="staff">Staff</option>
+              <option value="gmd">GMD</option>
+              <option value="finance">Finance</option>
+              <option value="chairman">Chairman</option>
               <option value="admin">Admin</option>
             </select>
           </div>
@@ -150,7 +235,7 @@ const UserList = () => {
                 Role
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Admin
               </th>
               <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -163,6 +248,9 @@ const UserList = () => {
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{user.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.email}
@@ -174,19 +262,15 @@ const UserList = () => {
                     {user.role}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      onClick={() => handleStatusChange(user.id)}
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full cursor-pointer ${
-                        user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {user.status}
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_admin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                      {user.is_admin ? 'Yes' : 'No'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-900"
+                      className="text-red-600 hover:text-red-900 mr-3"
                     >
                       Delete
                     </button>
@@ -204,7 +288,7 @@ const UserList = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default UserList
+export default UserList;

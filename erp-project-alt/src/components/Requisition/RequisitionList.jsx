@@ -1,71 +1,60 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from "../../context/AuthContext";
 
 const RequisitionList = () => {
-  const [requisitions, setRequisitions] = useState([])
-  const { user } = useAuth()
-  const [selectedRequisition, setSelectedRequisition] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [requisitions, setRequisitions] = useState([]);
+  const { user } = useAuth();
+  const [selectedRequisition, setSelectedRequisition] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchRequisitions = async () => {
       try {
-        const response = await fetch(`http://localhost:7000/api/requisitions/user/${user.id}`)
-        const data = await response.json()
-        
+        const response = await fetch(`http://localhost:7000/api/requisitions/user/${user.id}`);
+        const data = await response.json();
+
         if (response.ok) {
-          setRequisitions(data.data)
+          setRequisitions(data.data);
         } else {
-          throw new Error(data.message || 'Failed to fetch requisitions')
+          throw new Error(data.message || 'Failed to fetch requisitions');
         }
       } catch (err) {
-        setError(err.message)
+        setError(err.message);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchRequisitions()
-  }, [user.id])
+    fetchRequisitions();
+  }, [user.id]);
 
   const filteredRequisitions = requisitions.filter(req =>
     req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     req.description.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  );
 
   const handleRequisitionClick = (requisition) => {
-    setSelectedRequisition(requisition)
-  }
-
-  const handleStatusChange = (id, newStatus) => {
-    setRequisitions(requisitions.map(req =>
-      req.id === id ? { ...req, status: newStatus } : req
-    ))
-    setSelectedRequisition(null)
-  }
+    setSelectedRequisition(requisition);
+  };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString)
+    const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    })
-  }
-
-  if (loading) return <div className="text-center py-8">Loading requisitions...</div>
-  if (error) return <div className="text-center text-red-500 py-8">{error}</div>
+    });
+  };
 
 const handleApprove = async (id) => {
   try {
     const response = await fetch(`http://localhost:7000/api/requisitions/${id}/approve`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id })  // <-- include this
     });
 
     if (!response.ok) {
@@ -73,13 +62,21 @@ const handleApprove = async (id) => {
       throw new Error(errorData.message || 'Failed to approve requisition');
     }
 
-    // Update the requisitions list with new status
     setRequisitions(prev =>
-      prev.map(req =>
-        req.id === id ? { ...req, status: 'approved' } : req
-      )
-    );
+      prev.map(req => {
+        if (req.id === id) {
+          const updated = { ...req };
+          if (user.role.toLowerCase() === 'gmd') updated.approved_by_gmd = true;
+          else if (user.role.toLowerCase() === 'gmd2') updated.approved_by_gmd2 = true;
+          else if (user.role.toLowerCase() === 'finance') updated.approved_by_finance = true;
+          else if (user.role.toLowerCase() === 'chairman') updated.approved_by_chairman = true;
 
+          updated.status = 'approved';
+          return updated;
+        }
+        return req;
+      })
+    );
     setSelectedRequisition(null);
   } catch (error) {
     console.error('Approve error:', error);
@@ -91,9 +88,8 @@ const handleReject = async (id) => {
   try {
     const response = await fetch(`http://localhost:7000/api/requisitions/${id}/reject`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id }),  // <-- Include user_id here
     });
 
     if (!response.ok) {
@@ -102,11 +98,22 @@ const handleReject = async (id) => {
     }
 
     setRequisitions(prev =>
-      prev.map(req =>
-        req.id === id ? { ...req, status: 'rejected' } : req
-      )
-    );
+      prev.map(req => {
+        if (req.id === id) {
+          const updated = { ...req };
+          const role = user.role.toLowerCase(); // normalize case
 
+          if (role === 'gmd') updated.rejected_by_gmd = true;
+          else if (role === 'gmd2') updated.rejected_by_gmd2 = true;
+          else if (role === 'finance') updated.rejected_by_finance = true;
+          else if (role === 'chairman') updated.rejected_by_chairman = true;
+
+          updated.status = 'rejected';
+          return updated;
+        }
+        return req;
+      })
+    );
     setSelectedRequisition(null);
   } catch (error) {
     console.error('Reject error:', error);
@@ -115,6 +122,8 @@ const handleReject = async (id) => {
 };
 
 
+  if (loading) return <div className="text-center py-8">Loading requisitions...</div>;
+  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -148,21 +157,12 @@ const handleReject = async (id) => {
                 >
                   <div className="flex justify-between items-start">
                     <h3 className="font-medium">{req.title}</h3>
-                    {req.status === 'pending' && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                        Pending
-                      </span>
-                    )}
-                    {req.status === 'approved' && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                        Approved
-                      </span>
-                    )}
-                    {req.status === 'rejected' && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                        Rejected
-                      </span>
-                    )}
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                      ${req.status === 'pending' ? 'bg-yellow-100 text-yellow-800'
+                        : req.status === 'approved' ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'}`}>
+                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                    </span>
                   </div>
                   <p className="text-sm text-gray-500 line-clamp-1">{req.description}</p>
                   <p className="text-sm font-medium">₦{parseFloat(req.total).toFixed(2)}</p>
@@ -194,7 +194,7 @@ const handleReject = async (id) => {
                 </svg>
               </button>
             </div>
-            
+
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Details</h3>
               <div className="bg-gray-50 p-4 rounded-md">
@@ -224,49 +224,68 @@ const handleReject = async (id) => {
                 <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.total).toFixed(2)}</p>
               </div>
               <div>
-                <h4 className="text-sm font-medium text-gray-500">Status</h4>
-                <p className="text-lg font-semibold capitalize">{selectedRequisition.status}</p>
+                <h4 className="text-sm font-medium text-gray-500">Attachment</h4>
+                <a
+                  href={`http://localhost:7000/${selectedRequisition.attachment}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  View File ({selectedRequisition.attachment_type})
+                </a>
               </div>
             </div>
 
-            {selectedRequisition.attachment && (
-              <div className="mt-6 border-t pt-4">
-                <h4 className="text-sm font-medium mb-2">Attachment</h4>
-                <a 
-                  href={`http://localhost:7000/${selectedRequisition.attachment}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center p-2 border rounded-md hover:bg-gray-50"
-                >
-                  <svg className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-sm">View Attachment</span>
-                </a>
-              </div>
-            )}
+            <div className="mb-4">
+  <h4 className="text-sm font-medium text-gray-500 mb-2">Approvals</h4>
+  <div className="flex gap-2 flex-wrap">
+    {['gmd', 'gmd2', 'finance', 'chairman'].map(role => {
+      const approved = selectedRequisition[`approved_by_${role}`];
+      const rejected = selectedRequisition[`rejected_by_${role}`];
 
-            {selectedRequisition.status === 'pending' && (
-              <div className="mt-6 flex justify-end space-x-3">
-                <button 
-                  onClick={() => handleStatusChange(selectedRequisition.id, 'rejected')}
-                  className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50"
-                >
-                  Reject
-                </button>
-                <button 
-                  onClick={() => handleStatusChange(selectedRequisition.id, 'approved')}
-                  className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary"
-                >
-                  Approve
-                </button>
-              </div>
-            )}
+      let statusLabel = 'Pending';
+      let statusClass = 'bg-gray-100 text-gray-600';
+
+      if (approved === 1 || approved === true) {
+        statusLabel = 'Approved';
+        statusClass = 'bg-green-100 text-green-800';
+      } else if (rejected === 1 || rejected === true) {
+        statusLabel = 'Rejected';
+        statusClass = 'bg-red-100 text-red-800';
+      }
+
+      return (
+        <span
+          key={role}
+          className={`text-xs px-2 py-1 rounded-full ${statusClass}`}
+        >
+          {role.toUpperCase()}: {statusLabel}
+        </span>
+      );
+    })}
+  </div>
+</div>
+
+
+            <div className="flex gap-4">
+              <button
+                onClick={() => handleApprove(selectedRequisition.id)}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => handleReject(selectedRequisition.id)}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+              >
+                Reject
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default RequisitionList
+export default RequisitionList;

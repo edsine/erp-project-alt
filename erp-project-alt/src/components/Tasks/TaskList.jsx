@@ -1,81 +1,193 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 const TaskList = () => {
-  const [tasks, setTasks] = useState([
-    {
-      id: 1,
-      title: 'Complete project proposal',
-      assignedTo: 'John Doe',
-      dueDate: '2023-06-20',
-      priority: 'high',
-      status: 'in-progress',
-    },
-    {
-      id: 2,
-      title: 'Review budget report',
-      assignedTo: 'Jane Smith',
-      dueDate: '2023-06-15',
-      priority: 'medium',
-      status: 'pending',
-    },
-    {
-      id: 3,
-      title: 'Update employee handbook',
-      assignedTo: 'Mike Johnson',
-      dueDate: '2023-06-25',
-      priority: 'low',
-      status: 'completed',
-    },
-  ])
-
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [userLoading, setUserLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
   const [newTask, setNewTask] = useState({
     title: '',
     assignedTo: '',
     dueDate: '',
     priority: 'medium',
-  })
-  const [searchTerm, setSearchTerm] = useState('')
+  });
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredTasks = tasks.filter(task =>
-    task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    task.assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Fetch tasks when component mounts or user changes
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setLoading(true);
+        const response = await fetch(`http://localhost:7000/api/tasks/user/${user.id}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch tasks');
+        }
+        
+        const data = await response.json();
+        setTasks(data.tasks || []);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [user?.id]);
+
+  // Fetch users when component mounts
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setUserLoading(true);
+        const response = await fetch('http://localhost:7000/api/users');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        
+        const data = await response.json();
+        // Assuming the API returns the array directly (not nested under 'users')
+        setUsers(data || []);
+      } catch (err) {
+        setError(err.message);
+        setUsers([]);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+const filteredTasks = tasks.filter(task => {
+  const title = task.title ?? '';
+  const assignedTo = task.assigned_to ?? '';
+  return (
+    title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+});
+
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setNewTask(prev => ({
       ...prev,
       [name]: value
-    }))
+    }));
+  };
+
+ const handleAddTask = async () => {
+  if (!newTask.title || !newTask.assignedTo || !newTask.dueDate) {
+    setError('Please fill all required fields');
+    return;
   }
 
-  const handleAddTask = () => {
-    if (newTask.title && newTask.assignedTo && newTask.dueDate) {
-      setTasks([...tasks, {
-        id: tasks.length + 1,
+  try {
+    const response = await fetch('http://localhost:7000/api/tasks', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         title: newTask.title,
-        assignedTo: newTask.assignedTo,
         dueDate: newTask.dueDate,
-        priority: newTask.priority,
-        status: 'pending'
-      }])
-      setNewTask({
-        title: '',
-        assignedTo: '',
-        dueDate: '',
-        priority: 'medium',
+        priority: newTask.priority || 'medium',
+        status: 'pending',
+        assignedTo: newTask.assignedTo,
+        createdBy: user.id, // 👈 correctly named to match backend expectation
       })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to add task');
     }
+
+    const result = await response.json();
+    const createdTask = {
+      id: result.taskId,
+      ...newTask,
+      createdBy: user.id,
+      status: 'pending'
+    };
+
+    setTasks([createdTask, ...tasks]);
+    setNewTask({
+      title: '',
+      assignedTo: '',
+      dueDate: '',
+      priority: 'medium',
+    });
+    setError(null);
+  } catch (err) {
+    setError(err.message);
+  }
+};
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      const response = await fetch(`http://localhost:7000/api/tasks/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+       body: JSON.stringify({ userId: user.id, status: newStatus })
+
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task status');
+      }
+
+      setTasks(tasks.map(task =>
+        task.id === id ? { ...task, status: newStatus } : task
+      ));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteTask = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:7000/api/tasks/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
+
+      setTasks(tasks.filter(task => task.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <p>Loading tasks...</p>
+      </div>
+    );
   }
 
-  const handleStatusChange = (id, newStatus) => {
-    setTasks(tasks.map(task =>
-      task.id === id ? { ...task, status: newStatus } : task
-    ))
-  }
-
-  const handleDeleteTask = (id) => {
-    setTasks(tasks.filter(task => task.id !== id))
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <p className="text-red-500">Error: {error}</p>
+      </div>
+    );
   }
 
   return (
@@ -93,6 +205,12 @@ const TaskList = () => {
         </div>
       </div>
 
+      {error && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded-md">
+          {error}
+        </div>
+      )}
+
       <div className="mb-6 p-4 border border-gray-200 rounded-md">
         <h3 className="text-sm font-medium text-gray-700 mb-3">Add New Task</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -102,19 +220,33 @@ const TaskList = () => {
               name="title"
               value={newTask.title}
               onChange={handleInputChange}
-              placeholder="Task title"
+              placeholder="Task title *"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div>
-            <input
-              type="text"
-              name="assignedTo"
-              value={newTask.assignedTo}
-              onChange={handleInputChange}
-              placeholder="Assign to"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            {userLoading ? (
+              <select 
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option>Loading users...</option>
+              </select>
+            ) : (
+              <select
+                name="assignedTo"
+                value={newTask.assignedTo}
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="">Select user...</option>
+                {users.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.email})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <input
@@ -138,7 +270,7 @@ const TaskList = () => {
             </select>
             <button
               onClick={handleAddTask}
-              className="px-3 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary"
+              className="px-3 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary-dark"
             >
               Add
             </button>
@@ -172,59 +304,66 @@ const TaskList = () => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => (
-                <tr key={task.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{task.title}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {task.assignedTo}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {task.dueDate}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {task.priority === 'high' && (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                        High
-                      </span>
-                    )}
-                    {task.priority === 'medium' && (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        Medium
-                      </span>
-                    )}
-                    {task.priority === 'low' && (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        Low
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={task.status}
-                      onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
-                        task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                        task.status === 'in-progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
-                        'bg-yellow-100 text-yellow-800 border-yellow-200'
-                      }`}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredTasks.map((task) => {
+                const assignedUser = users.find(u => u.id === task.assigned_to);
+                const assignedToName = assignedUser 
+                  ? `${assignedUser.name} (${assignedUser.email})`
+                  : task.assigned_to || 'Unassigned';
+
+                return (
+                  <tr key={task.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="font-medium text-gray-900">{task.title}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {assignedToName}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(task.due_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {task.priority === 'high' && (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                          High
+                        </span>
+                      )}
+                      {task.priority === 'medium' && (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                          Medium
+                        </span>
+                      )}
+                      {task.priority === 'low' && (
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Low
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                          task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                          task.status === 'in-progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                          'bg-yellow-100 text-yellow-800 border-yellow-200'
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
@@ -236,7 +375,7 @@ const TaskList = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TaskList
+export default TaskList;

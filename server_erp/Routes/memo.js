@@ -652,94 +652,83 @@ router.post('/memos/:id/approve', (req, res) => {
   });
 });
 
+
+
 router.post('/memos/:id/reject', (req, res) => {
-  const memoId = req.params.id;
-  const { user_id } = req.body;
+    const memoId = req.params.id;
+    const { userId } = req.body;
 
-  if (!user_id) {
-    return res.status(400).json({ message: 'User ID is required for rejection.' });
-  }
-
-  const roleApprovalMap = {
-    gmd: { field: 'approved_by_gmd', dependsOn: null },
-    finance: { field: 'approved_by_finance', dependsOn: 'approved_by_gmd' },
-    gmd2: { field: 'approved_by_gmd2', dependsOn: 'approved_by_finance' },
-    chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd2' }
-  };
-
-  const userSql = 'SELECT role FROM users WHERE id = ?';
-  db.query(userSql, [user_id], (userErr, userResults) => {
-    if (userErr || userResults.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+    if (!userId) {
+        return res.status(400).json({ message: 'User ID is required to reject memo' });
     }
 
-    const role = userResults[0].role;
-
-    if (!roleApprovalMap[role]) {
-      return res.status(403).json({ message: 'User role is not authorized to reject' });
-    }
-
-    if (role === 'gmd') {
-      const gmdCheckSql = `SELECT approved_by_gmd, approved_by_finance, approved_by_gmd2 FROM memos WHERE id = ?`;
-      db.query(gmdCheckSql, [memoId], (checkErr, checkResults) => {
-        if (checkErr || checkResults.length === 0) {
-          return res.status(404).json({ message: 'Memo not found' });
+    const getUserRoleSql = 'SELECT role FROM users WHERE id = ?';
+    db.query(getUserRoleSql, [userId], (err, userResults) => {
+        if (err || userResults.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        const memo = checkResults[0];
+        const role = userResults[0].role;
 
-        if (memo.approved_by_gmd === 0) {
-          // First GMD rejection
-          const updateSql = `UPDATE memos SET approved_by_gmd = -1 WHERE id = ?`;
-          db.query(updateSql, [memoId], (updateErr) => {
+        let updateClause = '';
+        let field = '';
+
+        switch (role) {
+            case 'gmd':
+                updateClause = 'rejected_by_gmd = 1';
+                field = 'rejected_by_gmd';
+                break;
+            case 'finance':
+                updateClause = 'rejected_by_finance = 1';
+                field = 'rejected_by_finance';
+                break;
+            case 'gmd2':
+                updateClause = 'rejected_by_gmd2 = 1';
+                field = 'rejected_by_gmd2';
+                break;
+            case 'chairman':
+                updateClause = 'rejected_by_chairman = 1';
+                field = 'rejected_by_chairman';
+                break;
+            default:
+                return res.status(403).json({ message: 'User role not authorized to reject memos' });
+        }
+
+        const rejectMemoSql = `UPDATE memos SET ${updateClause} WHERE id = ?`;
+        db.query(rejectMemoSql, [memoId], (updateErr, updateResults) => {
             if (updateErr) {
-              return res.status(500).json({ message: 'Error rejecting at GMD stage' });
+                return res.status(500).json({ message: 'Error rejecting memo' });
             }
-            return res.status(200).json({ message: 'Rejected by GMD', field: 'approved_by_gmd' });
-          });
-        } else if (memo.approved_by_gmd === 1 && memo.approved_by_finance === 1 && memo.approved_by_gmd2 === 0) {
-          // GMD acting as GMD2 rejection
-          const updateSql = `UPDATE memos SET approved_by_gmd2 = -1 WHERE id = ?`;
-          db.query(updateSql, [memoId], (updateErr) => {
-            if (updateErr) {
-              return res.status(500).json({ message: 'Error rejecting at GMD2 stage' });
+
+            if (updateResults.affectedRows === 0) {
+                return res.status(404).json({ message: 'Memo not found' });
             }
-            return res.status(200).json({ message: 'Rejected by GMD2', field: 'approved_by_gmd2' });
-          });
-        } else {
-          return res.status(400).json({ message: 'GMD cannot reject at this stage or already acted' });
-        }
-      });
-    } else {
-      const { field, dependsOn } = roleApprovalMap[role];
-      const checkSql = `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM memos WHERE id = ?`;
-      db.query(checkSql, [memoId], (checkErr, checkResults) => {
-        if (checkErr || checkResults.length === 0) {
-          return res.status(404).json({ message: 'Memo not found' });
-        }
 
-        const memo = checkResults[0];
-
-        if (memo[field] !== 0) {
-          return res.status(400).json({ message: `Already acted on by ${role}` });
-        }
-
-        if (dependsOn && memo[dependsOn] !== 1) {
-          return res.status(403).json({
-            message: `Cannot reject yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`
-          });
-        }
-
-        const updateSql = `UPDATE memos SET ${field} = -1 WHERE id = ?`;
-        db.query(updateSql, [memoId], (updateErr) => {
-          if (updateErr) {
-            return res.status(500).json({ message: 'Error updating rejection status' });
-          }
-          return res.status(200).json({ message: `Rejected by ${role}`, field });
+            res.status(200).json({
+                success: true,
+                message: 'Memo rejected successfully',
+                field,
+            });
         });
-      });
-    }
-  });
+    });
+});
+
+
+router.delete('/memos/:id', (req, res) => {
+    const memoId = req.params.id;
+
+    const deleteMemoSql = 'DELETE FROM memos WHERE id = ?';
+    db.query(deleteMemoSql, [memoId], (err, result) => {
+        if (err) {
+            return res.status(500).json({ message: 'Error deleting memo' });
+        }
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Memo not found' });
+        }
+
+        res.status(200).json({ message: 'Memo deleted successfully' });
+    });
 });
 
 

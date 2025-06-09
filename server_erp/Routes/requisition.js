@@ -226,7 +226,7 @@ router.get('/requisitions/user/:userId', (req, res) => {
 
 router.post('/requisitions/:id/reject', (req, res) => {
   const requisitionId = req.params.id;
-  const { user_id, reason } = req.body;
+  const { user_id } = req.body;
 
   if (!user_id) {
     return res.status(400).json({ message: 'User ID is required for rejection.' });
@@ -278,9 +278,9 @@ router.post('/requisitions/:id/reject', (req, res) => {
         });
       }
 
-      // Update rejection field and status
-      const updateSql = `UPDATE requisitions SET ${field} = 1, status = 'rejected', rejection_reason = ? WHERE id = ?`;
-      db.query(updateSql, [reason || null, requisitionId], (updateErr) => {
+      // Update rejection field and status (no reason)
+      const updateSql = `UPDATE requisitions SET ${field} = 1, status = 'rejected' WHERE id = ?`;
+      db.query(updateSql, [requisitionId], (updateErr) => {
         if (updateErr) {
           return res.status(500).json({ message: 'Error updating rejection status' });
         }
@@ -289,6 +289,8 @@ router.post('/requisitions/:id/reject', (req, res) => {
     });
   });
 });
+
+
 
 
 
@@ -325,6 +327,23 @@ router.get('/requisitions/:id', (req, res) => {
   });
 });
 
+router.delete('/requisitions/:id', (req, res) => {
+  const requisitionId = req.params.id;
 
+  const deleteQuery = 'DELETE FROM requisitions WHERE id = ?';
+
+  db.query(deleteQuery, [requisitionId], (err, result) => {
+    if (err) {
+      console.error('Error deleting requisition:', err);
+      return res.status(500).json({ message: 'Error deleting requisition' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Requisition not found' });
+    }
+
+    res.status(200).json({ message: 'Requisition deleted successfully' });
+  });
+});
 
 module.exports = router

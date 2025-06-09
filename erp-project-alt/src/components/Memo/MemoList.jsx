@@ -83,32 +83,50 @@ const MemoList = () => {
   };
 
 
-  const handleReject = async () => {
-    if (!selectedMemo) return;
+  const handleReject = async (memo) => {
+  if (!memo) return;
 
-    try {
-      const response = await axios.patch(
-        `http://localhost:7000/api/memos/${selectedMemo.id}/reject`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
+  try {
+    const response = await axios.post(
+      `http://localhost:7000/api/memos/${memo.id}/reject`,
+      { userId: user.id }, // ✅ match backend key
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    if (response.data?.success) {
+      const { field } = response.data;
+
+      const updatedMemos = memos.map(m =>
+        m.id === memo.id
+          ? {
+              ...m,
+              status: 'rejected',
+              [field]: -1,
+            }
+          : m
       );
 
-      if (response.data.success) {
-        const updatedMemos = memos.map(m =>
-          m.id === selectedMemo.id ? { ...m, status: 'rejected' } : m
-        );
+      setMemos(updatedMemos);
 
-        setMemos(updatedMemos);
-        setSelectedMemo(prev => ({ ...prev, status: 'rejected' }));
+      if (selectedMemo?.id === memo.id) {
+        setSelectedMemo(prev => ({
+          ...prev,
+          status: 'rejected',
+          [field]: -1,
+        }));
       }
-    } catch (err) {
-      setError('Failed to reject memo');
+
+      setError(null);
     }
-  };
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to reject memo');
+  }
+};
+
 
 
   const getStatusBadge = (status) => {
