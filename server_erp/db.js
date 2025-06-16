@@ -1,4 +1,4 @@
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise'); // Add /promise
 require('dotenv').config();
 
 const db = mysql.createPool({
@@ -8,14 +8,17 @@ const db = mysql.createPool({
   database: process.env.DB_NAME,
 });
 
-
-db.getConnection((err,connection)=>{
-      if (err) {
-    console.error('Database connection failed:', err.message);
-  } else {
+// Test connection with promise syntax
+async function testConnection() {
+  try {
+    const connection = await db.getConnection();
     console.log('✅ MySQL DB connected successfully');
-    connection.release(); // release connection back to pool
+    connection.release();
+  } catch (err) {
+    console.error('Database connection failed:', err.message);
   }
-})
+}
+
+testConnection();
+
 module.exports = db;
-// db.js

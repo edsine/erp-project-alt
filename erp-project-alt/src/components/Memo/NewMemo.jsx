@@ -6,19 +6,50 @@ import { useAuth } from '../../context/AuthContext'
 const NewMemo = () => {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [memoType, setMemoType] = useState('normal') // 'normal' or 'requisition'
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     priority: 'medium',
+    // Requisition-specific fields
+    requestedBy: '',
+    department: '',
+    requestedItems: '',
+    quantity: '',
+    estimatedCost: '',
+    justification: '',
+    urgency: 'normal',
+    budgetCode: '',
+    approvalRequired: false
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const handleMemoTypeChange = (type) => {
+    setMemoType(type)
+    // Reset form data when switching types
+    setFormData({
+      title: '',
+      content: '',
+      priority: 'medium',
+      requestedBy: '',
+      department: '',
+      requestedItems: '',
+      quantity: '',
+      estimatedCost: '',
+      justification: '',
+      urgency: 'normal',
+      budgetCode: '',
+      approvalRequired: false
+    })
+    setError('')
+  }
+
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }))
   }
 
@@ -28,11 +59,30 @@ const NewMemo = () => {
     setError('')
 
     try {
-      const response = await axios.post('http://localhost:7000/api/memos', {
+      const submitData = {
         title: formData.title,
         content: formData.content,
-        created_by: user.id
-      })
+        priority: formData.priority,
+        created_by: user.id,
+        memo_type: memoType
+      }
+
+      // Add requisition-specific data if it's a requisition memo
+      if (memoType === 'requisition') {
+        submitData.requisition_data = {
+          requestedBy: formData.requestedBy,
+          department: formData.department,
+          requestedItems: formData.requestedItems,
+          quantity: formData.quantity,
+          estimatedCost: formData.estimatedCost,
+          justification: formData.justification,
+          urgency: formData.urgency,
+          budgetCode: formData.budgetCode,
+          approvalRequired: formData.approvalRequired
+        }
+      }
+
+      const response = await axios.post('http://localhost:7000/api/memos', submitData)
 
       if (response.status === 201) {
         navigate('/memos')
@@ -49,6 +99,35 @@ const NewMemo = () => {
     <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
       <h2 className="text-xl font-bold mb-6">Create New Memo</h2>
       
+      {/* Memo Type Toggle */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">Memo Type</label>
+        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+          <button
+            type="button"
+            onClick={() => handleMemoTypeChange('normal')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+              memoType === 'normal'
+                ? 'bg-white text-primary shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Normal Memo
+          </button>
+          <button
+            type="button"
+            onClick={() => handleMemoTypeChange('requisition')}
+            className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+              memoType === 'requisition'
+                ? 'bg-white text-primary shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Memo with Requisition
+          </button>
+        </div>
+      </div>
+
       {error && (
         <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4">
           <div className="flex">
@@ -65,6 +144,7 @@ const NewMemo = () => {
       )}
 
       <form onSubmit={handleSubmit}>
+        {/* Common Fields */}
         <div className="mb-4">
           <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
             Title <span className="text-red-500">*</span>
@@ -112,7 +192,161 @@ const NewMemo = () => {
           </select>
         </div>
 
-        <div className="flex justify-end space-x-3">
+        {/* Requisition-specific Fields */}
+        {memoType === 'requisition' && (
+          <div className="border-t pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Requisition Details</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="requestedBy" className="block text-sm font-medium text-gray-700 mb-1">
+                  Requested By <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="requestedBy"
+                  name="requestedBy"
+                  value={formData.requestedBy}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  required
+                />
+              </div>
+
+              <div>
+                <label htmlFor="department" className="block text-sm font-medium text-gray-700 mb-1">
+                  Department <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  id="department"
+                  name="department"
+                  value={formData.department}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="requestedItems" className="block text-sm font-medium text-gray-700 mb-1">
+                Requested Items/Services <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="requestedItems"
+                name="requestedItems"
+                rows="3"
+                value={formData.requestedItems}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Describe the items or services being requested..."
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity
+                </label>
+                <input
+                  type="text"
+                  id="quantity"
+                  name="quantity"
+                  value={formData.quantity}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="e.g., 10 units, 5 hours, etc."
+                />
+              </div>
+
+              <div>
+                <label htmlFor="estimatedCost" className="block text-sm font-medium text-gray-700 mb-1">
+                  Estimated Cost
+                </label>
+                <input
+                  type="text"
+                  id="estimatedCost"
+                  name="estimatedCost"
+                  value={formData.estimatedCost}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="$0.00"
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label htmlFor="justification" className="block text-sm font-medium text-gray-700 mb-1">
+                Justification <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                id="justification"
+                name="justification"
+                rows="3"
+                value={formData.justification}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="Explain why this requisition is necessary..."
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label htmlFor="urgency" className="block text-sm font-medium text-gray-700 mb-1">
+                  Urgency Level
+                </label>
+                <select
+                  id="urgency"
+                  name="urgency"
+                  value={formData.urgency}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="budgetCode" className="block text-sm font-medium text-gray-700 mb-1">
+                  Budget Code
+                </label>
+                <input
+                  type="text"
+                  id="budgetCode"
+                  name="budgetCode"
+                  value={formData.budgetCode}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="e.g., DEPT-2024-001"
+                />
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="approvalRequired"
+                  name="approvalRequired"
+                  checked={formData.approvalRequired}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+                <label htmlFor="approvalRequired" className="ml-2 block text-sm text-gray-700">
+                  Manager approval required
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end space-x-3 pt-6 border-t">
           <button
             type="button"
             onClick={() => navigate('/memos')}
@@ -125,7 +359,7 @@ const NewMemo = () => {
             disabled={loading}
             className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            {loading ? 'Sending...' : 'Send Memo'}
+            {loading ? 'Sending...' : `Send ${memoType === 'requisition' ? 'Requisition ' : ''}Memo`}
           </button>
         </div>
       </form>
