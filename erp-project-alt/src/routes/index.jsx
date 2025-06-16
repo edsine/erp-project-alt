@@ -12,6 +12,11 @@ import NewLeave from '../components/Leave/NewLeave'
 import PayrollList from '../components/Payroll/PayrollList'
 import TaskList from '../components/Tasks/TaskList'
 import UserList from '../components/Users/UserList'
+import FileList from '../components/Files/FileList'
+import ClientFileList from '../components/Files/ClientFileList'
+import UploadFile from '../components/Files/UploadFile'
+import FileDetails from '../components/Files/FileDetails'
+import NewClient from '../components/Files/NewClient'
 
 const router = createBrowserRouter([
   {
@@ -42,6 +47,26 @@ const router = createBrowserRouter([
         path: '/tasks',
         element: <TaskList />,
       },
+      {
+        path: '/files/new-client',
+        element: <NewClient />,
+      },
+      {
+  path: '/files',
+  element: <FileList />,
+},
+{
+  path: '/files/:clientId',
+  element: <ClientFileList />,
+},
+{
+  path: '/files/:clientId/upload',
+  element: <UploadFile />,
+},
+{
+  path: '/files/:clientId/:fileId',
+  element: <FileDetails />,
+},
       {
         path: '/users',
         element: <UserList />,
