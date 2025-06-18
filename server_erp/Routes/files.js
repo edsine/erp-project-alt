@@ -8,6 +8,8 @@ const upload = require('../Middleware/uploadMiddleware');
 router.get('/files/clients', authMiddleware, fileController.getAllClients);
 router.get('/files/clients/:id', authMiddleware, fileController.getClientById);
 router.post('/files/clients', authMiddleware, fileController.createClient);
+router.put('/files/clients/:id', authMiddleware, fileController.updateClient);
+router.delete('/files/clients/:id', authMiddleware, fileController.deleteClient);
 
 // File routes
 router.get('/files', authMiddleware, fileController.getAllFiles);

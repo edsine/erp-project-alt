@@ -101,7 +101,7 @@ const NewClient = () => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="e.g. NITT"
+              placeholder="e.g. National Institute of Transport Technology"
             />
           </div>
 
@@ -117,7 +117,7 @@ const NewClient = () => {
               onChange={handleChange}
               required
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              placeholder="e.g. NITT001"
+              placeholder="e.g. NITT"
             />
             <p className="mt-1 text-xs text-gray-500">Unique identifier for the client</p>
           </div>
