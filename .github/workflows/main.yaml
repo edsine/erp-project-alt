@@ -9,7 +9,7 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: erp-be
   ECR_REPOSITORY2: erp-fe
-  ECS_SERVICE: erp-be
+  ECS_SERVICE: erp-be-service-buf4c1pn
   ECS_SERVICE2: erp-fe
   ECS_CLUSTER: staging-cluster
   ECS_TASK_DEFINITION: task-definition.json
