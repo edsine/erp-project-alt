@@ -9,10 +9,10 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: erp-be
   ECR_REPOSITORY2: erp-fe
-  ECS_SERVICE: erp-be-service-buf4c1pn
+  ECS_SERVICE: erp-be
   ECS_SERVICE2: erp-fe
   ECS_CLUSTER: staging-cluster
-  ECS_TASK_DEFINITION: erp-be
+  ECS_TASK_DEFINITION: task-definition.json
   BRANCH: ${{ github.head_ref || github.ref_name }}
   AWS_ASSUME_ROLE: arn:aws:iam::418295682157:role/github-action-pipeline
 
