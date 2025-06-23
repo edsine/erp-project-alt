@@ -30,7 +30,8 @@ runs:
         COMMIT_ID=$(echo ${{ inputs.branchTag }} | cut -c 1-7)
         IMAGE_TAG=$(echo ${{ inputs.branch }}-$COMMIT_ID)
         ECR_TAG=$(echo ${{ inputs.ecrRegistry }}/${{ inputs.ecrRepo }})
-        docker build -t $ECR_TAG:$IMAGE_TAG -t $ECR_TAG:${{ inputs.branch }} ${{ inputs.build-context }}
+        cd erp-project-alt
+        docker build -t $ECR_TAG:$IMAGE_TAG -t $ECR_TAG:${{ inputs.branch }} .
         docker tag $ECR_TAG:$IMAGE_TAG $ECR_TAG:${{ inputs.branch }}
         docker push $ECR_TAG:$IMAGE_TAG
         docker push $ECR_TAG:${{ inputs.branch }}

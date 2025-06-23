@@ -35,7 +35,7 @@ jobs:
           region: ${{ env.AWS_REGION }}
       - name: Build for Amazon ECS task
         id: build-image
-        uses: ./.github/workflows/actions/build
+        uses: ./.github/workflows/actions/build-backend
         with:
           branch: ${{ env.BRANCH }}
           ecrRepo: ${{ env.ECR_REPOSITORY }}
@@ -56,7 +56,7 @@ jobs:
           region: ${{ env.AWS_REGION }}
       - name: Build for Amazon ECS task
         id: build-image
-        uses: ./.github/workflows/actions/build
+        uses: ./.github/workflows/actions/build-frontend
         with:
           branch: ${{ env.BRANCH }}
           ecrRepo: ${{ env.ECR_REPOSITORY2 }}

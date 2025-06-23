@@ -1,0 +1,37 @@
+name: 'Build Docker Image'
+description: 'Build, tag, and push image to Amazon ECR'
+
+inputs:
+  ecrRegistry:
+    description: 'ECR Registry'
+    required: true
+  ecrRepo:
+    description: 'ECR Repo'
+    required: true
+  branch:
+    description: 'additional tag to identify latest build from branch'
+    required: true
+  branchTag:
+    description: 'additional tag to identify latest build from branch Tag'
+    default: ${{ github.sha }} 
+  build-context:
+    description: 'Path to the build context'
+    default: '.'
+
+
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build, tag, and push image to Amazon ECR
+      id: build_image
+      shell: bash
+      run: |
+        COMMIT_ID=$(echo ${{ inputs.branchTag }} | cut -c 1-7)
+        IMAGE_TAG=$(echo ${{ inputs.branch }}-$COMMIT_ID)
+        ECR_TAG=$(echo ${{ inputs.ecrRegistry }}/${{ inputs.ecrRepo }})
+        cd server_erp
+        docker build -t $ECR_TAG:$IMAGE_TAG -t $ECR_TAG:${{ inputs.branch }} .
+        docker tag $ECR_TAG:$IMAGE_TAG $ECR_TAG:${{ inputs.branch }}
+        docker push $ECR_TAG:$IMAGE_TAG
+        docker push $ECR_TAG:${{ inputs.branch }}
