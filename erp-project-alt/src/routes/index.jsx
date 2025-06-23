@@ -17,6 +17,7 @@ import ClientFileList from '../components/Files/ClientFileList'
 import UploadFile from '../components/Files/UploadFile'
 import FileDetails from '../components/Files/FileDetails'
 import NewClient from '../components/Files/NewClient'
+import EditClient from '../components/Files/EditClient'
 
 const router = createBrowserRouter([
   {
@@ -66,6 +67,11 @@ const router = createBrowserRouter([
 {
   path: '/files/:clientId/:fileId',
   element: <FileDetails />,
+},
+{
+  path:"/files/edit-client/:clientId",
+  element:<EditClient /> ,
+  
 },
       {
         path: '/users',

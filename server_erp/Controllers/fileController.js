@@ -62,6 +62,65 @@ exports.createClient = async (req, res) => {
   }
 };
 
+// Update client
+exports.updateClient = async (req, res) => {
+  const { name, code } = req.body;
+  if (!name || !code) {
+    return res.status(400).json({ success: false, message: 'Name and code are required' });
+  }
+
+  try {
+    // Check if client exists
+    const [client] = await db.query('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (client.length === 0) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    // Update client
+    await db.query('UPDATE clients SET name = ?, code = ? WHERE id = ?', [
+      name, 
+      code, 
+      req.params.id
+    ]);
+
+    res.json({ 
+      success: true, 
+      data: { id: req.params.id, name, code },
+      message: 'Client updated successfully'
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to update client' });
+  }
+};
+
+// Delete client
+exports.deleteClient = async (req, res) => {
+  try {
+    // First check if client exists
+    const [client] = await db.query('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (client.length === 0) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    // Check if client has files (optional - you might want to prevent deletion if files exist)
+    const [files] = await db.query('SELECT id FROM files WHERE client_id = ? LIMIT 1', [req.params.id]);
+    if (files.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot delete client with existing files' 
+      });
+    }
+
+    // Delete client
+    await db.query('DELETE FROM clients WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Client deleted successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to delete client' });
+  }
+};
+
 // Get all files
 exports.getAllFiles = async (req, res) => {
   const { client_id } = req.query;

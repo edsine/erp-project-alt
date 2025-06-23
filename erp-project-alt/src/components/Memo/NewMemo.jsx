@@ -18,8 +18,6 @@ const NewMemo = () => {
     quantity: '',
     estimatedCost: '',
     justification: '',
-    urgency: 'normal',
-    budgetCode: '',
     approvalRequired: false
   })
   const [error, setError] = useState('')
@@ -38,8 +36,6 @@ const NewMemo = () => {
       quantity: '',
       estimatedCost: '',
       justification: '',
-      urgency: 'normal',
-      budgetCode: '',
       approvalRequired: false
     })
     setError('')
@@ -76,8 +72,6 @@ const NewMemo = () => {
           quantity: formData.quantity,
           estimatedCost: formData.estimatedCost,
           justification: formData.justification,
-          urgency: formData.urgency,
-          budgetCode: formData.budgetCode,
           approvalRequired: formData.approvalRequired
         }
       }
@@ -291,41 +285,6 @@ const NewMemo = () => {
                 placeholder="Explain why this requisition is necessary..."
                 required
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label htmlFor="urgency" className="block text-sm font-medium text-gray-700 mb-1">
-                  Urgency Level
-                </label>
-                <select
-                  id="urgency"
-                  name="urgency"
-                  value={formData.urgency}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="budgetCode" className="block text-sm font-medium text-gray-700 mb-1">
-                  Budget Code
-                </label>
-                <input
-                  type="text"
-                  id="budgetCode"
-                  name="budgetCode"
-                  value={formData.budgetCode}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                  placeholder="e.g., DEPT-2024-001"
-                />
-              </div>
             </div>
 
             <div className="mb-4">

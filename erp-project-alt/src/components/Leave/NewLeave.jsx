@@ -52,34 +52,55 @@ const NewLeave = () => {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
-    if (!formData.type || !formData.startDate || !formData.endDate || !formData.reason) {
-      setError('Please fill all required fields')
-      setLoading(false)
-      return
-    }
-
-    if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      setError('End date must be after start date')
-      setLoading(false)
-      return
-    }
-
-    try {
-      // TODO: API call to create leave request
-      // For now, simulate creation
-      setTimeout(() => {
-        navigate('/leaves')
-      }, 1000)
-    } catch (err) {
-      setError(err.message || 'Failed to create leave request')
-    } finally {
-      setLoading(false)
-    }
+  if (!formData.type || !formData.startDate || !formData.endDate || !formData.reason) {
+    setError('Please fill all required fields')
+    setLoading(false)
+    return
   }
+
+  if (new Date(formData.startDate) > new Date(formData.endDate)) {
+    setError('End date must be after start date')
+    setLoading(false)
+    return
+  }
+
+  try {
+    const payload = new FormData()
+    payload.append('user_id', 1) // Replace with actual user_id from auth/session
+    payload.append('type', formData.type)
+    payload.append('start_date', formData.startDate)
+    payload.append('end_date', formData.endDate)
+    payload.append('reason', formData.reason)
+    payload.append('contact', formData.contact)
+
+    // Only upload one file, as your backend expects single file under `attachment`
+    if (formData.attachments.length > 0) {
+      payload.append('attachment', formData.attachments[0])
+    }
+
+    const response = await fetch('http://localhost:7000/api/leave', {
+      method: 'POST',
+      body: payload
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to submit leave request')
+    }
+
+    navigate('/leaves')
+  } catch (err) {
+    setError(err.message)
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
