@@ -24,14 +24,13 @@ const MemoList = () => {
         );
 
         if (response.data.success) {
-          // Transform the API data to include requisition info
+          // Transform the API data
           const transformedMemos = response.data.data.map(memo => ({
             ...memo,
-            sender: memo.created_by_name || `User ${memo.created_by}`,
+            sender: `User ${memo.created_by}`, // Replace with actual username if available
             date: new Date(memo.created_at).toLocaleDateString(),
             status: memo.status || 'submitted',
-            priority: memo.priority || 'medium',
-            isRequisition: memo.memo_type === 'requisition'
+            priority: 'medium'
           }));
           setMemos(transformedMemos);
         } else {
@@ -50,8 +49,7 @@ const MemoList = () => {
   const filteredMemos = memos.filter(memo =>
     memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (memo.isRequisition && memo.requested_items && memo.requested_items.toLowerCase().includes(searchTerm.toLowerCase()))
+    (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleMemoClick = (memo) => {
@@ -71,51 +69,65 @@ const MemoList = () => {
       );
 
       if (response.status === 200) {
+        console.log(response.data.message);
+
         alert(`✅ Success: ${response.data.message}`);
-        // Update memo list with the field that was approved
-        const updatedMemo = { 
-          ...memo, 
-          [response.data.field]: 1,
-          status: response.data.field === 'approved_by_chairman' ? 'approved' : memo.status
-        };
+        // Update memo list
+        const updatedMemo = { ...memo, status: 'approved' };
         setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
-        setSelectedMemo(updatedMemo);
+
       }
     } catch (error) {
       console.error('Approval failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
   };
+
 
   const handleReject = async (memo) => {
-    if (!memo) return;
+  if (!memo) return;
 
-    try {
-      const response = await axios.post(
-        `http://localhost:7000/api/memos/${memo.id}/reject`,
-        { userId: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
+  try {
+    const response = await axios.post(
+      `http://localhost:7000/api/memos/${memo.id}/reject`,
+      { userId: user.id }, // ✅ match backend key
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    if (response.data?.success) {
+      const { field } = response.data;
+
+      const updatedMemos = memos.map(m =>
+        m.id === memo.id
+          ? {
+              ...m,
+              status: 'rejected',
+              [field]: -1,
+            }
+          : m
       );
 
-      if (response.data?.success) {
-        const updatedMemo = { 
-          ...memo, 
+      setMemos(updatedMemos);
+
+      if (selectedMemo?.id === memo.id) {
+        setSelectedMemo(prev => ({
+          ...prev,
           status: 'rejected',
-          [response.data.field]: 1
-        };
-        
-        setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
-        setSelectedMemo(updatedMemo);
-        setError(null);
+          [field]: -1,
+        }));
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject memo');
+
+      setError(null);
     }
-  };
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to reject memo');
+  }
+};
+
+
 
   const getStatusBadge = (status) => {
     switch (status.toLowerCase()) {
@@ -172,31 +184,6 @@ const MemoList = () => {
     }
   };
 
-  const canApproveMemo = (memo) => {
-    if (!user || !memo) return false;
-    
-    const role = user.role;
-    
-    // GMD can approve in two different stages
-    if (role === 'gmd') {
-      return memo.approved_by_gmd === 0 || 
-             (memo.approved_by_gmd === 1 && memo.approved_by_finance === 1 && memo.approved_by_gmd2 === 0);
-    }
-    
-    // Other roles can only approve if their specific field is 0
-    const roleApprovalMap = {
-      finance: 'approved_by_finance',
-      gmd2: 'approved_by_gmd2',
-      chairman: 'approved_by_chairman'
-    };
-    
-    if (roleApprovalMap[role]) {
-      return memo[roleApprovalMap[role]] === 0;
-    }
-    
-    return false;
-  };
-
   if (loading) return <p className="text-center py-4">Loading memos...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
@@ -233,17 +220,11 @@ const MemoList = () => {
                 <div
                   key={memo.id}
                   onClick={() => handleMemoClick(memo)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${memo.status === 'submitted' ? 'border-l-4 border-l-primary' : ''} ${selectedMemo?.id === memo.id ? 'bg-gray-100' : ''}`}
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${memo.status === 'submitted' ? 'border-l-4 border-l-primary' : ''
+                    } ${selectedMemo?.id === memo.id ? 'bg-gray-100' : ''}`}
                 >
                   <div className="flex justify-between items-start">
-                    <h3 className="font-medium">
-                      {memo.title}
-                      {memo.isRequisition && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          Requisition
-                        </span>
-                      )}
-                    </h3>
+                    <h3 className="font-medium">{memo.title}</h3>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo.status).className}`}>
                       {getStatusBadge(memo.status).icon}
                       {getStatusBadge(memo.status).text}
@@ -251,11 +232,6 @@ const MemoList = () => {
                   </div>
                   <p className="text-sm text-gray-500">{memo.sender}</p>
                   <p className="text-xs text-gray-400">{memo.date}</p>
-                  {memo.isRequisition && memo.requested_items && (
-                    <p className="text-xs text-gray-500 mt-1 truncate">
-                      Items: {memo.requested_items}
-                    </p>
-                  )}
                 </div>
               ))
             ) : (
@@ -271,20 +247,12 @@ const MemoList = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-xl font-bold">
-                  {selectedMemo.title}
-                  {selectedMemo.isRequisition && (
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                      Requisition
-                    </span>
-                  )}
-                </h2>
+                <h2 className="text-xl font-bold">{selectedMemo.title}</h2>
                 <p className="text-sm text-gray-500">From: {selectedMemo.sender}</p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
                 <div className="mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo.status).className}`}>
-                    {getStatusBadge(selectedMemo.status).icon}
-                    {getStatusBadge(selectedMemo.status).text}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo.status)}`}>
+                    {selectedMemo.status}
                   </span>
                 </div>
               </div>
@@ -298,43 +266,6 @@ const MemoList = () => {
               </button>
             </div>
 
-            {/* Requisition details if this is a requisition memo */}
-            {selectedMemo.isRequisition && (
-              <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-medium text-gray-700 mb-3">Requisition Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Requested By:</p>
-                    <p className="text-sm font-medium">{selectedMemo.requested_by || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Department:</p>
-                    <p className="text-sm font-medium">{selectedMemo.department || 'N/A'}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm text-gray-600">Requested Items/Services:</p>
-                    <p className="text-sm font-medium">{selectedMemo.requested_items || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Quantity:</p>
-                    <p className="text-sm font-medium">{selectedMemo.quantity || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Estimated Cost:</p>
-                    <p className="text-sm font-medium">{selectedMemo.estimated_cost || 'N/A'}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm text-gray-600">Justification:</p>
-                    <p className="text-sm font-medium">{selectedMemo.justification || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Approval Required:</p>
-                    <p className="text-sm font-medium">{selectedMemo.approval_required ? 'Yes' : 'No'}</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="prose max-w-none mb-6">
               <pre className="whitespace-pre-wrap font-sans">{selectedMemo.content}</pre>
             </div>
@@ -344,11 +275,11 @@ const MemoList = () => {
               <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_gmd ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                 GMD 1: {selectedMemo.approved_by_gmd ? 'Approved' : 'Pending'}
               </div>
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_finance ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Finance: {selectedMemo.approved_by_finance ? 'Approved' : 'Pending'}
-              </div>
               <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_gmd2 ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                 GMD 2: {selectedMemo.approved_by_gmd2 ? 'Approved' : 'Pending'}
+              </div>
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_finance ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
+                Finance: {selectedMemo.approved_by_finance ? 'Approved' : 'Pending'}
               </div>
               <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_chairman ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                 Chairman: {selectedMemo.approved_by_chairman ? 'Approved' : 'Pending'}
@@ -356,24 +287,32 @@ const MemoList = () => {
             </div>
 
             {/* Approval buttons for authorized roles */}
-            {selectedMemo.status === 'submitted' && canApproveMemo(selectedMemo) && (
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  onClick={() => handleReject(selectedMemo)}
-                  disabled={loading}
-                  className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {loading ? 'Processing...' : 'Reject'}
-                </button>
-                <button
-                  onClick={() => handleApprove(selectedMemo)}
-                  disabled={loading}
-                  className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {loading ? 'Processing...' : 'Approve'}
-                </button>
-              </div>
-            )}
+            {/* Approval buttons for authorized roles */}
+            {selectedMemo.status === 'submitted' &&
+              (user?.role === 'gmd' ||
+                user?.role === 'finance' ||
+                user?.role === 'gmd2' ||
+                user?.role === 'chairman') && (
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => handleReject(selectedMemo)}
+                    disabled={loading}
+                    className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                  >
+                    {loading ? 'Processing...' : 'Reject'}
+                  </button>
+                  <button
+                    onClick={() => handleApprove(selectedMemo)}
+                    disabled={loading}
+                    className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                  >
+                    {loading ? 'Processing...' : 'Approve'}
+                  </button>
+                </div>
+              )}
+
           </div>
         </div>
       )}
