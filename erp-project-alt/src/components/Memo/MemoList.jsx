@@ -4,6 +4,8 @@ import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
 const MemoList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
@@ -15,7 +17,7 @@ const MemoList = () => {
     const fetchMemos = async () => {
       try {
         const response = await axios.get(
-          `http://localhost:7000/api/memos/user/${user.id}`,
+          `${BASE_URL}/memos/user/${user.id}`,
           {
             headers: {
               Authorization: `Bearer ${user.token}`,
@@ -59,7 +61,7 @@ const MemoList = () => {
   const handleApprove = async (memo) => {
     try {
       const response = await axios.post(
-        `http://localhost:7000/api/memos/${memo.id}/approve`,
+        `${BASE_URL}/memos/${memo.id}/approve`,
         { user_id: user.id },
         {
           headers: {
@@ -88,7 +90,7 @@ const MemoList = () => {
 
   try {
     const response = await axios.post(
-      `http://localhost:7000/api/memos/${memo.id}/reject`,
+      `${BASE_URL}/memos/${memo.id}/reject`,
       { userId: user.id }, // ✅ match backend key
       {
         headers: {

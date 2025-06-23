@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
 const UploadFile = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { clientId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -61,7 +63,7 @@ const UploadFile = () => {
     data.append('uploaded_by', user.id);
 
     try {
-      const response = await axios.post('http://localhost:7000/api/files', data, {
+      const response = await axios.post('${BASE_URL}/files', data, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`

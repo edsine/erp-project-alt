@@ -3,6 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const ProjectDetail = () => {
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -13,7 +15,7 @@ const ProjectDetail = () => {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await fetch(`http://localhost:7000/api/projects/${id}`);
+        const response = await fetch(`${BASE_URL}/projects/${id}`);
         const data = await response.json();
         
         if (response.ok) {
@@ -34,13 +36,13 @@ const ProjectDetail = () => {
   const handleDeleteDocument = async (docId) => {
     if (window.confirm('Are you sure you want to delete this document?')) {
       try {
-        const response = await fetch(`http://localhost:7000/api/projects/documents/${docId}`, {
+        const response = await fetch(`${BASE_URL}/projects/documents/${docId}`, {
           method: 'DELETE',
         });
 
         if (response.ok) {
           // Refresh project data
-          const updatedResponse = await fetch(`http://localhost:7000/api/projects/${id}`);
+          const updatedResponse = await fetch(`${BASE_URL}/projects/${id}`);
           const updatedData = await updatedResponse.json();
           setProject(updatedData.data);
         } else {

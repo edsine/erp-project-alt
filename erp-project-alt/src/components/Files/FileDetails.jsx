@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
 const FileDetails = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { clientId, fileId } = useParams();
   const navigate = useNavigate();
   const [file, setFile] = useState(null);
@@ -19,7 +21,7 @@ const FileDetails = () => {
           return;
         }
 
-        const response = await axios.get(`http://localhost:7000/api/files/${fileId}`, {
+        const response = await axios.get(`${BASE_URL}/files/${fileId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFile(response.data.data);
@@ -42,7 +44,7 @@ const FileDetails = () => {
           return;
         }
 
-        await axios.delete(`http://localhost:7000/api/files/${fileId}`, {
+        await axios.delete(`${BASE_URL}/files/${fileId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         navigate(`/files/${clientId}`);
@@ -105,7 +107,7 @@ const FileDetails = () => {
         <div className="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-md">
           {file.type.startsWith('image/') ? (
             <img
-              src={`http://localhost:7000/${file.path}`}
+              src={`${BASE_URL}/${file.path}`}
               alt={file.name}
               className="max-h-48 max-w-full"
             />
@@ -118,7 +120,7 @@ const FileDetails = () => {
             </div>
           )}
           <a
-            href={`http://localhost:7000/${file.path}`}
+            href={`${BASE_URL}/${file.path}`}
             download
             className="mt-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
           >

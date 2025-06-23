@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from "../../context/AuthContext";
 
 const RequisitionList = () => {
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const [requisitions, setRequisitions] = useState([]);
   const { user } = useAuth();
   const [selectedRequisition, setSelectedRequisition] = useState(null);
@@ -13,7 +15,7 @@ const RequisitionList = () => {
   useEffect(() => {
     const fetchRequisitions = async () => {
       try {
-        const response = await fetch(`http://localhost:7000/api/requisitions/user/${user.id}`);
+        const response = await fetch(`${BASE_URL}/requisitions/user/${user.id}`);
         const data = await response.json();
 
         if (response.ok) {
@@ -51,7 +53,7 @@ const RequisitionList = () => {
 
 const handleApprove = async (id) => {
   try {
-    const response = await fetch(`http://localhost:7000/api/requisitions/${id}/approve`, {
+    const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.id })  // <-- include this
@@ -86,7 +88,7 @@ const handleApprove = async (id) => {
 
 const handleReject = async (id) => {
   try {
-    const response = await fetch(`http://localhost:7000/api/requisitions/${id}/reject`, {
+    const response = await fetch(`${BASE_URL}/requisitions/${id}/reject`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user_id: user.id }),  // <-- Include user_id here

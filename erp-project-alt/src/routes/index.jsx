@@ -20,6 +20,10 @@ import NewClient from '../components/Files/NewClient'
 import EditClient from '../components/Files/EditClient'
 
 const router = createBrowserRouter([
+    {
+    path: '/login',
+    element: <Login />,
+  },
   {
     path: '/',
     element: <DashboardLayout />,
@@ -91,10 +95,7 @@ const router = createBrowserRouter([
       },
     ],
   },
-  {
-    path: '/login',
-    element: <Login />,
-  },
+
   {
     path: '/register',
     element: <Register />,

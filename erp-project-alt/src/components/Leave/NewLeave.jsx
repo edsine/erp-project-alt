@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const NewLeave = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     type: 'annual',
@@ -82,7 +84,7 @@ const NewLeave = () => {
       payload.append('attachment', formData.attachments[0])
     }
 
-    const response = await fetch('http://localhost:7000/api/leave', {
+    const response = await fetch(`${BASE_URL}/leave`, {
       method: 'POST',
       body: payload
     })

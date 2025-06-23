@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 
 const UserList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,7 +21,7 @@ const UserList = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('http://localhost:7000/api/users');
+        const response = await fetch(`${BASE_URL}/users`);
         if (!response.ok) {
           throw new Error('Failed to fetch users');
         }
@@ -55,7 +57,7 @@ const UserList = () => {
   }
 
   try {
-    const response = await fetch('http://localhost:7000/api/users', {
+    const response = await fetch(`${BASE_URL}/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +93,7 @@ const UserList = () => {
   const handleStatusChange = async (id, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     try {
-      const response = await fetch(`http://localhost:7000/api/users/${id}/status`, {
+      const response = await fetch(`${BASE_URL}/users/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -113,7 +115,7 @@ const UserList = () => {
 
   const handleDeleteUser = async (id) => {
     try {
-      const response = await fetch(`http://localhost:7000/api/users/${id}`, {
+      const response = await fetch(`${BASE_URL}/users/${id}`, {
         method: 'DELETE',
       });
 

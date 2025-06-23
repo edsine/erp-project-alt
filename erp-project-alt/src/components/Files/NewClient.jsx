@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const NewClient = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -39,7 +41,7 @@ const NewClient = () => {
       }
 
       const response = await axios.post(
-        'http://localhost:7000/api/files/clients',
+        '${BASE_URL}/files/clients',
         formData,
         {
           headers: {

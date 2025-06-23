@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 const TaskList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -24,7 +26,7 @@ const TaskList = () => {
       
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:7000/api/tasks/user/${user.id}`);
+        const response = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch tasks');
@@ -49,7 +51,7 @@ const TaskList = () => {
     const fetchUsers = async () => {
       try {
         setUserLoading(true);
-        const response = await fetch('http://localhost:7000/api/users');
+        const response = await fetch(`${BASE_URL}/users`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch users');
@@ -94,7 +96,7 @@ const filteredTasks = tasks.filter(task => {
   }
 
   try {
-    const response = await fetch('http://localhost:7000/api/tasks', {
+    const response = await fetch(`${BASE_URL}/tasks`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -137,7 +139,7 @@ const filteredTasks = tasks.filter(task => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const response = await fetch(`http://localhost:7000/api/tasks/${id}`, {
+      const response = await fetch(`${BASE_URL}/tasks/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -160,7 +162,7 @@ const filteredTasks = tasks.filter(task => {
 
   const handleDeleteTask = async (id) => {
     try {
-      const response = await fetch(`http://localhost:7000/api/tasks/${id}`, {
+      const response = await fetch(`${BASE_URL}/tasks/${id}`, {
         method: 'DELETE'
       });
 

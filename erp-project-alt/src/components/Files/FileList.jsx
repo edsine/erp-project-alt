@@ -4,6 +4,8 @@ import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
 const FileList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +23,7 @@ const FileList = () => {
           return;
         }
         
-        const response = await axios.get('http://localhost:7000/api/files/clients', {
+        const response = await axios.get(`${BASE_URL}/files/clients`, {
           headers: {
             Authorization: `Bearer ${token}`
           }

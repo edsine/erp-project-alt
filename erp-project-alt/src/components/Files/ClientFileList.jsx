@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+
 const ClientFileList = () => {
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { clientId } = useParams();
   const navigate = useNavigate();
   const [client, setClient] = useState(null);
@@ -25,10 +28,10 @@ const ClientFileList = () => {
         }
 
         const [clientRes, filesRes] = await Promise.all([
-          axios.get(`http://localhost:7000/api/files/clients/${clientId}`, {
+          axios.get(`${BASE_URL}/files/clients/${clientId}`, {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          axios.get(`http://localhost:7000/api/files?client_id=${clientId}`, {
+          axios.get(`${BASE_URL}/files?client_id=${clientId}`, {
             headers: { Authorization: `Bearer ${token}` }
           })
         ]);
@@ -63,7 +66,7 @@ const ClientFileList = () => {
 
     if (window.confirm('Are you sure you want to delete this file?')) {
       try {
-        await axios.delete(`http://localhost:7000/api/files/${fileId}`, {
+        await axios.delete(`${BASE_URL}/api/files/${fileId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setFiles(files.filter(file => file.id !== fileId));
@@ -81,7 +84,7 @@ const ClientFileList = () => {
     }
 
     try {
-      const response = await axios.get(`http://localhost:7000/api/files/download/${fileId}`, {
+      const response = await axios.get(`${BASE_URL}/api/files/download/${fileId}`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob'
       });
@@ -191,7 +194,7 @@ const ClientFileList = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <a
-                        href={`http://localhost:7000/api/files/${file.id}/view`}
+                        href={`${BASE_URL}/api/files/${file.id}/view`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:text-primary-dark"

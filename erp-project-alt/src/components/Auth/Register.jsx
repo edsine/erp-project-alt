@@ -190,7 +190,7 @@ const Register = () => {
         </form>
         <div className="text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <Link to="/login" className="font-medium text-primary hover:text-primary">
+          <Link to="/" className="font-medium text-primary hover:text-primary">
             Sign in
           </Link>
         </div>

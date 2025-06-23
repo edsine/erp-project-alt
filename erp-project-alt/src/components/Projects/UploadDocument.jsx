@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const UploadDocument = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -19,7 +21,7 @@ const UploadDocument = () => {
   useEffect(() => {
     const fetchProject = async () => {
       try {
-        const response = await fetch(`http://localhost:7000/api/projects/${id}`);
+        const response = await fetch(`${BASE_URL}/projects/${id}`);
         const data = await response.json();
         
         if (response.ok) {
@@ -71,7 +73,7 @@ const UploadDocument = () => {
     formDataToSend.append('uploaded_by', user.id);
 
     try {
-      const response = await fetch('http://localhost:7000/api/projects/documents', {
+      const response = await fetch(`${BASE_URL}/projects/documents`, {
         method: 'POST',
         body: formDataToSend,
       });

@@ -35,7 +35,7 @@ const NewProject = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:7000/api/projects', {
+      const response = await fetch(`${BASE_URL}/projects`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

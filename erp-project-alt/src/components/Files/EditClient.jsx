@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 const EditClient = () => {
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+
   const { clientId } = useParams();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -18,7 +21,7 @@ const EditClient = () => {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.get(
-          `http://localhost:7000/api/files/clients/${clientId}`,
+          `${BASE_URL}/files/clients/${clientId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setFormData(response.data.data);
@@ -46,7 +49,7 @@ const EditClient = () => {
     try {
       const token = localStorage.getItem('token');
       await axios.put(
-        `http://localhost:7000/api/files/clients/${clientId}`,
+        `${BASE_URL}/files/clients/${clientId}`,
         formData,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -67,7 +70,7 @@ const EditClient = () => {
       try {
         const token = localStorage.getItem('token');
         await axios.delete(
-          `http://localhost:7000/api/files/clients/${clientId}`,
+          `${BASE_URL}/files/clients/${clientId}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         navigate('/files');

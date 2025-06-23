@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const ProjectList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
@@ -15,7 +17,7 @@ const ProjectList = () => {
 const fetchProjects = async () => {
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch('http://localhost:7000/api/projects', {
+    const response = await fetch(`${BASE_URL}/projects`, {
       headers: {
         Authorization: `Bearer ${token}`, // Include the token
       },

@@ -28,7 +28,7 @@ const NewMemo = () => {
     setError('')
 
     try {
-      const response = await axios.post('http://localhost:7000/api/memos', {
+      const response = await axios.post(`${BASE_URL}/memos`, {
         title: formData.title,
         content: formData.content,
         created_by: user.id

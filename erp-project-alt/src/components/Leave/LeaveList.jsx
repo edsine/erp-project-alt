@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
 const LeaveList = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const [leaves, setLeaves] = useState([])
   const [selectedLeave, setSelectedLeave] = useState(null)
@@ -13,7 +15,7 @@ const LeaveList = () => {
   useEffect(() => {
     const fetchLeaves = async () => {
       try {
-        const res = await fetch('http://localhost:7000/api/leave')
+        const res = await fetch('${BASE_URL}/leave')
         const data = await res.json()
         setLeaves(data)
       } catch (err) {
@@ -44,7 +46,7 @@ const LeaveList = () => {
 
   try {
     if (newStatus === 'approved') {
-      const res = await fetch(`http://localhost:7000/api/leave/${id}/approve`, {
+      const res = await fetch(`${BASE_URL}/leave/${id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: user.id })
