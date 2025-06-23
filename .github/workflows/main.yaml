@@ -8,8 +8,10 @@ on:
 env:
   AWS_REGION: eu-west-1
   ECR_REPOSITORY: erp-be
-  ECS_SERVICE: erp-backend
-  ECS_CLUSTER: production-cluster
+  ECR_REPOSITORY2: erp-fe
+  ECS_SERVICE: erp-be
+  ECS_SERVICE2: erp-fe
+  ECS_CLUSTER: staging-cluster
   ECS_TASK_DEFINITION: task-definition.json
   BRANCH: ${{ github.head_ref || github.ref_name }}
   AWS_ASSUME_ROLE: arn:aws:iam::418295682157:role/github-action-pipeline
@@ -39,8 +41,30 @@ jobs:
           ecrRepo: ${{ env.ECR_REPOSITORY }}
           ecrRegistry: ${{ steps.login-ecr.outputs.registry }}
           build-context: 'server_erp'
+
+  buildImagebe:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Login Amazon ECR
+        id: login-ecr
+        uses: ./.github/workflows/actions/config/login-oidc
+        with:
+          role-to-assume: ${{ env.AWS_ASSUME_ROLE }}
+          region: ${{ env.AWS_REGION }}
+      - name: Build for Amazon ECS task
+        id: build-image
+        uses: ./.github/workflows/actions/build
+        with:
+          branch: ${{ env.BRANCH }}
+          ecrRepo: ${{ env.ECR_REPOSITORY2 }}
+          ecrRegistry: ${{ steps.login-ecr.outputs.registry }}
+          build-context: 'erp-project-alt'
+
   deploy:
-    name: Deploy
+    name: Deploy Backend to Amazon ECS
     runs-on: ubuntu-latest
     needs: [buildImage]
     steps:
@@ -60,6 +84,31 @@ jobs:
           taskDefinition: ${{ env.ECS_TASK_DEFINITION }}
           service: ${{ env.ECS_SERVICE }}
           containerName: ${{ env.ECS_SERVICE }}
+          ecrRepo: ${{ env.ECR_REPOSITORY }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          ecrRegistry: ${{ steps.login-ecr.outputs.registry }}
+
+  deploy:
+    name: Deploy Frontend to Amazon ECS
+    runs-on: ubuntu-latest
+    needs: [buildImagebe]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Login Amazon ECR
+        id: login-ecr
+        uses: ./.github/workflows/actions/config/login-oidc
+        with:
+          role-to-assume: ${{ env.AWS_ASSUME_ROLE }}
+          region: ${{ env.AWS_REGION }}
+      - name: Deploy Amazon ECS task
+        id: deploy_image
+        uses: ./.github/workflows/actions/deploy
+        with:
+          branch: ${{ env.BRANCH }}
+          taskDefinition: ${{ env.ECS_TASK_DEFINITION }}
+          service: ${{ env.ECS_SERVICE2 }}
+          containerName: ${{ env.ECS_SERVICE2 }}
           ecrRepo: ${{ env.ECR_REPOSITORY }}
           cluster: ${{ env.ECS_CLUSTER }}
           ecrRegistry: ${{ steps.login-ecr.outputs.registry }}
