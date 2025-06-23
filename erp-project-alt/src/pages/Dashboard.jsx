@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from "../context/AuthContext";
 
 const Dashboard = () => {
+  const { user } = useAuth()
   const [stats] = useState({
     memos: 12,
     requisitions: 5,
@@ -16,9 +18,17 @@ const Dashboard = () => {
     { id: 4, type: 'Leave', title: 'Annual Leave Request', time: '3 days ago' },
   ]
 
+  // Extract first name from user.name (assuming it's "First Last" format)
+  const getFirstName = () => {
+    if (user?.name) {
+      return user.name.split(' ')[0]
+    }
+    return 'User' // fallback if name is not available
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <h1 className="text-2xl text-primary mt-6 font-bold">Welcome, {getFirstName()}.</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white p-6 rounded-lg shadow-md">

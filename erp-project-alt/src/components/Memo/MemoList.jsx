@@ -194,7 +194,7 @@ const MemoList = () => {
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Memos</h2>
-            {user.role !== 'gmd' && user.role !== 'finance' && user.role !== 'chairman' && (
+            {user.role !== 'gmd' &&  user.role !== 'chairman' && (
               <Link
                 to="/memos/new"
                 className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"

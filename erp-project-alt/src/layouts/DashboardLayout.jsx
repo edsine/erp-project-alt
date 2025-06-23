@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
+import logo from '../assets/pgl_logo.png'
 
 const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
-  const defaultAvatar = 'https://randomuser.me/api/portraits/men/1.jpg';
+const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
   const [sidebarOpen, setSidebarOpen] = useState(false) // Default to closed on mobile
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const navigate = useNavigate()
@@ -96,7 +97,7 @@ const DashboardLayout = () => {
           </button>
         </div>
         
-        <nav className="p-4">
+        <nav className="p-4 mt-5">
           <ul className="space-y-2">
             <li>
               <Link
@@ -188,7 +189,7 @@ const DashboardLayout = () => {
             </li>
             {user.role === 'finance' && (
               <li>
-                <Link
+                {/* <Link
                   to="/payroll"
                   onClick={closeSidebar}
                   className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
@@ -197,10 +198,14 @@ const DashboardLayout = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Payroll</span>}
-                </Link>
+                </Link> */}
               </li>
             )}
           </ul>
+          <div className="p-4 mt-44 flex justify-center">
+  <img src={logo} alt="PGL Logo" className="w- mx-auto mt-6" />
+</div>
+
         </nav>
       </div>
 
@@ -240,12 +245,12 @@ const DashboardLayout = () => {
             {/* Right side items */}
             <div className="flex items-center space-x-2 sm:space-x-4">
               {/* Notifications */}
-              <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary">
+              {/* <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary">
                 <span className="sr-only">View notifications</span>
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-              </button>
+              </button> */}
 
               {/* Profile dropdown */}
               <div className="relative" ref={dropdownRef}>               
@@ -280,7 +285,7 @@ const DashboardLayout = () => {
                       Sign out
                     </button>
                   </div>
-                )}
+                  )}
               </div>
             </div>
           </div>
