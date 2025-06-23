@@ -1,0 +1,62 @@
+name: 'Build Docker Image'
+description: 'Build, tag, and push image to Amazon ECR'
+
+inputs:
+  ecrRegistry:
+    description: 'ECR Registry'
+    required: true
+  ecrRepo:
+    description: 'ECR Repo'
+    required: true
+  branch:
+    description: 'additional tag to identify latest build from branch'
+    required: true
+  branchTag:
+    description: 'additional tag to identify latest build from branch Tag'
+    default: ${{ github.sha }} 
+  cluster:
+    description: 'ECS cluster'
+    required: true
+  containerName:
+    description: 'Container name'
+    required: true
+  service:
+    description: 'ECS service'
+    required: true
+  taskDefinition:
+    description: 'ECS task definition'
+    required: true
+  variable:
+    description: 'env for respective environment'
+    required: true
+
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Tag image from Amazon ECR
+      id: build_image
+      shell: bash
+      run: |
+        COMMIT_ID=$(echo ${{ inputs.branchTag }} | cut -c 1-7)
+        IMAGE_TAG=$(echo ${{ inputs.branch }}-$COMMIT_ID)
+        ECR_TAG=$(echo ${{ inputs.ecrRegistry }}/${{ inputs.ecrRepo }})
+        echo "image=$ECR_TAG:$IMAGE_TAG" >> $GITHUB_OUTPUT
+    - name: Download task definition
+      shell: bash
+      run: |
+        aws ecs describe-task-definition --task-definition  ${{ inputs.containerName }} --query taskDefinition > task-definition.json        
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ inputs.taskDefinition }}
+        container-name: ${{ inputs.containerName }}
+        image: ${{ steps.build_image.outputs.image }}
+    - name: Deploy Amazon ECS task definition.outputs.image
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ inputs.service }}
+        cluster: ${{ inputs.cluster }}
+        wait-for-service-stability: true

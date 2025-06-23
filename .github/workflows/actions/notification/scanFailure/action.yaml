@@ -1,0 +1,64 @@
+name: 'Scan Failure Notification'
+description: 'Scan failure notification via Slack'
+
+inputs:
+  actor:
+    description: 'Actor'
+    default: ${{ github.actor }}
+  branch:
+    description: 'Branch name'
+    default: ${{ github.base_ref || github.ref_name }}
+  repo:
+    description: 'repository name'
+    default: ${{ github.event.repository.name }}
+  buildResult:
+    description: 'Build result'
+    default: ${{ github.event.repository.name }}
+  buildImageResult:
+    description: 'Build image result'
+    default: ${{ github.event.repository.name }}
+  scanResult:
+    description: 'Scan result'
+    default: ${{ github.event.repository.name }}
+  deployResult:
+    description: 'Deploy result'
+    default: ${{ github.event.repository.name }}
+  testResult:
+    description: 'Test result'
+    default: ${{ github.event.repository.name }}
+  slack:
+    description: 'Slack Webhook'
+    default: ${{ github.event.repository.name }}    
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send slack message on failure
+      id: send-notification
+      shell: bash
+      run: |
+        BUILD=$(echo ${{ inputs.buildResult }})
+        BUILD_IMAGE=$(echo ${{ inputs.buildImageResult }})
+        SCAN=$(echo ${{ inputs.scanResult }})
+        DEPLOY=$(echo ${{ inputs.deployResult }})
+        TEST=$(echo ${{ inputs.testResult }})
+
+
+        output=" "
+        if [[ $BUILD == "failure" ]];
+        then
+          output=$(echo "Build Stage")
+        elif [[ $BUILD_IMAGE == "failure" ]];
+        then
+          output=$(echo "Build Image Stage")
+        elif [[ $SCAN == "failure" ]];
+        then
+          output=$(echo "Scan Stage")
+        elif [[ $DEPLOY == "failure" ]];
+        then
+          output=$(echo "Deploy Stage")
+        elif [[ $TEST == "failure" ]];
+        then
+         output=$(echo "Test Stage")
+        fi
+        curl -X POST -H 'Content-type: application/json'  --data '{  "username": "Server",  "attachments": [ { "color": "danger", "fields": [{"title" : "Service Deployment Alert", "value": " \n - Repository: '"${{ inputs.repo }}"' \n - Author: '"${{ inputs.actor }}"' \n - Branch: '"${{ inputs.branch }}"' \n - Status: Failed \n - Stage: '"$output"' ", "short": "false" }]} ]}' ${{ inputs.slack }}

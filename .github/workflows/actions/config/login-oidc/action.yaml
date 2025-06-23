@@ -1,0 +1,38 @@
+name: 'Login to AWS using OIDC'
+description: 'Configure AWS credentials and login to AWS'
+
+inputs:
+  role-to-assume:
+    description: 'IAM role to assume'
+    required: true
+  region:
+    description: 'AWS region'
+    required: true
+
+outputs:
+  registry:
+    description: 'ECR Registry'
+    value: ${{ steps.login-ecr.outputs.registry }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.region }}
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+    - name: Get timestamp
+      uses: gerred/actions/current-time@master
+      id: current-time
+    - name: Run string replace
+      uses: frabert/replace-string-action@master
+      id: format-time
+      with:
+        pattern: '[:\.]+'
+        string: '${{ steps.current-time.outputs.time }}'
+        replace-with: '-'
+        flags: 'g'
