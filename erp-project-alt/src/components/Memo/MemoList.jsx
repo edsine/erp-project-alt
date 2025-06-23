@@ -198,7 +198,7 @@ const MemoList = () => {
             <h2 className="text-lg font-semibold">Memos</h2>
             {user.role !== 'gmd' &&  user.role !== 'chairman' && (
               <Link
-                to="/memos/new"
+                to="/dashboard/memos/new"
                 className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
               >
                 New Memo

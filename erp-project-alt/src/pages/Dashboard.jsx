@@ -44,7 +44,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/memos" className="text-sm text-primary hover:underline">View all memos</Link>
+            <Link to="/dashboard/memos" className="text-sm text-primary hover:underline">View all memos</Link>
           </div>
         </div>
 
@@ -61,7 +61,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/requisitions" className="text-sm text-primary hover:underline">View all requisitions</Link>
+            <Link to="requisitions" className="text-sm text-primary hover:underline">View all requisitions</Link>
           </div>
         </div>
 
@@ -78,7 +78,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/tasks" className="text-sm text-primary hover:underline">View all tasks</Link>
+            <Link to="/dashboard/tasks" className="text-sm text-primary hover:underline">View all tasks</Link>
           </div>
         </div>
 
@@ -95,7 +95,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-4">
-            <Link to="/leaves" className="text-sm text-primary hover:underline">View all leaves</Link>
+            <Link to="/dashboard/leaves" className="text-sm text-primary hover:underline">View all leaves</Link>
           </div>
         </div>
       </div>
@@ -152,7 +152,7 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
           <div className="space-y-3">
             <Link
-              to="/memos/new"
+              to="/dashboard/memos/new"
               className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
             >
               <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
@@ -165,7 +165,7 @@ const Dashboard = () => {
               </div>
             </Link>
             <Link
-              to="/requisitions/new"
+              to="requisitions/new"
               className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
             >
               <div className="flex-shrink-0 h-8 w-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
@@ -178,7 +178,7 @@ const Dashboard = () => {
               </div>
             </Link>
             <Link
-              to="/leaves/new"
+              to="/dashboard/leaves/new"
               className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
             >
               <div className="flex-shrink-0 h-8 w-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">

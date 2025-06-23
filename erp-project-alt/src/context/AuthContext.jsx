@@ -5,14 +5,26 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true) // Start with true
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    // Set loading to true when checking for saved user
+    setLoading(true)
+    
     const savedUser = localStorage.getItem('user')
     if (savedUser) {
-      setUser(JSON.parse(savedUser))
+      try {
+        setUser(JSON.parse(savedUser))
+      } catch (err) {
+        console.error('Error parsing saved user:', err)
+        localStorage.removeItem('user')
+        localStorage.removeItem('token')
+      }
     }
+    
+    // Set loading to false after checking
+    setLoading(false)
   }, [])
 
   // login function: calls backend API to login

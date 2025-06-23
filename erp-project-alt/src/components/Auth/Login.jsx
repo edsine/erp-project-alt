@@ -77,7 +77,7 @@ const Login = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
-                className="w-full rounded-sm border-b border-white/30 pb-2 bg-transparent focus:outline-none focus:border-white/60 text-white placeholder-white/40"
+                className="w-full rounded-sm border-b border-white/30 pb-1 bg-transparent focus:outline-none focus:border-white/60 text-white placeholder-white/40"
                 placeholder=""
               />
             </div>
@@ -96,7 +96,7 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
-                className="w-full border-b border-white/30 rounded-sm pb-2 bg-transparent focus:outline-none focus:border-white/60 text-white placeholder-white/40"
+                className="w-full border-b border-white/30 rounded-sm pb-1 bg-transparent focus:outline-none focus:border-white/60 text-white placeholder-white/40"
                 placeholder=""
               />
             </div>

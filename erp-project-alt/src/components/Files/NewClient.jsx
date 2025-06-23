@@ -4,7 +4,6 @@ import axios from 'axios';
 
 const NewClient = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -41,7 +40,7 @@ const NewClient = () => {
       }
 
       const response = await axios.post(
-        '${BASE_URL}/files/clients',
+        `${BASE_URL}/files/clients`, // Fixed template literal
         formData,
         {
           headers: {
@@ -53,7 +52,7 @@ const NewClient = () => {
 
       setSuccess('Client created successfully! Redirecting...');
       setTimeout(() => {
-        navigate('/files');
+        navigate('/dashboard/files'); // Fixed navigation path
       }, 1500);
     } catch (err) {
       console.error('Error creating client:', err);
@@ -64,12 +63,13 @@ const NewClient = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-md mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold">Create New Client</h2>
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 max-w-md mx-auto">
+      <div className="flex justify-between items-center mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-bold">Create New Client</h2>
         <button
-          onClick={() => navigate('/files')}
+          onClick={() => navigate('/dashboard/files')} // Fixed navigation path
           className="text-gray-500 hover:text-gray-700"
+          aria-label="Close"
         >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -78,19 +78,19 @@ const NewClient = () => {
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm sm:text-base">
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">
+        <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md text-sm sm:text-base">
           {success}
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="space-y-4 mb-6">
+        <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
               Client Name *
@@ -102,7 +102,7 @@ const NewClient = () => {
               value={formData.name}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
               placeholder="e.g. National Institute of Transport Technology"
             />
           </div>
@@ -118,25 +118,25 @@ const NewClient = () => {
               value={formData.code}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
               placeholder="e.g. NITT"
             />
             <p className="mt-1 text-xs text-gray-500">Unique identifier for the client</p>
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:space-x-3">
           <button
             type="button"
-            onClick={() => navigate('/files')}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            onClick={() => navigate('/dashboard/files')} // Fixed navigation path
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm sm:text-base"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
           >
             {loading ? 'Creating...' : 'Create Client'}
           </button>

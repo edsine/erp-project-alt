@@ -35,7 +35,7 @@ const NewMemo = () => {
       })
 
       if (response.status === 201) {
-        navigate('/memos')
+        navigate('/dashboard/memos')
       }
     } catch (err) {
       console.error('Error creating memo:', err)
@@ -115,7 +115,7 @@ const NewMemo = () => {
         <div className="flex justify-end space-x-3">
           <button
             type="button"
-            onClick={() => navigate('/memos')}
+            onClick={() => navigate('/dashboard/memos')}
             className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel

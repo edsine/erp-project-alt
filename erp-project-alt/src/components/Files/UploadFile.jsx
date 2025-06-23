@@ -5,10 +5,10 @@ import axios from 'axios';
 
 const UploadFile = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
   const { clientId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -17,6 +17,7 @@ const UploadFile = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -37,6 +38,7 @@ const UploadFile = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
     if (!formData.file) {
       setError('Please select a file to upload');
@@ -44,13 +46,12 @@ const UploadFile = () => {
       return;
     }
 
-    // Get token from localStorage
     const token = localStorage.getItem('token');
     
     if (!token) {
-      setError('No authentication token found - please login again');
+      setError('Authentication required. Please login again.');
       setLoading(false);
-      navigate('/login'); // Optional: redirect to login if no token
+      navigate('/login');
       return;
     }
 
@@ -63,20 +64,22 @@ const UploadFile = () => {
     data.append('uploaded_by', user.id);
 
     try {
-      const response = await axios.post('${BASE_URL}/files', data, {
+      const response = await axios.post(`${BASE_URL}/files`, data, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
+          'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.status === 201) {
-        navigate(`/files/${clientId}`);
+        setSuccess('File uploaded successfully!');
+        setTimeout(() => {
+          navigate(`/dashboard/files/${clientId}`);
+        }, 1500);
       }
     } catch (err) {
       console.error('Upload error:', err);
       if (err.response?.status === 401) {
-        // Token might be invalid, remove it and prompt re-login
         localStorage.removeItem('token');
         setError('Session expired. Please login again.');
         navigate('/login');
@@ -87,13 +90,14 @@ const UploadFile = () => {
       setLoading(false);
     }
   };
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
-      <h2 className="text-xl font-bold mb-6">Upload New File</h2>
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mx-auto max-w-2xl">
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Upload New File</h2>
       
       {error && (
-        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4">
-          <div className="flex">
+        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 sm:p-4">
+          <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
@@ -106,64 +110,81 @@ const UploadFile = () => {
         </div>
       )}
 
+      {success && (
+        <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-3 sm:p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-700">{success}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-            File Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 gap-4 mb-4">
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              File Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
+              required
+            />
+          </div>
 
-        <div className="mb-4">
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows="3"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
+          <div>
+            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              rows="3"
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
+            />
+          </div>
 
-        <div className="mb-4">
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-            Category <span className="text-red-500">*</span>
-          </label>
-          <select
-            id="category"
-            name="category"
-            value={formData.category}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            required
-          >
-            <option value="requisition">Requisition</option>
-            <option value="memo">Memo</option>
-            <option value="contract">Contract</option>
-            <option value="report">Report</option>
-            <option value="other">Other</option>
-          </select>
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
+              required
+            >
+              <option value="requisition">Requisition</option>
+              <option value="memo">Memo</option>
+              <option value="contract">Contract</option>
+              <option value="report">Report</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
         </div>
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">
             File <span className="text-red-500">*</span>
           </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+          <div className="mt-1 flex justify-center px-4 sm:px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
             <div className="space-y-1 text-center">
               <svg
-                className="mx-auto h-12 w-12 text-gray-400"
+                className="mx-auto h-10 sm:h-12 w-10 sm:w-12 text-gray-400"
                 stroke="currentColor"
                 fill="none"
                 viewBox="0 0 48 48"
@@ -176,10 +197,10 @@ const UploadFile = () => {
                   strokeLinejoin="round"
                 />
               </svg>
-              <div className="flex text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row text-sm text-gray-600 justify-center items-center">
                 <label
                   htmlFor="file-upload"
-                  className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary focus-within:outline-none"
+                  className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none"
                 >
                   <span>Upload a file</span>
                   <input
@@ -190,29 +211,45 @@ const UploadFile = () => {
                     onChange={handleFileChange}
                   />
                 </label>
-                <p className="pl-1">or drag and drop</p>
+                <p className="mt-1 sm:mt-0 sm:pl-1">or drag and drop</p>
               </div>
               <p className="text-xs text-gray-500">
-                {formData.file ? formData.file.name : 'PDF, DOC, XLS up to 10MB'}
+                {formData.file ? (
+                  <span className="font-medium">{formData.file.name}</span>
+                ) : (
+                  'PDF, DOC, XLS up to 10MB'
+                )}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end space-x-3">
+        <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
           <button
             type="button"
-            onClick={() => navigate(`/files/${clientId}`)}
-            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            onClick={() => navigate(`/dashboard/files/${clientId}`)}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={loading}
-            className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark transition-colors ${
+              loading ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
-            {loading ? 'Uploading...' : 'Upload File'}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Uploading...
+              </span>
+            ) : (
+              'Upload File'
+            )}
           </button>
         </div>
       </form>

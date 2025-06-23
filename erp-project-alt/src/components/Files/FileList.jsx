@@ -57,32 +57,32 @@ const FileList = () => {
   if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl font-bold">Client Files</h2>
-        <div className="flex space-x-4">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-3 sm:gap-4">
           <input
             type="text"
             placeholder="Search clients..."
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <Link
-            to="/files/new-client"
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+            to="new-client"
+            className="w-full sm:w-auto px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark text-center"
           >
             New Client
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         {filteredClients.length > 0 ? (
           filteredClients.map(client => (
-            <div key={client.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow relative">
+            <div key={client.id} className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow relative">
               <Link
-                to={`/files/edit-client/${client.id}`}
+                to={`edit-client/${client.id}`}
                 className="absolute top-2 right-2 text-gray-400 hover:text-primary"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -90,17 +90,17 @@ const FileList = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </Link>
-              <Link to={`/files/${client.id}`} className="block">
-                <div className="flex items-center space-x-4">
-                  <div className="flex-shrink-0 h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+              <Link to={`/dashboard/files/${client.id}`} className="block">
+                <div className="flex items-center space-x-3 sm:space-x-4">
+                  <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                     {client.code.substring(0, 2).toUpperCase()}
                   </div>
-                  <div>
-                    <h3 className="font-medium">{client.name}</h3>
-                    <p className="text-sm text-gray-500">{client.code}</p>
-                    <div className="flex items-center mt-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        {client.file_count} files
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-sm sm:text-base truncate">{client.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-500 truncate">{client.code}</p>
+                    <div className="flex items-center mt-1 sm:mt-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        {client.file_count} {client.file_count === 1 ? 'file' : 'files'}
                       </span>
                     </div>
                   </div>
@@ -109,7 +109,7 @@ const FileList = () => {
             </div>
           ))
         ) : (
-          <div className="col-span-3 text-center py-8 text-gray-500">
+          <div className="col-span-full text-center py-8 text-gray-500">
             No clients found
           </div>
         )}

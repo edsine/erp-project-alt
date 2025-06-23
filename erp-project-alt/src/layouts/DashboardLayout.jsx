@@ -5,7 +5,11 @@ import logo from '../assets/pgl_logo.png'
 
 const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
-const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
+  
+  // Debug logging
+  console.log('DashboardLayout render - loading:', loading, 'isAuthenticated:', isAuthenticated, 'user:', user)
+  
+  const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
   const [sidebarOpen, setSidebarOpen] = useState(false) // Default to closed on mobile
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const navigate = useNavigate()
@@ -29,6 +33,15 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
     }
   }, [profileDropdownOpen])
 
+  // Separate useEffect for authentication check
+  useEffect(() => {
+    // Only redirect if we're not loading and user is not authenticated
+    if (!loading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [loading, isAuthenticated, navigate])
+
+  // Show loading while auth is being determined
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -37,14 +50,21 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
     );
   }
 
-  // Add this check - if not authenticated, redirect to login
-  if (!isAuthenticated || !user) {
-    navigate('/login');
-    return null; // or a loading spinner while redirecting
+  // If not loading and not authenticated, don't render anything (redirect will happen)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // If user object is still null despite being authenticated, show loading
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading user data...</div>
+      </div>
+    );
   }
 
   const handleLogout = () => {
-    // TODO: Implement logout logic
     setProfileDropdownOpen(false)
     navigate('/login')
   }
@@ -101,7 +121,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
           <ul className="space-y-2">
             <li>
               <Link
-                to="/dashboard"
+                to=""
                 onClick={closeSidebar}
                 className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
               >
@@ -113,7 +133,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
             </li>
             <li>
               <Link
-                to="/memos"
+                to="memos"
                 onClick={closeSidebar}
                 className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
               >
@@ -125,7 +145,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
             </li>
             <li>
               <Link
-                to="/requisitions"
+                to="requisitions"
                 onClick={closeSidebar}
                 className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
               >
@@ -135,10 +155,10 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                 {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Requisitions</span>}
               </Link>
             </li>
-            {user.role === 'staff' && (
+            {user && user.role === 'staff' && (
               <li>
                 <Link
-                  to="/tasks"
+                  to="tasks"
                   onClick={closeSidebar}
                   className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
                 >
@@ -149,10 +169,10 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                 </Link>
               </li>
             )}
-            {user.role === 'staff' && (
+            {user && user.role === 'staff' && (
               <li>
                 <Link
-                  to="/users"
+                  to="users"
                   onClick={closeSidebar}
                   className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
                 >
@@ -165,7 +185,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
             )}
             <li>
               <Link
-                to="/leaves"
+                to="leaves"
                 onClick={closeSidebar}
                 className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
               >
@@ -177,7 +197,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
             </li>
             <li>
               <Link
-                to="/files"
+                to="files"
                 onClick={closeSidebar}
                 className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
               >
@@ -187,10 +207,10 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                 {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">File Archive</span>}
               </Link>
             </li>
-            {user.role === 'finance' && (
+            {user && user.role === 'finance' && (
               <li>
-                {/* <Link
-                  to="/payroll"
+                <Link
+                  to="payroll"
                   onClick={closeSidebar}
                   className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
                 >
@@ -198,14 +218,13 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Payroll</span>}
-                </Link> */}
+                </Link>
               </li>
             )}
           </ul>
           <div className="p-4 mt-44 flex justify-center">
-  <img src={logo} alt="PGL Logo" className="w- mx-auto mt-6" />
-</div>
-
+            <img src={logo} alt="PGL Logo" className="w- mx-auto mt-6" />
+          </div>
         </nav>
       </div>
 
@@ -244,14 +263,6 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
 
             {/* Right side items */}
             <div className="flex items-center space-x-2 sm:space-x-4">
-              {/* Notifications */}
-              {/* <button className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary">
-                <span className="sr-only">View notifications</span>
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </button> */}
-
               {/* Profile dropdown */}
               <div className="relative" ref={dropdownRef}>               
                 <button 
@@ -264,7 +275,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                     className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
                   />
                   <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-24 truncate">
-                    {user.name}
+                    {user?.name || 'User'}
                   </span>
                   <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -275,8 +286,8 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                 {profileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
                     <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-gray-500">{user.email || user.role}</div>
+                      <div className="font-medium">{user?.name || 'User'}</div>
+                      <div className="text-gray-500">{user?.email || user?.role || 'Role'}</div>
                     </div>
                     <button 
                       onClick={handleLogout} 
@@ -285,7 +296,7 @@ const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
                       Sign out
                     </button>
                   </div>
-                  )}
+                )}
               </div>
             </div>
           </div>
