@@ -1,0 +1,38 @@
+name: 'Successful Deploy Notification'
+description: 'Send successful deploy notification via Slack'
+
+inputs:
+  actor:
+    description: 'Actor'
+    default: ${{ github.actor }}
+  branch:
+    description: 'Branch name'
+    default: ${{ github.base_ref || github.ref_name }}
+  repo:
+    description: 'repository name'
+    default: ${{ github.event.repository.name }}
+  slack:
+    description: 'Slack Webhook'
+    default: ${{ github.event.repository.name }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send Slack Notification
+      id: send-notification
+      shell: bash
+      run: |
+        BRANCH=$(echo ${{ inputs.branch }})
+        
+        color=" "
+        if [[ $BRANCH == "dev" ]];
+        then
+          color=$(echo "#34d2eb")
+        elif [[ $BRANCH == "staging" ]];
+        then
+          color=$(echo "#3437eb")
+        elif [[ $BRANCH == "prod" || $BRANCH == "main" ]];
+        then
+         color=$(echo "#00cf29")
+        fi
+        curl -X POST -H 'Content-type: application/json'  --data '{  "username": "Server",  "attachments": [ { "color": "'"$color"'", "fields": [{"title" : "Service Deployment Alert", "value": " \n - Repository: '"${{ inputs.repo }}"' \n - Author: '"${{ inputs.actor }}"' \n - Branch: '"${{ inputs.branch }}"' \n - Status: Successful", "short": "false" }]} ]}' ${{ inputs.slack }}
