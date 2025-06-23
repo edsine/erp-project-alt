@@ -109,6 +109,6 @@ jobs:
           taskDefinition: ${{ env.ECS_TASK_DEFINITION }}
           service: ${{ env.ECS_SERVICE2 }}
           containerName: ${{ env.ECS_SERVICE2 }}
-          ecrRepo: ${{ env.ECR_REPOSITORY }}
+          ecrRepo: ${{ env.ECR_REPOSITORY2 }}
           cluster: ${{ env.ECS_CLUSTER }}
           ecrRegistry: ${{ steps.login-ecr.outputs.registry }}
