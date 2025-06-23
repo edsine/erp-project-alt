@@ -54,7 +54,7 @@ runs:
         container-name: ${{ inputs.containerName }}
         image: ${{ steps.build_image.outputs.image }}
     - name: Deploy Amazon ECS task definition.outputs.image
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: ${{ inputs.service }}
