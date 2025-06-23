@@ -1,39 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-
+import { useAuth } from '../../context/AuthContext';
 const LeaveList = () => {
-  const [leaves, setLeaves] = useState([
-    {
-      id: 1,
-      type: 'Annual Leave',
-      startDate: '2023-07-01',
-      endDate: '2023-07-07',
-      days: 5,
-      status: 'pending',
-      reason: 'Family vacation',
-    },
-    {
-      id: 2,
-      type: 'Sick Leave',
-      startDate: '2023-06-10',
-      endDate: '2023-06-12',
-      days: 3,
-      status: 'approved',
-      reason: 'Flu symptoms',
-    },
-    {
-      id: 3,
-      type: 'Maternity Leave',
-      startDate: '2023-08-01',
-      endDate: '2023-11-01',
-      days: 90,
-      status: 'rejected',
-      reason: 'Maternity leave as per policy',
-    },
-  ])
-
+  const { user } = useAuth();
+  const [leaves, setLeaves] = useState([])
   const [selectedLeave, setSelectedLeave] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Fetch leave requests
+  useEffect(() => {
+    const fetchLeaves = async () => {
+      try {
+        const res = await fetch('http://localhost:7000/api/leave')
+        const data = await res.json()
+        setLeaves(data)
+      } catch (err) {
+        setError('Failed to load leave requests')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLeaves()
+  }, [])
 
   const filteredLeaves = leaves.filter(leave =>
     leave.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -44,12 +35,39 @@ const LeaveList = () => {
     setSelectedLeave(leave)
   }
 
-  const handleStatusChange = (id, newStatus) => {
-    setLeaves(leaves.map(leave =>
-      leave.id === id ? { ...leave, status: newStatus } : leave
-    ))
-    setSelectedLeave(null)
+ 
+  const handleStatusChange = async (id, newStatus) => {
+  if (!user || !user.id) {
+    alert("You're not logged in or user ID is missing.");
+    return;
   }
+
+  try {
+    if (newStatus === 'approved') {
+      const res = await fetch(`http://localhost:7000/api/leave/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id })
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) throw new Error(result.message || 'Approval failed');
+
+      setLeaves(prev =>
+        prev.map(leave =>
+          leave.id === id ? { ...leave, status: 'approved' } : leave
+        )
+      );
+      setSelectedLeave(null);
+    } else if (newStatus === 'rejected') {
+      alert('Rejection not implemented yet.');
+    }
+  } catch (err) {
+    alert(err.message);
+  }
+};
+
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -103,6 +121,8 @@ const LeaveList = () => {
                     {leave.startDate} to {leave.endDate} ({leave.days} days)
                   </p>
                   <p className="text-xs text-gray-400 truncate">{leave.reason}</p>
+
+                  
                 </div>
               ))
             ) : (
@@ -132,23 +152,55 @@ const LeaveList = () => {
                 </svg>
               </button>
             </div>
-            
+
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-2">Reason</h3>
               <div className="bg-gray-50 p-4 rounded-md">
                 <p>{selectedLeave.reason}</p>
               </div>
+            {/* Enhanced Approval indicators */}
+<div className="grid grid-cols-4 gap-2 mb-6 mt-4">
+  {[
+    { label: 'GMD 1', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
+    { label: 'Finance', approve: 'approved_by_finance', reject: 'rejected_by_finance' },
+    { label: 'GMD 2', approve: 'approved_by_gmd2', reject: 'rejected_by_gmd2' },
+    { label: 'Chairman', approve: 'approved_by_chairman', reject: 'rejected_by_chairman' },
+  ].map((approver) => {
+    const approved = selectedLeave[approver.approve] === 1;
+    const rejected = selectedLeave[approver.reject] === 1;
+
+    const bgColor = approved
+      ? 'bg-green-100 text-green-800'
+      : rejected
+      ? 'bg-red-100 text-red-800'
+      : 'bg-gray-100 text-gray-500';
+
+    const statusText = approved
+      ? 'Approved'
+      : rejected
+      ? 'Rejected'
+      : 'Pending';
+
+    return (
+      <div key={approver.label} className={`p-2 rounded text-center text-xs ${bgColor}`}>
+        {approver.label}: {statusText}
+      </div>
+    );
+  })}
+</div>
+
+
             </div>
 
             {selectedLeave.status === 'pending' && (
               <div className="mt-6 flex justify-end space-x-3">
-                <button 
+                <button
                   onClick={() => handleStatusChange(selectedLeave.id, 'rejected')}
                   className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50"
                 >
                   Reject
                 </button>
-                <button 
+                <button
                   onClick={() => handleStatusChange(selectedLeave.id, 'approved')}
                   className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary"
                 >
