@@ -232,3 +232,120 @@ exports.deleteFile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete file' });
   }
 };
+// Download file
+exports.downloadFile = async (req, res) => {
+  try {
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
+    }
+
+    const filePath = files[0].path;
+    const fileName = files[0].name;
+
+    // Check if file exists on filesystem
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File not found on server' });
+    }
+
+    // Set appropriate headers
+    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.setHeader('Content-Type', files[0].type);
+
+    // Stream the file to the client
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to download file' });
+  }
+};
+// View file (inline in browser)
+exports.viewFile = async (req, res) => {
+  try {
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
+    }
+
+    const filePath = files[0].path;
+    const fileName = files[0].name;
+
+    // Check if file exists on filesystem
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File not found on server' });
+    }
+
+    // Determine content disposition based on file type
+    const fileType = files[0].type;
+    const isViewable = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'text/plain'
+    ].includes(fileType);
+
+    if (isViewable) {
+      // For viewable files, send inline
+      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
+      res.setHeader('Content-Type', fileType);
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } else {
+      // For non-viewable files, force download
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', 'application/octet-stream');
+      
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to view file' });
+  }
+};
+
+// Download file (updated version)
+exports.downloadFile = async (req, res) => {
+  try {
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
+    }
+
+    const filePath = files[0].path;
+    const fileName = files[0].name;
+
+    // Check if file exists on filesystem
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'File not found on server' });
+    }
+
+    // Always force download for this endpoint
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', files[0].type);
+
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to download file' });
+  }
+};

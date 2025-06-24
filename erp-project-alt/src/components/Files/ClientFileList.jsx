@@ -105,6 +105,53 @@ const ClientFileList = () => {
     }
   };
 
+  const handleView = async (fileId, fileName, fileType) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Authentication required. Please login again.');
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${BASE_URL}/files/view/${fileId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      // Create a blob URL for the file
+      const blob = new Blob([response.data], { type: fileType });
+      const url = window.URL.createObjectURL(blob);
+
+      // Check if the file is viewable in browser
+      const isViewable = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'application/pdf',
+        'text/plain'
+      ].includes(fileType);
+
+      if (isViewable) {
+        // Open in new tab for viewable files
+        window.open(url, '_blank');
+      } else {
+        // Force download for non-viewable files
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+      }
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to view file');
+    }
+  };
+
   if (loading) return <div className="text-center py-8">Loading files...</div>;
   if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
   if (!client) return <div className="text-center py-8">Client not found</div>;
@@ -195,7 +242,11 @@ const ClientFileList = () => {
                 <tr key={file.id} className="hover:bg-gray-50">
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10">
+                      <div 
+                        className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 cursor-pointer"
+                        onClick={() => handleView(file.id, file.name, file.type)}
+                        title="View file"
+                      >
                         {getFileIcon(file.type)}
                       </div>
                       <div className="ml-2 sm:ml-4">
@@ -260,32 +311,61 @@ const ClientFileList = () => {
 
 function getFileIcon(fileType) {
   const type = fileType?.split('/')[0];
-  switch (type) {
-    case 'image':
-      return (
-        <svg className="h-full w-full text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      );
-    case 'application':
-      return (
-        <svg className="h-full w-full text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0120 9v10a2 2 0 01-2 2z" />
-        </svg>
-      );
-    case 'text':
-      return (
-        <svg className="h-full w-full text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M4 6h16M4 10h16M4 14h16M4 18h16" />
-        </svg>
-      );
-    default:
-      return (
-        <svg className="h-full w-full text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-        </svg>
-      );
+  const subtype = fileType?.split('/')[1];
+  
+  // PDF
+  if (fileType === 'application/pdf') {
+    return (
+      <svg className="h-full w-full text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
   }
+  
+  // Images
+  if (type === 'image') {
+    return (
+      <svg className="h-full w-full text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+  
+  // Word Documents
+  if (fileType === 'application/msword' || 
+      fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    return (
+      <svg className="h-full w-full text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  }
+  
+  // Excel Spreadsheets
+  if (fileType === 'application/vnd.ms-excel' || 
+      fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    return (
+      <svg className="h-full w-full text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  }
+  
+  // Text files
+  if (type === 'text') {
+    return (
+      <svg className="h-full w-full text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  }
+  
+  // Default file icon
+  return (
+    <svg className="h-full w-full text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+  );
 }
 
 function formatFileSize(bytes) {
