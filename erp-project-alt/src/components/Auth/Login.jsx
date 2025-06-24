@@ -49,7 +49,7 @@ const Login = () => {
       </div>
       
       <div className="relative z-10 flex items-center justify-center space-x-6 w-full max-w-4xl">
-        {/* Left side - Login Card */}
+        {/*Login Card */}
         <div className="bg-white/20 backdrop-blur-lg rounded-3xl p-8 w-80 shadow-lg border border-white/10">
           {/* Header */}
           <div className="mb-8">
@@ -129,7 +129,7 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Right side - Info Card */}
+      
 
       </div>
     </div>
