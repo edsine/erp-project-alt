@@ -136,5 +136,22 @@ router.post('/users', async (req, res) => {
     res.status(500).json({ message: 'Failed to create user', error: error.message });
   }
 });
+// DELETE /users/:id - Delete a user by ID
+router.delete('/users/:id', async (req, res) => {
+  const userId = req.params.id;
+
+  try {
+    const [result] = await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Failed to delete user', error: error.message });
+  }
+});
 
 module.exports = router;
