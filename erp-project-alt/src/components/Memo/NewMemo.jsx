@@ -4,6 +4,8 @@ import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
 
 const NewMemo = () => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const navigate = useNavigate()
   const { user } = useAuth()
   const [formData, setFormData] = useState({
