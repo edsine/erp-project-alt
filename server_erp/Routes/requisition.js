@@ -324,5 +324,14 @@ router.delete('/requisitions/:id', async (req, res) => {
     return res.status(500).json({ message: 'Error deleting requisition' });
   }
 });
-
+// Get requisition count
+router.get('/count', async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT COUNT(*) as count FROM requisitions');
+    res.json({ count: results[0].count });
+  } catch (err) {
+    console.error('Error fetching requisition count:', err);
+    res.status(500).json({ message: 'Database error' });
+  }
+});
 module.exports = router;

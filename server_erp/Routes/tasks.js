@@ -226,5 +226,15 @@ router.delete('/tasks/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete task', error: err.message });
   }
 });
+// Get task count
+router.get('/count', async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT COUNT(*) as count FROM tasks');
+    res.json({ count: results[0].count });
+  } catch (err) {
+    console.error('Error fetching task count:', err);
+    res.status(500).json({ message: 'Database error' });
+  }
+});
 
 module.exports = router;

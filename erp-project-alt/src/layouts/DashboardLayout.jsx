@@ -222,7 +222,7 @@ const DashboardLayout = () => {
               </li>
             )}
           </ul>
-          <div className="p-4 mt-44 flex justify-center">
+          <div className="p-4 mt-36 flex justify-center">
             <img src={logo} alt="PGL Logo" className="w- mx-auto mt-6" />
           </div>
         </nav>

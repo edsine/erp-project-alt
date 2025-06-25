@@ -315,6 +315,16 @@ router.get('/memos/approval/:userId', async (req, res) => {
         return res.status(500).json({ message: 'Error fetching memos for approval' });
     }
 });
+// Get memo count
+router.get('/count', async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT COUNT(*) as count FROM memos');
+    res.json({ count: results[0].count });
+  } catch (err) {
+    console.error('Error fetching memo count:', err);
+    res.status(500).json({ message: 'Database error' });
+  }
+});
 
 
 

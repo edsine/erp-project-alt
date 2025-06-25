@@ -250,6 +250,15 @@ router.delete('/leave/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete leave request' });
   }
 });
-
+// Get leave request count
+router.get('/count', async (req, res) => {
+  try {
+    const [results] = await db.query('SELECT COUNT(*) as count FROM leave_requests');
+    res.json({ count: results[0].count });
+  } catch (err) {
+    console.error('Error fetching leave request count:', err);
+    res.status(500).json({ message: 'Database error' });
+  }
+});
 
 module.exports = router;
