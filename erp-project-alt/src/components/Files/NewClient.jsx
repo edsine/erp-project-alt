@@ -21,46 +21,39 @@ const NewClient = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
 
-    if (!formData.name.trim() || !formData.code.trim()) {
-      setError('Both name and code are required');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found. Please login again.');
-      }
-
-      const response = await axios.post(
-        `${BASE_URL}/files/clients`, // Fixed template literal
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/files/clients`,
+      {
+        name: formData.name.trim(),
+        code: formData.code.trim()
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
         }
-      );
+      }
+    );
 
-      setSuccess('Client created successfully! Redirecting...');
-      setTimeout(() => {
-        navigate('/dashboard/files'); // Fixed navigation path
-      }, 1500);
-    } catch (err) {
-      console.error('Error creating client:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to create client');
-    } finally {
-      setLoading(false);
+    setSuccess('Client created successfully!');
+    setTimeout(() => navigate('/dashboard/files'), 1500);
+    
+  } catch (err) {
+    if (err.response?.data?.errorType === 'DUPLICATE_NAME_CODE') {
+      setError('This exact client name and code combination already exists');
+    } else {
+      setError(err.response?.data?.message || 'Failed to create client');
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 max-w-md mx-auto">

@@ -50,45 +50,45 @@ exports.getClientById = async (req, res) => {
 exports.createClient = async (req, res) => {
   const { name, code } = req.body;
   
+  // Validation
   if (!name || !code) {
-    return res.status(400).json({ success: false, message: 'Name and code are required' });
-  }
-
-  // Additional validation
-  if (typeof name !== 'string' || typeof code !== 'string') {
-    return res.status(400).json({ success: false, message: 'Name and code must be strings' });
+    return res.status(400).json({ 
+      success: false,
+      message: 'Both name and code are required' 
+    });
   }
 
   try {
-    // Check if code already exists
-    const [existing] = await db.query('SELECT id FROM clients WHERE code = ?', [code]);
-    if (existing.length > 0) {
-      return res.status(400).json({ success: false, message: 'Client code already exists' });
-    }
-
-    // Insert with proper escaping
-    const [result] = await db.query(
-      'INSERT INTO clients (name, code) VALUES (?, ?)', 
+    // Check for existing name+code combination (your actual requirement)
+    const [existing] = await db.query(
+      `SELECT id FROM clients WHERE name = ? AND code = ?`, 
       [name.trim(), code.trim()]
     );
 
-    res.status(201).json({ success: true, data: { id: result.insertId, name, code } });
+    if (existing.length > 0) {
+      return res.status(400).json({
+        success: false,
+        errorType: 'DUPLICATE_NAME_CODE',
+        message: 'This exact name and code combination already exists'
+      });
+    }
+
+    // Proceed with creation (allow same code with different names)
+    const [result] = await db.query(
+      `INSERT INTO clients (name, code) VALUES (?, ?)`,
+      [name.trim(), code.trim()]
+    );
+
+    return res.status(201).json({ 
+      success: true,
+      data: { id: result.insertId, name, code }
+    });
+
   } catch (err) {
     console.error('Database error:', err);
-    
-    // MySQL specific error handling
-    if (err.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ success: false, message: 'Client code already exists' });
-    }
-    if (err.code === 'ER_TRUNCATED_WRONG_VALUE') {
-      return res.status(400).json({ success: false, message: 'Invalid characters in name or code' });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to create client',
-      error: err.message,
-      code: err.code
+    return res.status(500).json({ 
+      success: false,
+      message: 'Server error during client creation'
     });
   }
 };
