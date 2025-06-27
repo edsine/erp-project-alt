@@ -6,15 +6,27 @@ const UserList = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editingUserId, setEditingUserId] = useState(null);
 
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-     password: '',
+    password: '',
     role: 'staff',
     department: '',
     is_admin: 0
   });
+
+  const [editUser, setEditUser] = useState({
+    name: '',
+    email: '',
+    password: '', // Added password field for editing
+    role: 'staff',
+    department: '',
+    is_admin: 0
+  });
+
+  const [showPassword, setShowPassword] = useState(false); // For toggling password visibility
   const [searchTerm, setSearchTerm] = useState('');
 
   // Fetch users from API
@@ -50,45 +62,117 @@ const UserList = () => {
     }));
   };
 
- const handleAddUser = async () => {
-  if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
-    setError('Please fill all required fields');
-    return;
-  }
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditUser(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
-  try {
-    const response = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newUser)
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to add user');
+  const handleAddUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
+      setError('Please fill all required fields');
+      return;
     }
 
-    alert('User added successfully!');
+    try {
+      const response = await fetch(`${BASE_URL}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser)
+      });
 
-    setUsers([...users, { ...newUser, id: responseData.user_id }]); // Assumes your API returns { user_id: ... }
+      const responseData = await response.json();
 
-    setNewUser({
-      name: '',
-      email: '',
-      password: '',
-      role: 'staff',
-      department: '',
-      is_admin: 0
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to add user');
+      }
+
+      alert('User added successfully!');
+
+      setUsers([...users, { ...newUser, id: responseData.user_id }]);
+
+      setNewUser({
+        name: '',
+        email: '',
+        password: '',
+        role: 'staff',
+        department: '',
+        is_admin: 0
+      });
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setEditingUserId(user.id);
+    setEditUser({
+      name: user.name,
+      email: user.email,
+      password: '', // Initialize with empty password
+      role: user.role,
+      department: user.department,
+      is_admin: user.is_admin
     });
-    setError(null);
-  } catch (err) {
-    setError(err.message);
-  }
-};
+  };
 
+  const handleUpdateUser = async () => {
+    if (!editUser.name || !editUser.email || !editUser.department) {
+      setError('Please fill all required fields');
+      return;
+    }
+
+    try {
+      // Only include password in the update if it's not empty
+      const updateData = {
+        name: editUser.name,
+        email: editUser.email,
+        role: editUser.role,
+        department: editUser.department,
+        is_admin: editUser.is_admin
+      };
+
+      if (editUser.password) {
+        updateData.password = editUser.password;
+      }
+
+      const response = await fetch(`${BASE_URL}/users/${editingUserId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update user');
+      }
+
+      alert('User updated successfully!');
+
+      setUsers(users.map(user =>
+        user.id === editingUserId ? { ...user, ...updateData } : user
+      ));
+
+      setEditingUserId(null);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUserId(null);
+  };
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   const handleStatusChange = async (id, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
@@ -148,14 +232,16 @@ const UserList = () => {
       </div>
 
       <div className="mb-6 p-4 border border-gray-200 rounded-md">
-        <h3 className="text-sm font-medium text-gray-700 mb-3">Add New User</h3>
+        <h3 className="text-sm font-medium text-gray-700 mb-3">
+          {editingUserId ? 'Edit User' : 'Add New User'}
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div>
             <input
               type="text"
               name="name"
-              value={newUser.name}
-              onChange={handleInputChange}
+              value={editingUserId ? editUser.name : newUser.name}
+              onChange={editingUserId ? handleEditInputChange : handleInputChange}
               placeholder="Full name"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
@@ -164,28 +250,45 @@ const UserList = () => {
             <input
               type="email"
               name="email"
-              value={newUser.email}
-              onChange={handleInputChange}
+              value={editingUserId ? editUser.email : newUser.email}
+              onChange={editingUserId ? handleEditInputChange : handleInputChange}
               placeholder="Email"
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </div>
           <div>
-            <input
-              type="password"
-              name="password"
-              value={newUser.password}
-              onChange={handleInputChange}
-              placeholder="Password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={editingUserId ? editUser.password : newUser.password}
+                onChange={editingUserId ? handleEditInputChange : handleInputChange}
+                placeholder={editingUserId ? "New password (leave blank to keep current)" : "Password"}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-gray-800"
+              >
+                {showPassword ? (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                ) : (
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
-
           <div>
             <select
               name="department"
-              value={newUser.department}
-              onChange={handleInputChange}
+              value={editingUserId ? editUser.department : newUser.department}
+              onChange={editingUserId ? handleEditInputChange : handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">Select Department</option>
@@ -200,25 +303,42 @@ const UserList = () => {
           <div>
             <select
               name="role"
-              value={newUser.role}
-              onChange={handleInputChange}
+              value={editingUserId ? editUser.role : newUser.role}
+              onChange={editingUserId ? handleEditInputChange : handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="staff">Staff</option>
               <option value="gmd">GMD</option>
               <option value="finance">Finance</option>
               <option value="chairman">Chairman</option>
-              <option value="chairman">Manager</option>
+              <option value="manager">Manager</option>
               <option value="admin">Admin</option>
             </select>
           </div>
           <div>
-            <button
-              onClick={handleAddUser}
-              className="w-full px-3 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary"
-            >
-              Add User
-            </button>
+            {editingUserId ? (
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleUpdateUser}
+                  className="w-full px-3 py-2 bg-green-600 text-white rounded-md text-sm hover:bg-green-700"
+                >
+                  Update
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  className="w-full px-3 py-2 bg-gray-500 text-white rounded-md text-sm hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleAddUser}
+                className="w-full px-3 py-2 bg-primary text-white rounded-md text-sm hover:bg-primary-dark"
+              >
+                Add User
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -274,8 +394,14 @@ const UserList = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
+                      onClick={() => handleEditUser(user)}
+                      className="text-blue-600 hover:text-blue-900 mr-3"
+                    >
+                      Edit
+                    </button>
+                    <button
                       onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-900 mr-3"
+                      className="text-red-600 hover:text-red-900"
                     >
                       Delete
                     </button>
