@@ -12,7 +12,6 @@ const MemoList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sendDirectlyToChairman, setSendDirectlyToChairman] = useState(false);
 
   useEffect(() => {
     const fetchMemos = async () => {
@@ -30,7 +29,7 @@ const MemoList = () => {
           // Transform the API data
           const transformedMemos = response.data.data.map(memo => ({
             ...memo,
-            sender: `User ${memo.created_by}`, // Replace with actual username if available
+            sender: `User ${memo.created_by}`,
             date: new Date(memo.created_at).toLocaleDateString(),
             status: memo.status || 'submitted',
             priority: 'medium'
@@ -63,10 +62,7 @@ const MemoList = () => {
     try {
       const response = await axios.post(
         `${BASE_URL}/memos/${memo.id}/approve`,
-        { 
-          user_id: user.id,
-          send_directly_to_chairman: sendDirectlyToChairman 
-        },
+        { user_id: user.id },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -298,41 +294,23 @@ const MemoList = () => {
                 user?.role === 'finance' ||
                 user?.role === 'gmd' ||
                 user?.role === 'chairman') && (
-                <div className="mt-6 space-y-4">
-                  {/* Show checkbox for executive, finance, and GMD to send directly to chairman */}
-                  {(user?.role === 'executive' || user?.role === 'finance' || user?.role === 'gmd') && (
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="sendDirectly"
-                        checked={sendDirectlyToChairman}
-                        onChange={(e) => setSendDirectlyToChairman(e.target.checked)}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
-                        Send directly to Chairman
-                      </label>
-                    </div>
-                  )}
-                  
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => handleReject(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                    >
-                      {loading ? 'Processing...' : 'Reject'}
-                    </button>
-                    <button
-                      onClick={() => handleApprove(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                    >
-                      {loading ? 'Processing...' : 'Approve'}
-                    </button>
-                  </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => handleReject(selectedMemo)}
+                    disabled={loading}
+                    className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                  >
+                    {loading ? 'Processing...' : 'Reject'}
+                  </button>
+                  <button
+                    onClick={() => handleApprove(selectedMemo)}
+                    disabled={loading}
+                    className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                  >
+                    {loading ? 'Processing...' : 'Approve'}
+                  </button>
                 </div>
               )}
           </div>

@@ -104,7 +104,7 @@ const NewMemo = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Normal Memo (Requires Approval)
+            Normal Memo 
           </button>
           <button
             type="button"
@@ -115,7 +115,7 @@ const NewMemo = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Report Memo (Acknowledgment Only)
+            Report Memo 
           </button>
         </div>
       </div>
@@ -182,6 +182,7 @@ const NewMemo = () => {
             <option value="medium">Medium</option>
             <option value="high">High</option>
           </select>
+          
         </div>
 
         {/* Report-specific Fields */}
@@ -229,18 +230,8 @@ const NewMemo = () => {
             </div>
 
             <div className="mb-4">
-              <label htmlFor="attachments" className="block text-sm font-medium text-gray-700 mb-1">
-                Attachments
-              </label>
-              <input
-                type="text"
-                id="attachments"
-                name="attachments"
-                value={formData.attachments}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="List any attachments (comma separated)"
-              />
+          
+              
             </div>
 
             <div className="mb-4">
@@ -289,7 +280,7 @@ const NewMemo = () => {
                     className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <label htmlFor="acknowledge_executive" className="ml-2 block text-sm text-gray-700">
-                    Executive
+                    GMD
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -311,7 +302,7 @@ const NewMemo = () => {
                     className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <label htmlFor="acknowledge_finance" className="ml-2 block text-sm text-gray-700">
-                    Finance
+                    Chairman
                   </label>
                 </div>
               </div>
