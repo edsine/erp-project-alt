@@ -64,7 +64,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: 'Server error during login' });
   }
 });
-
+    
 // GET /users - fetch all users
 router.get('/users', async (req, res) => {
   try {

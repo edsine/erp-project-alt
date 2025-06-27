@@ -47,7 +47,7 @@ exports.getClientById = async (req, res) => {
 };
 
 // Create new client
-exports.createClient = async (req, res) => {
+  exports.createClient = async (req, res) => {
   const { name, code } = req.body;
   
   // Validation
