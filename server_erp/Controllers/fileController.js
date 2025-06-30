@@ -5,26 +5,15 @@ const fs = require('fs');
 // Get all clients
 exports.getAllClients = async (req, res) => {
   try {
-    // For GMD and Chairman, show all clients
-    let query = `
+    // Show all clients to all roles
+    const query = `
       SELECT c.*, COUNT(f.id) as file_count 
       FROM clients c
       LEFT JOIN files f ON c.id = f.client_id
       GROUP BY c.id
     `;
 
-    // For other roles, show only clients they have files for
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
-      query = `
-        SELECT c.*, COUNT(f.id) as file_count 
-        FROM clients c
-        LEFT JOIN files f ON c.id = f.client_id
-        WHERE f.uploaded_by = ? OR f.id IS NULL
-        GROUP BY c.id
-      `;
-    }
-
-    const [clients] = await db.query(query, req.user.role !== 'gmd' && req.user.role !== 'chairman' ? [req.user.id] : []);
+    const [clients] = await db.query(query);
     res.json({ success: true, data: clients });
   } catch (err) {
     console.error(err);
@@ -156,16 +145,9 @@ exports.deleteClient = async (req, res) => {
 exports.getAllFiles = async (req, res) => {
   const { client_id } = req.query;
   try {
-    let query = 'SELECT * FROM files WHERE client_id = ?';
-    const params = [client_id];
-
-    // For GMD and Chairman, show all files
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
-      query += ' AND uploaded_by = ?';
-      params.push(req.user.id);
-    }
-
-    const [files] = await db.query(query, params);
+    // Show all files to all roles for the specified client
+    const query = 'SELECT * FROM files WHERE client_id = ?';
+    const [files] = await db.query(query, [client_id]);
     res.json({ success: true, data: files });
   } catch (err) {
     console.error(err);
@@ -181,11 +163,7 @@ exports.getFileById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
+    // Removed permission check - all authenticated users can access
     res.json({ success: true, data: files[0] });
   } catch (err) {
     console.error(err);
@@ -271,24 +249,17 @@ exports.downloadFile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
+    // Removed permission check - all authenticated users can download
     const filePath = files[0].path;
     const fileName = files[0].name;
 
-    // Check if file exists on filesystem
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Set appropriate headers
-    res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.setHeader('Content-Type', files[0].type);
 
-    // Stream the file to the client
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
   } catch (err) {
@@ -304,20 +275,14 @@ exports.viewFile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
+    // Removed permission check - all authenticated users can view
     const filePath = files[0].path;
     const fileName = files[0].name;
 
-    // Check if file exists on filesystem
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Determine content disposition based on file type
     const fileType = files[0].type;
     const isViewable = [
       'image/jpeg',
@@ -328,14 +293,12 @@ exports.viewFile = async (req, res) => {
     ].includes(fileType);
 
     if (isViewable) {
-      // For viewable files, send inline
       res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
       res.setHeader('Content-Type', fileType);
       
       const fileStream = fs.createReadStream(filePath);
       fileStream.pipe(res);
     } else {
-      // For non-viewable files, force download
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Content-Type', 'application/octet-stream');
       

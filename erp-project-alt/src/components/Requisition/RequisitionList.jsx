@@ -77,9 +77,10 @@ const RequisitionList = () => {
         prev.map(req => {
           if (req.id === id) {
             const updated = { ...req };
-            if (user.role.toLowerCase() === 'gmd') updated.approved_by_gmd = true;
-            else if (user.role.toLowerCase() === 'gmd2') updated.approved_by_gmd2 = true;
+            if (user.role.toLowerCase() === 'manager') updated.approved_by_manager = true;
+            else if (user.role.toLowerCase() === 'executive') updated.approved_by_executive = true;
             else if (user.role.toLowerCase() === 'finance') updated.approved_by_finance = true;
+            else if (user.role.toLowerCase() === 'gmd') updated.approved_by_gmd = true;
             else if (user.role.toLowerCase() === 'chairman') updated.approved_by_chairman = true;
 
             updated.status = 'approved';
@@ -118,9 +119,10 @@ const RequisitionList = () => {
             const updated = { ...req };
             const role = user.role.toLowerCase();
 
-            if (role === 'gmd') updated.rejected_by_gmd = true;
-            else if (role === 'gmd2') updated.rejected_by_gmd2 = true;
+            if (role === 'manager') updated.rejected_by_manager = true;
+            else if (role === 'executive') updated.rejected_by_executive = true;
             else if (role === 'finance') updated.rejected_by_finance = true;
+            else if (role === 'gmd') updated.rejected_by_gmd = true;
             else if (role === 'chairman') updated.rejected_by_chairman = true;
 
             updated.status = 'rejected';
@@ -265,7 +267,7 @@ const RequisitionList = () => {
             <div className="mb-6">
               <h4 className="text-sm font-medium text-gray-500 mb-2">Approvals</h4>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {['gmd', 'gmd2', 'finance', 'chairman'].map(role => {
+                {['Line Manager', 'executive', 'finance', 'gmd', 'chairman'].map(role => {
                   const approved = selectedRequisition[`approved_by_${role}`];
                   const rejected = selectedRequisition[`rejected_by_${role}`];
 
@@ -285,7 +287,7 @@ const RequisitionList = () => {
                       key={role}
                       className={`p-2 rounded-md text-center ${statusClass}`}
                     >
-                      <div className="text-xs font-medium">{role.toUpperCase()}</div>
+                      <div className="text-xs font-medium">{role.charAt(0).toUpperCase() + role.slice(1)}</div>
                       <div className="text-xs">{statusLabel}</div>
                     </div>
                   );

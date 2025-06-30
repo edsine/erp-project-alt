@@ -258,7 +258,7 @@ const NewMemo = () => {
                     className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                   />
                   <label htmlFor="acknowledge_manager" className="ml-2 block text-sm text-gray-700">
-                    Manager
+                    Line Manager
                   </label>
                 </div>
                 <div className="flex items-center">

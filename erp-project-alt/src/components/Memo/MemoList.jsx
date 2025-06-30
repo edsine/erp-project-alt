@@ -271,7 +271,7 @@ const MemoList = () => {
             {/* Approval status indicators */}
             <div className="grid grid-cols-4 gap-2 mb-6">
               <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_manager ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Manager: {selectedMemo.approved_by_manager ? 'Approved' : 'Pending'}
+                Line Manager: {selectedMemo.approved_by_manager ? 'Approved' : 'Pending'}
               </div>
               <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_executive ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
                 Executive: {selectedMemo.approved_by_executive ? 'Approved' : 'Pending'}

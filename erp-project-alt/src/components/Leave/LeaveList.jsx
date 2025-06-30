@@ -191,7 +191,7 @@ const LeaveList = () => {
             {/* Approval Status Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
               {[
-                { label: 'Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
+                { label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
                 { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
                 { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
                 { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
