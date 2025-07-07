@@ -189,12 +189,12 @@ const LeaveList = () => {
             </div>
 
             {/* Approval Status Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
               {[
-                { label: 'GMD 1', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
-                { label: 'Finance', approve: 'approved_by_finance', reject: 'rejected_by_finance' },
-                { label: 'GMD 2', approve: 'approved_by_gmd2', reject: 'rejected_by_gmd2' },
-                { label: 'Chairman', approve: 'approved_by_chairman', reject: 'rejected_by_chairman' },
+                { label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
+                { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
+                { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
+                { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
               ].map((approver) => {
                 const approved = selectedLeave[approver.approve] === 1;
                 const rejected = selectedLeave[approver.reject] === 1;
@@ -242,4 +242,4 @@ const LeaveList = () => {
   )
 }
 
-export default LeaveList  
+export default LeaveList

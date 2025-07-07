@@ -13,7 +13,6 @@ const MemoList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sendDirectlyToChairman, setSendDirectlyToChairman] = useState(false);
 
   useEffect(() => {
 

@@ -5,26 +5,15 @@ const fs = require('fs');
 // Get all clients
 exports.getAllClients = async (req, res) => {
   try {
-    // For GMD and Chairman, show all clients
-    let query = `
+    // Show all clients to all roles
+    const query = `
       SELECT c.*, COUNT(f.id) as file_count 
       FROM clients c
       LEFT JOIN files f ON c.id = f.client_id
       GROUP BY c.id
     `;
 
-    // For other roles, show only clients they have files for
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
-      query = `
-        SELECT c.*, COUNT(f.id) as file_count 
-        FROM clients c
-        LEFT JOIN files f ON c.id = f.client_id
-        WHERE f.uploaded_by = ? OR f.id IS NULL
-        GROUP BY c.id
-      `;
-    }
-
-    const [clients] = await db.query(query, req.user.role !== 'gmd' && req.user.role !== 'chairman' ? [req.user.id] : []);
+    const [clients] = await db.query(query);
     res.json({ success: true, data: clients });
   } catch (err) {
     console.error(err);
@@ -156,16 +145,9 @@ exports.deleteClient = async (req, res) => {
 exports.getAllFiles = async (req, res) => {
   const { client_id } = req.query;
   try {
-    let query = 'SELECT * FROM files WHERE client_id = ?';
-    const params = [client_id];
-
-    // For GMD and Chairman, show all files
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
-      query += ' AND uploaded_by = ?';
-      params.push(req.user.id);
-    }
-
-    const [files] = await db.query(query, params);
+    // Show all files to all roles for the specified client
+    const query = 'SELECT * FROM files WHERE client_id = ?';
+    const [files] = await db.query(query, [client_id]);
     res.json({ success: true, data: files });
   } catch (err) {
     console.error(err);
@@ -181,11 +163,7 @@ exports.getFileById = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found' });
     }
 
-    // Check permissions
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
+    // Removed permission check - all authenticated users can access
     res.json({ success: true, data: files[0] });
   } catch (err) {
     console.error(err);

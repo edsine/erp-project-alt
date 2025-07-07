@@ -142,9 +142,10 @@ const handleApprove = async (id) => {
             const updated = { ...req };
             const role = user.role.toLowerCase();
 
-            if (role === 'gmd') updated.rejected_by_gmd = true;
-            else if (role === 'gmd2') updated.rejected_by_gmd2 = true;
+            if (role === 'manager') updated.rejected_by_manager = true;
+            else if (role === 'executive') updated.rejected_by_executive = true;
             else if (role === 'finance') updated.rejected_by_finance = true;
+            else if (role === 'gmd') updated.rejected_by_gmd = true;
             else if (role === 'chairman') updated.rejected_by_chairman = true;
 
             updated.status = 'rejected';

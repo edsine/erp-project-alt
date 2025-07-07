@@ -288,7 +288,7 @@ const handleSubmit = async (e) => {
         <div className="mb-4 p-3 bg-gray-50 rounded-md">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium">Total Amount:</span>
-            <span className="text-lg font-bold">${calculateTotal().toFixed(2)}</span>
+            <span className="text-lg font-bold">₦{calculateTotal().toFixed(2)}</span>
           </div>
         </div>
 
