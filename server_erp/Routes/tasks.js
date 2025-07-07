@@ -171,6 +171,112 @@ router.get('/tasks/user/:userId', async (req, res) => {
   }
 });
 
+//count tasks for users
+router.get('/tasks/counts/user/:userId', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    // Get user info including role and department
+    const [userRows] = await db.query(`
+      SELECT id, role, department 
+      FROM users 
+      WHERE id = ?
+    `, [userId]);
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+    const role = user.role.toLowerCase();
+    const department = user.department;
+
+    // Define role categories
+    const globalRoles = ['gmd', 'chairman'];
+    const departmentRoles = ['manager', 'executive'];
+    const regularRoles = ['staff', 'hr', 'finance'];
+
+    let query = '';
+    let params = [];
+
+    if (globalRoles.includes(role)) {
+      // Global roles see all tasks
+      query = 'SELECT COUNT(*) AS count FROM tasks';
+    } 
+    else if (departmentRoles.includes(role)) {
+      // Department heads see tasks in their department (created by or assigned to department members)
+      query = `
+        SELECT COUNT(*) AS count
+        FROM tasks t
+        JOIN users creator ON t.created_by = creator.id
+        LEFT JOIN users assignee ON t.assigned_to = assignee.id
+        WHERE creator.department = ? OR (assignee.id IS NOT NULL AND assignee.department = ?)
+      `;
+      params = [department, department];
+    }
+    else {
+      // Regular users see only their own tasks (created or assigned)
+      query = `
+        SELECT COUNT(*) AS count
+        FROM tasks
+        WHERE created_by = ? OR assigned_to = ?
+      `;
+      params = [userId, userId];
+    }
+
+    // Add status filter if provided
+    if (req.query.status) {
+      const validStatuses = ['pending', 'in progress', 'completed'];
+      if (validStatuses.includes(req.query.status)) {
+        if (query.includes('WHERE')) {
+          query += ' AND status = ?';
+        } else {
+          query += ' WHERE status = ?';
+        }
+        params.push(req.query.status);
+      }
+    }
+
+    // Add priority filter if provided
+    if (req.query.priority) {
+      const validPriorities = ['low', 'medium', 'high'];
+      if (validPriorities.includes(req.query.priority)) {
+        if (query.includes('WHERE')) {
+          query += ' AND priority = ?';
+        } else {
+          query += ' WHERE priority = ?';
+        }
+        params.push(req.query.priority);
+      }
+    }
+
+    const [rows] = await db.query(query, params);
+    const count = rows[0]?.count || 0;
+
+    res.json({ 
+      success: true,
+      count,
+      filters: {
+        role,
+        department,
+        status: req.query.status || 'all',
+        priority: req.query.priority || 'all'
+      }
+    });
+
+  } catch (err) {
+    console.error('Error fetching task counts:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      details: err.message 
+    });
+  }
+});
+
 router.put('/tasks/:taskId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.taskId, 10);

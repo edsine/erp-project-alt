@@ -302,71 +302,61 @@ exports.viewFile = async (req, res) => {
 
 
 exports.downloadFile = async (req, res) => {
-  try {
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
+  const { id } = req.params;
+  console.log(`Download request for file ID: ${id}`);
 
+  try {
+    // 1. Get file from database
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [id]);
+    
     if (files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+      console.log('File not found in database');
+      return res.status(404).json({ error: 'File not found in database' });
     }
 
     const file = files[0];
+    console.log('Found file:', file.name);
+    
+    // 2. Verify file exists (normalize path for Windows)
+    const filePath = file.path.replace(/\\/g, '/');
+    console.log('Checking file at:', filePath);
 
-    const relativePath = file.path.trim(); // Remove spaces
-    const normalizedPath = path.normalize(relativePath.replace(/\\/g, path.sep));
-    const absolutePath = path.isAbsolute(normalizedPath)
-      ? normalizedPath
-      : path.join(__dirname, '..', normalizedPath);
-
-    console.log('Resolved file path:', absolutePath);
-
-    if (!fs.existsSync(absolutePath)) {
-      return res.status(404).json({ success: false, message: 'File not found on server' });
+    if (!fs.existsSync(filePath)) {
+      console.error('File not found at path:', filePath);
+      return res.status(404).json({ error: 'File not found on server' });
     }
 
+    // 3. Set proper headers
     res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
     res.setHeader('Content-Type', file.type);
+    res.setHeader('Content-Length', file.size);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
 
-    const stream = fs.createReadStream(absolutePath);
-    stream.pipe(res);
+    // 4. Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    
+    fileStream.on('open', () => {
+      console.log('File stream opened, starting download');
+      fileStream.pipe(res);
+    });
+
+    fileStream.on('error', (err) => {
+      console.error('Stream error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'File streaming error' });
+      }
+    });
+
+    req.on('close', () => {
+      console.log('Client disconnected, cleaning up');
+      fileStream.destroy();
+    });
 
   } catch (err) {
     console.error('Download error:', err);
-    res.status(500).json({ success: false, message: 'Failed to download file' });
-  }
-};
-exports.downloadFile = async (req, res) => {
-  try {
-    const fileId = req.params.id;
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
-
-    if (files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    const file = files[0];
-    const relativePath = file.path.trim();
-
-    // Sanitize and resolve the absolute path
-    const normalizedPath = path.normalize(relativePath.replace(/\\/g, path.sep));
-    const absolutePath = path.isAbsolute(normalizedPath)
-      ? normalizedPath
-      : path.join(__dirname, '..', normalizedPath); // assumes `path` is relative to project root
-
-    console.log('Resolved file path:', absolutePath);
-
-    if (!fs.existsSync(absolutePath)) {
-      return res.status(404).json({ success: false, message: 'File not found on server' });
-    }
-
-    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
-    res.setHeader('Content-Type', file.type);
-
-    const stream = fs.createReadStream(absolutePath);
-    stream.pipe(res);
-
-  } catch (err) {
-    console.error('Download error:', err);
-    res.status(500).json({ success: false, message: 'Failed to download file' });
   }
 };
 

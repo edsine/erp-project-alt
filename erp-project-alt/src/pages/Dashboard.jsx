@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import axios from 'axios';
 
 const Dashboard = () => {
+    const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { user } = useAuth();
   const [stats, setStats] = useState({
     memos: 0,
@@ -14,6 +15,63 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [memoCount, setMemoCount] = useState(0)
+
+  const [requisitionCount, setRequisitionCount] = useState(0);
+
+    const [taskCount, setTaskCount] = useState(0);
+
+  useEffect(() => {
+    const fetchTaskCount = async () => {
+      try {
+        const res = await fetch(`http://localhost:7000/api/tasks/counts/user/${user.id}`);
+        const data = await res.json();
+        if (data.success) {
+          setTaskCount(data.count);
+        }
+      } catch (error) {
+        console.error('Error fetching task count:', error);
+      }
+    };
+
+    if (user) {
+      fetchTaskCount();
+    }
+  }, [user]);
+
+useEffect(() => {
+  fetch(`${BASE_URL}/requisitions/count/user/${user.id}`)
+    .then(res => res.json())
+    .then(data => {
+      if (data && typeof data.count === 'number') {
+        setRequisitionCount(data.count);
+      }
+    })
+    .catch(err => console.error('Failed to fetch requisition count:', err));
+}, [user]);
+
+useEffect(() => {
+  let interval
+  if (user?.id) {
+    const fetchMemoCount = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/memos/counts/${user.id}`)
+        const data = await res.json()
+        setMemoCount(data.count || 0)
+      } catch (err) {
+        console.error("Error fetching memo count:", err)
+      }
+    }
+
+    fetchMemoCount()
+    interval = setInterval(fetchMemoCount, 60000) // refresh every 60 seconds
+  }
+
+  return () => clearInterval(interval)
+}, [user?.id])
+
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -86,7 +144,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Memos</p>
-              <p className="text-2xl font-semibold">{stats.memos}</p>
+              <p className="text-2xl font-semibold">  {memoCount}</p>
             </div>
             <div className="p-3 rounded-full bg-blue-50 text-primary">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -103,7 +161,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Requisitions</p>
-              <p className="text-2xl font-semibold">{stats.requisitions}</p>
+              <p className="text-2xl font-semibold">{requisitionCount}</p>
             </div>
             <div className="p-3 rounded-full bg-green-50 text-green-600">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,7 +178,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Tasks</p>
-              <p className="text-2xl font-semibold">{stats.tasks}</p>
+              <p className="text-2xl font-semibold">{taskCount}</p>
             </div>
             <div className="p-3 rounded-full bg-yellow-50 text-yellow-600">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
