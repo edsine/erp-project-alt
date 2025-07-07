@@ -241,105 +241,132 @@ exports.deleteFile = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete file' });
   }
 };
-// Download file
-exports.downloadFile = async (req, res) => {
-  try {
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
-    if (files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
-    }
 
-    // Removed permission check - all authenticated users can download
-    const filePath = files[0].path;
-    const fileName = files[0].name;
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: 'File not found on server' });
-    }
-
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Type', files[0].type);
-
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to download file' });
-  }
-};
 // View file (inline in browser)
 exports.viewFile = async (req, res) => {
   try {
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
-    if (files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+    const fileId = req.params.id;
+
+    // Fetch file metadata
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
+    if (!files || files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found in database' });
     }
 
-    // Removed permission check - all authenticated users can view
-    const filePath = files[0].path;
-    const fileName = files[0].name;
+    const file = files[0];
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ success: false, message: 'File not found on server' });
-    }
-
-    const fileType = files[0].type;
-    const isViewable = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/pdf',
-      'text/plain'
-    ].includes(fileType);
-
-    if (isViewable) {
-      res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-      res.setHeader('Content-Type', fileType);
-      
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
-    } else {
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
-      
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
-    }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Failed to view file' });
-  }
-};
-
-// Download file (updated version)
-exports.downloadFile = async (req, res) => {
-  try {
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
-    if (files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
-    }
-
-    // Check permissions
-    if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
+    // Permission check
+    const isOwner = file.uploaded_by === req.user.id;
+    const isPrivileged = ['gmd', 'chairman'].includes(req.user.role);
+    if (!isPrivileged && !isOwner) {
       return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
     }
 
-    const filePath = files[0].path;
-    const fileName = files[0].name;
+    const filePath = path.resolve(file.path);
+    const fileName = file.name;
+    const fileType = file.type || 'application/octet-stream';
 
-    // Check if file exists on filesystem
+    // File existence check
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Always force download for this endpoint
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.setHeader('Content-Type', files[0].type);
+    // Viewable MIME types
+    const viewableTypes = [
+      'image/jpeg', 'image/png', 'image/gif',
+      'application/pdf', 'text/plain'
+    ];
 
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
+    const isViewable = viewableTypes.includes(fileType);
+
+    // Headers
+    res.setHeader(
+      'Content-Disposition',
+      `${isViewable ? 'inline' : 'attachment'}; filename="${fileName}"`
+    );
+    res.setHeader('Content-Type', fileType);
+
+    // Stream the file
+    const stream = fs.createReadStream(filePath);
+    stream.pipe(res);
+
+    stream.on('error', (err) => {
+      console.error('Stream error:', err);
+      res.status(500).end('Error reading file');
+    });
   } catch (err) {
-    console.error(err);
+    console.error('ViewFile Error:', err);
+    res.status(500).json({ success: false, message: 'Failed to serve file' });
+  }
+};
+
+
+exports.downloadFile = async (req, res) => {
+  try {
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [req.params.id]);
+
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    const file = files[0];
+
+    const relativePath = file.path.trim(); // Remove spaces
+    const normalizedPath = path.normalize(relativePath.replace(/\\/g, path.sep));
+    const absolutePath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.join(__dirname, '..', normalizedPath);
+
+    console.log('Resolved file path:', absolutePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ success: false, message: 'File not found on server' });
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+    res.setHeader('Content-Type', file.type);
+
+    const stream = fs.createReadStream(absolutePath);
+    stream.pipe(res);
+
+  } catch (err) {
+    console.error('Download error:', err);
     res.status(500).json({ success: false, message: 'Failed to download file' });
   }
 };
+exports.downloadFile = async (req, res) => {
+  try {
+    const fileId = req.params.id;
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
+
+    if (files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found' });
+    }
+
+    const file = files[0];
+    const relativePath = file.path.trim();
+
+    // Sanitize and resolve the absolute path
+    const normalizedPath = path.normalize(relativePath.replace(/\\/g, path.sep));
+    const absolutePath = path.isAbsolute(normalizedPath)
+      ? normalizedPath
+      : path.join(__dirname, '..', normalizedPath); // assumes `path` is relative to project root
+
+    console.log('Resolved file path:', absolutePath);
+
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ success: false, message: 'File not found on server' });
+    }
+
+    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
+    res.setHeader('Content-Type', file.type);
+
+    const stream = fs.createReadStream(absolutePath);
+    stream.pipe(res);
+
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ success: false, message: 'Failed to download file' });
+  }
+};
+

@@ -17,7 +17,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Create a new requisition with file upload
+
+
 router.post('/requisitions', upload.single('attachment'), async (req, res) => {
   try {
     const {
@@ -27,18 +28,23 @@ router.post('/requisitions', upload.single('attachment'), async (req, res) => {
       quantity,
       unit_price,
       attachment_type = 'PDF',
-      created_by
+      created_by,
+
+      // Optional approval fields
+      approval_manager = 'pending',
+      approval_executive = 'pending',
+      approval_finance = 'pending',
+      approval_gmd = 'pending',
+      approval_chairman = 'pending'
     } = req.body;
 
-    // Validation: make sure required fields are present
+    // Validate required fields
     if (!title || !items || !quantity || !unit_price || !created_by) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Parse and validate numeric fields
     const parsedQuantity = parseInt(quantity, 10);
     const parsedUnitPrice = parseFloat(unit_price);
-
     if (isNaN(parsedQuantity) || isNaN(parsedUnitPrice)) {
       return res.status(400).json({ error: 'Quantity and unit price must be numbers' });
     }
@@ -47,19 +53,32 @@ router.post('/requisitions', upload.single('attachment'), async (req, res) => {
 
     const sql = `
       INSERT INTO requisitions 
-        (title, description, items, quantity, unit_price, attachment, attachment_type, created_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (title, description, items, quantity, unit_price, attachment, attachment_type, created_by, 
+         approval_manager, approval_executive, approval_finance, approval_gmd, approval_chairman) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
-    const [result] = await db.query(
-      sql,
-      [title, description, items, parsedQuantity, parsedUnitPrice, attachmentPath, attachment_type, created_by]
-    );
+    const [result] = await db.query(sql, [
+      title,
+      description,
+      items,
+      parsedQuantity,
+      parsedUnitPrice,
+      attachmentPath,
+      attachment_type,
+      created_by,
+      approval_manager,
+      approval_executive,
+      approval_finance,
+      approval_gmd,
+      approval_chairman
+    ]);
 
     return res.status(201).json({
       message: 'Requisition created successfully',
       requisitionId: result.insertId
     });
+
   } catch (err) {
     console.error('Error inserting requisition:', err);
     return res.status(500).json({ error: 'Failed to create requisition' });
@@ -75,93 +94,93 @@ router.post('/requisitions/:id/approve', async (req, res) => {
       return res.status(400).json({ message: 'User ID is required for approval.' });
     }
 
-    // Map roles to approval fields and dependencies
+    // Define role-to-approval field mapping
     const roleApprovalMap = {
-      gmd: { field: 'approved_by_gmd', dependsOn: null },
-      finance: { field: 'approved_by_finance', dependsOn: 'approved_by_gmd' },
-      gmd2: { field: 'approved_by_gmd2', dependsOn: 'approved_by_finance' },
-      chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd2' }
+      manager:   { field: 'approval_manager',   dependsOn: null,                  departmentMatch: true },
+      executive: { field: 'approval_executive', dependsOn: 'approval_manager',   departmentMatch: true },
+      finance:   { field: 'approval_finance',   dependsOn: 'approval_executive' },
+      gmd:       { field: 'approval_gmd',       dependsOn: 'approval_finance' },
+      chairman:  { field: 'approval_chairman',  dependsOn: 'approval_gmd' }
     };
 
-    // Get the user's role
-    const userSql = 'SELECT role FROM users WHERE id = ?';
-    const [userResults] = await db.query(userSql, [user_id]);
-
+    // Get user role and department
+    const [userResults] = await db.query('SELECT role, department FROM users WHERE id = ?', [user_id]);
     if (userResults.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const role = userResults[0].role;
+    const { role, department: userDept } = userResults[0];
 
+    // Ensure user has a valid approval role
     if (!roleApprovalMap[role]) {
       return res.status(403).json({ message: 'User role is not authorized to approve' });
     }
 
-    if (role === 'gmd') {
-      // GMD special case: can approve first or act as GMD2 after finance
-      const gmdCheckSql = `
-        SELECT approved_by_gmd, approved_by_finance, approved_by_gmd2 
-        FROM requisitions 
-        WHERE id = ?
-      `;
-      const [checkResults] = await db.query(gmdCheckSql, [requisitionId]);
+    // Get requisition and approval fields
+    const [requisitionResults] = await db.query(
+      'SELECT created_by, approval_manager, approval_executive, approval_finance, approval_gmd, approval_chairman FROM requisitions WHERE id = ?',
+      [requisitionId]
+    );
 
-      if (checkResults.length === 0) {
-        return res.status(404).json({ message: 'Requisition not found' });
-      }
-
-      const reqs = checkResults[0];
-
-      if (reqs.approved_by_gmd === 0) {
-        // First GMD approval
-        const updateSql = `UPDATE requisitions SET approved_by_gmd = 1 WHERE id = ?`;
-        await db.query(updateSql, [requisitionId]);
-        return res.status(200).json({ message: 'Approved by GMD', field: 'approved_by_gmd' });
-      } else if (reqs.approved_by_gmd === 1 && reqs.approved_by_finance === 1 && reqs.approved_by_gmd2 === 0) {
-        // GMD acting as GMD2 after Finance approval
-        const updateSql = `UPDATE requisitions SET approved_by_gmd2 = 1 WHERE id = ?`;
-        await db.query(updateSql, [requisitionId]);
-        return res.status(200).json({ message: 'Approved by GMD2', field: 'approved_by_gmd2' });
-      } else {
-        return res.status(400).json({ message: 'GMD cannot approve at this stage or already approved' });
-      }
-    } else {
-      // Other roles: check dependency and approval status
-      const { field, dependsOn } = roleApprovalMap[role];
-      const checkSql = `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM requisitions WHERE id = ?`;
-      const [checkResults] = await db.query(checkSql, [requisitionId]);
-
-      if (checkResults.length === 0) {
-        return res.status(404).json({ message: 'Requisition not found' });
-      }
-
-      const reqs = checkResults[0];
-
-      if (reqs[field] === 1) {
-        return res.status(400).json({ message: `Already approved by ${role}` });
-      }
-
-      if (dependsOn && reqs[dependsOn] !== 1) {
-        return res.status(403).json({
-          message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`
-        });
-      }
-
-      const updateSql = `UPDATE requisitions SET ${field} = 1 WHERE id = ?`;
-      await db.query(updateSql, [requisitionId]);
-      return res.status(200).json({ message: `Approved by ${role}`, field });
+    if (requisitionResults.length === 0) {
+      return res.status(404).json({ message: 'Requisition not found' });
     }
+
+    const requisition = requisitionResults[0];
+
+    // Get sender department
+    const [senderResults] = await db.query('SELECT department FROM users WHERE id = ?', [requisition.created_by]);
+    if (senderResults.length === 0) {
+      return res.status(404).json({ message: 'Sender user not found' });
+    }
+
+    const senderDept = senderResults[0].department;
+
+    // Special case: GMD approval only once
+    if (role === 'gmd') {
+      if (requisition.approval_gmd === 'approved') {
+        return res.status(400).json({ message: 'Already approved by GMD' });
+      }
+
+      if (requisition.approval_finance !== 'approved') {
+        return res.status(403).json({ message: 'Cannot approve yet. Waiting for finance approval.' });
+      }
+
+      await db.query('UPDATE requisitions SET approval_gmd = "approved" WHERE id = ?', [requisitionId]);
+      return res.status(200).json({ message: 'Approved by GMD', field: 'approval_gmd' });
+    }
+
+    // Standard flow
+    const { field, dependsOn, departmentMatch } = roleApprovalMap[role];
+
+    if (requisition[field] === 'approved') {
+      return res.status(400).json({ message: `Already approved by ${role}` });
+    }
+
+    if (dependsOn && requisition[dependsOn] !== 'approved') {
+      return res.status(403).json({ message: `Cannot approve yet. Waiting for ${dependsOn.replace('approval_', '')} approval.` });
+    }
+
+    if (departmentMatch && userDept !== senderDept) {
+      return res.status(403).json({ message: `Approval denied. ${role} must be from the same department as the requisition sender.` });
+    }
+
+    await db.query(`UPDATE requisitions SET ${field} = 'approved' WHERE id = ?`, [requisitionId]);
+    return res.status(200).json({ message: `Approved by ${role}`, field });
+
   } catch (err) {
     console.error('Error in approval process:', err);
     return res.status(500).json({ message: 'Error updating approval status' });
   }
 });
 
+
+
 router.get('/requisitions/user/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Get user info first
+    // 1. Get user info
     const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
 
     if (userRows.length === 0) {
@@ -169,44 +188,58 @@ router.get('/requisitions/user/:userId', async (req, res) => {
     }
 
     const user = userRows[0];
-    const role = user.role.toLowerCase(); // Normalize role
+    const role = user.role.toLowerCase(); // Normalize
+    const department = user.department;   // Assuming user table has this field
+
     let query = '';
     let queryParams = [];
 
-    // Determine query based on user role
     switch (role) {
-      case 'gmd':
-        query = `
-          SELECT * FROM requisitions
-          WHERE 
-            (approved_by_gmd = 0)
-            OR (approved_by_gmd = 1 AND approved_by_finance = 1 AND approved_by_gmd2 = 0)
-        `;
-        break;
-      case 'finance':
-        query = 'SELECT * FROM requisitions WHERE approved_by_finance = 0';
-        break;
-      case 'chairman':
-        query = 'SELECT * FROM requisitions WHERE approved_by_chairman = 0';
-        break;
       case 'manager':
-        query = 'SELECT * FROM requisitions WHERE status = "in_review"';
+        query = `
+          SELECT r.* FROM requisitions r
+          JOIN users u ON r.created_by = u.id
+          WHERE r.approval_manager = 'pending' AND u.department = ?
+        `;
+        queryParams = [department];
         break;
+
+      case 'executive':
+        query = `
+          SELECT r.* FROM requisitions r
+          JOIN users u ON r.created_by = u.id
+          WHERE r.approval_executive = 'pending' AND u.department = ?
+        `;
+        queryParams = [department];
+        break;
+
+      case 'finance':
+        query = `SELECT * FROM requisitions WHERE approval_finance = 'pending'`;
+        break;
+
+      case 'gmd':
+        query = `SELECT * FROM requisitions WHERE approval_gmd = 'pending'`;
+        break;
+
+      case 'chairman':
+        query = `SELECT * FROM requisitions WHERE approval_chairman = 'pending'`;
+        break;
+
       default:
-        // For other roles, just fetch their own requisitions
-        query = 'SELECT * FROM requisitions WHERE created_by = ?';
+        query = `SELECT * FROM requisitions WHERE created_by = ?`;
         queryParams = [userId];
+        break;
     }
 
-    // Run the requisitions query
     const [requisitions] = await db.query(query, queryParams);
 
     res.json({ success: true, data: requisitions });
   } catch (err) {
     console.error('Error fetching requisitions:', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
 
 router.post('/requisitions/:id/reject', async (req, res) => {
   try {

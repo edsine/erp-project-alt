@@ -78,79 +78,83 @@ const ClientFileList = () => {
     }
   };
 
-  const handleDownload = async (fileId, fileName) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Authentication required. Please login again.');
-      navigate('/login');
-      return;
+
+const handleDownload = async (fileId, fileName) => {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  try {
+    const response = await axios.get(`${BASE_URL}/files/download/${fileId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+
+    const contentType = response.headers['content-type'];
+    if (contentType && contentType.includes('application/json')) {
+      const text = await new Response(response.data).text();
+      const json = JSON.parse(text);
+      throw new Error(json.message || 'Unexpected server response');
     }
 
-    try {
-      const response = await axios.get(`${BASE_URL}/files/download/${fileId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName || 'downloaded-file');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Download failed:', err.message || err);
+  }
+};
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+
+
+
+ const handleView = async (fileId, fileName, fileType) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    navigate('/login');
+    return;
+  }
+
+  try {
+    const response = await axios.get(`${BASE_URL}/files/view/${fileId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+
+    const isViewable = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/pdf',
+      'text/plain',
+    ].includes(fileType);
+
+    const blob = new Blob([response.data], { type: fileType });
+    const url = window.URL.createObjectURL(blob);
+
+    if (isViewable) {
+      window.open(url, '_blank');
+    } else {
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', fileName);
+      link.setAttribute('download', fileName || 'download');
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to download file');
-    }
-  };
-
-  const handleView = async (fileId, fileName, fileType) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('Authentication required. Please login again.');
-      navigate('/login');
-      return;
+      link.remove();
     }
 
-    try {
-      const response = await axios.get(`${BASE_URL}/files/view/${fileId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob'
-      });
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000); // allow time for open/click to complete
+  } catch (err) {
+    console.error('View failed:', err);
+    setError(err.response?.data?.message || 'Failed to view file');
+  }
+};
 
-      // Create a blob URL for the file
-      const blob = new Blob([response.data], { type: fileType });
-      const url = window.URL.createObjectURL(blob);
-
-      // Check if the file is viewable in browser
-      const isViewable = [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'application/pdf',
-        'text/plain'
-      ].includes(fileType);
-
-      if (isViewable) {
-        // Open in new tab for viewable files
-        window.open(url, '_blank');
-      } else {
-        // Force download for non-viewable files
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', fileName);
-        document.body.appendChild(link);
-        link.click();
-        link.parentNode.removeChild(link);
-      }
-
-      // Clean up
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to view file');
-    }
-  };
 
   if (loading) return <div className="text-center py-8">Loading files...</div>;
   if (error) return <div className="text-center text-red-500 py-8">{error}</div>;

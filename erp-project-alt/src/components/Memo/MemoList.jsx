@@ -8,16 +8,18 @@ const MemoList = () => {
 
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
+  const [acknowledgments, setAcknowledgments] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+
     const fetchMemos = async () => {
       try {
         const response = await axios.get(
-          `${BASE_URL}/memos/user/${user.id}`,
+          `${BASE_URL}/memos/user/${user.id}?role=${user.role}`,
           {
             headers: {
               Authorization: `Bearer ${user.token}`,
@@ -25,25 +27,26 @@ const MemoList = () => {
           }
         );
 
-        if (response.data.success) {
-          // Transform the API data
-          const transformedMemos = response.data.data.map(memo => ({
-            ...memo,
-            sender: `User ${memo.created_by}`,
-            date: new Date(memo.created_at).toLocaleDateString(),
-            status: memo.status || 'submitted',
-            priority: 'medium'
-          }));
-          setMemos(transformedMemos);
-        } else {
-          setError(response.data.message || 'Failed to fetch memos');
-        }
+
+        const memosArray = response.data; // Directly the array
+
+        const transformedMemos = memosArray.map(memo => ({
+          ...memo,
+          sender: `User ${memo.created_by}`, // Replace with actual username if you have a lookup
+          date: new Date(memo.created_at).toLocaleDateString(),
+          status: memo.status || 'submitted',
+          priority: memo.priority || 'medium',
+          acknowledged: isMemoAcknowledgedByUser(memo, user.id)
+        }));
+
+        setMemos(transformedMemos);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch memos');
       } finally {
         setLoading(false);
       }
     };
+
 
     fetchMemos();
   }, [user]);
@@ -55,14 +58,22 @@ const MemoList = () => {
   );
 
   const handleMemoClick = (memo) => {
-    setSelectedMemo(memo);
+    setSelectedMemo({
+      ...memo,
+      acknowledged: isMemoAcknowledgedByUser(memo, user.id)
+    })
   };
+
 
   const handleApprove = async (memo) => {
     try {
       const response = await axios.post(
         `${BASE_URL}/memos/${memo.id}/approve`,
-        { user_id: user.id },
+        {
+          user_id: user.id,
+          role: user.role, // ✅ pass the role
+          send_directly_to_chairman: sendDirectlyToChairman,
+        },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -71,14 +82,14 @@ const MemoList = () => {
       );
 
       if (response.status === 200) {
-        console.log(response.data.message);
         alert(`✅ Success: ${response.data.message}`);
-        // Update memo list
-        const updatedMemo = { ...memo, status: 'approved' };
+        const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
         setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+        setSelectedMemo(updatedMemo)
       }
     } catch (error) {
       console.error('Approval failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
   };
 
@@ -102,10 +113,10 @@ const MemoList = () => {
         const updatedMemos = memos.map(m =>
           m.id === memo.id
             ? {
-                ...m,
-                status: 'rejected',
-                [field]: -1,
-              }
+              ...m,
+              status: 'rejected',
+              [field]: -1,
+            }
             : m
         );
 
@@ -181,8 +192,72 @@ const MemoList = () => {
     }
   };
 
+  const handleAcknowledge = async (memo) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/acknowledge`,
+        { user_id: user.id },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        alert(`✅ Acknowledged: ${response.data.message}`);
+
+        // Ensure that acknowledgments is parsed into an array of objects
+        let updatedAcks = response.data.acknowledgments;
+        if (typeof updatedAcks === 'string') {
+          try {
+            updatedAcks = JSON.parse(updatedAcks);
+          } catch (err) {
+            updatedAcks = [];
+          }
+        }
+
+        const updatedMemo = {
+          ...memo,
+          acknowledged: true,
+          acknowledgments: updatedAcks
+        };
+
+        setSelectedMemo(updatedMemo);
+        setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+      }
+    } catch (error) {
+      console.error('Acknowledgment failed:', error);
+      alert(`❌ Error: ${error.response?.data?.message || 'Acknowledgment failed'}`);
+    }
+  };
+
+
+  const isMemoAcknowledgedByUser = (memo, userId) => {
+    if (!memo.acknowledgments) return false;
+    const acks = Array.isArray(memo.acknowledgments)
+      ? memo.acknowledgments
+      : [];
+    return acks.some(a => typeof a === 'object' && a.id === userId);
+  };
+
+
+
   if (loading) return <p className="text-center py-4">Loading memos...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
+
+  const getMemoTypeBadge = (type) => {
+    if (type === 'report') {
+      return {
+        text: 'Report',
+        className: 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+      };
+    }
+    return {
+      text: 'Normal',
+      className: 'bg-blue-100 text-blue-800 border border-blue-300'
+    };
+  };
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -221,11 +296,22 @@ const MemoList = () => {
                     } ${selectedMemo?.id === memo.id ? 'bg-gray-100' : ''}`}
                 >
                   <div className="flex justify-between items-start">
-                    <h3 className="font-medium">{memo.title}</h3>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo.status).className}`}>
-                      {getStatusBadge(memo.status).icon}
-                      {getStatusBadge(memo.status).text}
-                    </span>
+                    <div>
+                      <h3 className="font-medium">{memo.title}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo.status).className}`}
+                        >
+                          {getStatusBadge(memo.status).icon}
+                          {getStatusBadge(memo.status).text}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMemoTypeBadge(memo.memo_type).className}`}
+                        >
+                          {getMemoTypeBadge(memo.memo_type).text}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <p className="text-sm text-gray-500">{memo.sender}</p>
                   <p className="text-xs text-gray-400">{memo.date}</p>
@@ -235,6 +321,7 @@ const MemoList = () => {
               <p className="text-center text-gray-500 py-4">No memos found</p>
             )}
           </div>
+
         </div>
       </div>
 
@@ -244,7 +331,18 @@ const MemoList = () => {
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-xl font-bold">{selectedMemo.title}</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  {selectedMemo.memo_type === 'report' && selectedMemo.acknowledged && (
+                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                      Acknowledged
+                    </span>
+                  )}
+
+                </h2>
+
                 <p className="text-sm text-gray-500">From: {selectedMemo.sender}</p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
                 <div className="mt-2">
@@ -252,6 +350,7 @@ const MemoList = () => {
                     {getStatusBadge(selectedMemo.status).icon}
                     {getStatusBadge(selectedMemo.status).text}
                   </span>
+
                 </div>
               </div>
               <button
@@ -270,22 +369,129 @@ const MemoList = () => {
 
             {/* Approval status indicators */}
             <div className="grid grid-cols-4 gap-2 mb-6">
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_manager ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Line Manager: {selectedMemo.approved_by_manager ? 'Approved' : 'Pending'}
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_manager === 1
+                ? 'bg-green-100 text-green-800'
+                : selectedMemo.approved_by_manager === -1
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100'
+                }`}>
+                Manager: {
+                  selectedMemo.approved_by_manager === 1
+                    ? 'Approved'
+                    : selectedMemo.approved_by_manager === -1
+                      ? 'Rejected'
+                      : 'Pending'
+                }
               </div>
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_executive ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Executive: {selectedMemo.approved_by_executive ? 'Approved' : 'Pending'}
+
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_executive === 1
+                ? 'bg-green-100 text-green-800'
+                : selectedMemo.approved_by_executive === -1
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100'
+                }`}>
+                Executive: {
+                  selectedMemo.approved_by_executive === 1
+                    ? 'Approved'
+                    : selectedMemo.approved_by_executive === -1
+                      ? 'Rejected'
+                      : 'Pending'
+                }
               </div>
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_finance ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Finance: {selectedMemo.approved_by_finance ? 'Approved' : 'Pending'}
+
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_finance === 1
+                ? 'bg-green-100 text-green-800'
+                : selectedMemo.approved_by_finance === -1
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100'
+                }`}>
+                Finance: {
+                  selectedMemo.approved_by_finance === 1
+                    ? 'Approved'
+                    : selectedMemo.approved_by_finance === -1
+                      ? 'Rejected'
+                      : 'Pending'
+                }
               </div>
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_gmd ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                GMD: {selectedMemo.approved_by_gmd ? 'Approved' : 'Pending'}
+
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_gmd === 1
+                ? 'bg-green-100 text-green-800'
+                : selectedMemo.approved_by_gmd === -1
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100'
+                }`}>
+                GMD: {
+                  selectedMemo.approved_by_gmd === 1
+                    ? 'Approved'
+                    : selectedMemo.approved_by_gmd === -1
+                      ? 'Rejected'
+                      : 'Pending'
+                }
               </div>
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_chairman ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>
-                Chairman: {selectedMemo.approved_by_chairman ? 'Approved' : 'Pending'}
+
+              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_chairman === 1
+                ? 'bg-green-100 text-green-800'
+                : selectedMemo.approved_by_chairman === -1
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100'
+                }`}>
+                Chairman: {
+                  selectedMemo.approved_by_chairman === 1
+                    ? 'Approved'
+                    : selectedMemo.approved_by_chairman === -1
+                      ? 'Rejected'
+                      : 'Pending'
+                }
               </div>
             </div>
+
+
+            {/* Acknowledgment checkbox for reports */}
+            {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (
+              <div className="mt-6 border-t pt-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    className="form-checkbox h-4 w-4 text-primary"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        handleAcknowledge(selectedMemo);
+                      }
+                    }}
+                  />
+                  <span className="ml-2 text-sm text-gray-700">I acknowledge this memo</span>
+                </label>
+              </div>
+            )}
+            {selectedMemo.memo_type === 'report' && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-1">Pending Acknowledgment From:</h4>
+                <ul className="list-disc list-inside text-sm text-gray-500">
+                  {selectedMemo.acknowledgments
+                    .filter(a => typeof a === 'string')
+                    .map((role, idx) => (
+                      <li key={idx}>{role}</li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
+
+            {selectedMemo.memo_type === 'report' && selectedMemo.acknowledgments?.length > 0 && (
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Acknowledged by:</h4>
+                <ul className="list-disc list-inside text-sm text-gray-700">
+                  {selectedMemo.acknowledgments
+                    .filter(a => typeof a === 'object') // filter only actual acknowledgment objects
+                    .map((a) => (
+                      <li key={a.id}>
+                        {a.name} — {a.role} ({a.dept})
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
 
             {/* Approval buttons for authorized roles */}
             {selectedMemo.status === 'submitted' &&
@@ -294,25 +500,44 @@ const MemoList = () => {
                 user?.role === 'finance' ||
                 user?.role === 'gmd' ||
                 user?.role === 'chairman') && (
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    onClick={() => handleReject(selectedMemo)}
-                    disabled={loading}
-                    className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                  >
-                    {loading ? 'Processing...' : 'Reject'}
-                  </button>
-                  <button
-                    onClick={() => handleApprove(selectedMemo)}
-                    disabled={loading}
-                    className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                  >
-                    {loading ? 'Processing...' : 'Approve'}
-                  </button>
+                <div className="mt-6 space-y-4">
+                  {/* Show checkbox for executive, finance, and GMD to send directly to chairman */}
+                  {(user?.role === 'executive' || user?.role === 'finance' || user?.role === 'gmd') && (
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="sendDirectly"
+                        checked={sendDirectlyToChairman}
+                        onChange={(e) => setSendDirectlyToChairman(e.target.checked)}
+                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                      />
+                      <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
+                        Send directly to Chairman
+                      </label>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => handleReject(selectedMemo)}
+                      disabled={loading}
+                      className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {loading ? 'Processing...' : 'Reject'}
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedMemo)}
+                      disabled={loading}
+                      className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {loading ? 'Processing...' : 'Approve'}
+                    </button>
+                  </div>
                 </div>
               )}
+
           </div>
         </div>
       )}

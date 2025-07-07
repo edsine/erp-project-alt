@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fileController = require('../Controllers/fileController');
 const authMiddleware = require('../Middleware/authMiddleware');
-const upload = require('../Middleware/uploadMiddleware');
+const upload = require('../Middleware/uploadMiddleware'); // ✅ moved here
 
 // Client routes
 router.get('/files/clients', authMiddleware, fileController.getAllClients);
@@ -14,10 +14,10 @@ router.delete('/files/clients/:id', authMiddleware, fileController.deleteClient)
 // File routes
 router.get('/files', authMiddleware, fileController.getAllFiles);
 router.get('/files/:id', authMiddleware, fileController.getFileById);
-router.get('/files/download/:id', authMiddleware, fileController.downloadFile);
+router.get('/files/download/:id', fileController.downloadFile);
+
 router.get('/files/view/:id', authMiddleware, fileController.viewFile);
 router.post('/files', authMiddleware, upload.single('file'), fileController.uploadFile);
 router.delete('/files/:id', authMiddleware, fileController.deleteFile);
-
 
 module.exports = router;

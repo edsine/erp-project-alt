@@ -295,7 +295,7 @@ const UserList = () => {
               <option value="ICT">ICT</option>
               <option value="Finance">Finance</option>
               <option value="Operations">Tender</option>
-              <option value="Executive">Executive</option>
+              
               <option value="HR">HR</option>
               <option value="Admin">Admin</option>
             </select>
@@ -313,6 +313,7 @@ const UserList = () => {
               <option value="chairman">Chairman</option>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
+              <option value="executive">Executive</option>
             </select>
           </div>
           <div>
