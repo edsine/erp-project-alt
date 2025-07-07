@@ -250,15 +250,130 @@ router.delete('/leave/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete leave request' });
   }
 });
+
+
 // Get leave request count
-router.get('/count', async (req, res) => {
+
+router.get('/leave-requests/count/user/:userId', async (req, res) => {
   try {
-    const [results] = await db.query('SELECT COUNT(*) as count FROM leave_requests');
-    res.json({ count: results[0].count });
+    const userId = parseInt(req.params.userId, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    // Get user info including role and department
+    const [userRows] = await db.query(`
+      SELECT id, role, department 
+      FROM users 
+      WHERE id = ?
+    `, [userId]);
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+    const role = user.role.toLowerCase();
+    const department = user.department;
+
+    // Define role categories
+    const approvalRoles = {
+      'gmd': 'approved_by_gmd',
+      'finance': 'approved_by_finance',
+      'chairman': 'approved_by_chairman'
+    };
+    const departmentRoles = ['manager', 'executive', 'hr'];
+
+    let query = '';
+    let params = [];
+
+    if (approvalRoles[role]) {
+      // Approval roles (GMD, Finance, Chairman)
+      const approvalField = approvalRoles[role];
+      query = `
+        SELECT COUNT(*) AS count
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        WHERE lr.status = 'pending'
+        AND lr.${approvalField} = 0
+        AND (lr.rejected_by_${role} = 0 OR lr.rejected_by_${role} IS NULL)
+      `;
+    } 
+    else if (departmentRoles.includes(role)) {
+      // Department roles (Manager, Executive, HR)
+      query = `
+        SELECT COUNT(*) AS count
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        WHERE u.department = ?
+        AND lr.status = 'pending'
+        ${
+          role === 'hr' ? 
+          "AND lr.type IN ('annual', 'sick', 'maternity', 'paternity', 'unpaid')" : 
+          ""
+        }
+      `;
+      params = [department];
+    }
+    else {
+      // Regular users see only their own leave requests
+      query = `
+        SELECT COUNT(*) AS count
+        FROM leave_requests
+        WHERE user_id = ?
+      `;
+      params = [userId];
+    }
+
+    // Add status filter if provided
+    if (req.query.status) {
+      const validStatuses = ['pending', 'approved', 'rejected'];
+      if (validStatuses.includes(req.query.status)) {
+        if (query.includes('WHERE')) {
+          query += ' AND status = ?';
+        } else {
+          query += ' WHERE status = ?';
+        }
+        params.push(req.query.status);
+      }
+    }
+
+    // Add type filter if provided
+    if (req.query.type) {
+      const validTypes = ['annual', 'sick', 'maternity', 'paternity', 'unpaid', 'other'];
+      if (validTypes.includes(req.query.type)) {
+        if (query.includes('WHERE')) {
+          query += ' AND type = ?';
+        } else {
+          query += ' WHERE type = ?';
+        }
+        params.push(req.query.type);
+      }
+    }
+
+    const [rows] = await db.query(query, params);
+    const count = rows[0]?.count || 0;
+
+    res.json({ 
+      success: true,
+      count,
+      filters: {
+        role,
+        department,
+        status: req.query.status || 'all',
+        type: req.query.type || 'all'
+      }
+    });
+
   } catch (err) {
-    console.error('Error fetching leave request count:', err);
-    res.status(500).json({ message: 'Database error' });
+    console.error('Error fetching leave request counts:', err);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error',
+      details: err.message 
+    });
   }
 });
+
 
 module.exports = router;

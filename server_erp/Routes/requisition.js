@@ -240,6 +240,81 @@ router.get('/requisitions/user/:userId', async (req, res) => {
   }
 });
 
+//this is for the count loginc
+router.get('/requisitions/count/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Get user info
+    const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+    const role = user.role.toLowerCase();
+    const department = user.department;
+
+    let query = '';
+    let params = [];
+
+    if (role === 'manager') {
+      query = `
+        SELECT COUNT(*) AS count
+        FROM requisitions r
+        JOIN users u ON r.created_by = u.id
+        WHERE u.department = ? 
+        AND r.approval_manager = 'pending'
+        AND r.status = 'pending'
+      `;
+      params = [department];
+    } 
+    else if (role === 'executive') {
+      query = `
+        SELECT COUNT(*) AS count
+        FROM requisitions r
+        JOIN users u ON r.created_by = u.id
+        WHERE u.department = ? 
+        AND r.approval_executive = 'pending'
+        AND r.status = 'pending'
+      `;
+      params = [department];
+    }
+    else if (['finance', 'gmd', 'chairman'].includes(role)) {
+      const approvalField = `approval_${role}`;
+      query = `
+        SELECT COUNT(*) AS count
+        FROM requisitions
+        WHERE ${approvalField} = 'pending'
+        AND status = 'pending'
+      `;
+    }
+    else {
+      // Regular user (staff/hr)
+      query = `
+        SELECT COUNT(*) AS count 
+        FROM requisitions 
+        WHERE created_by = ?
+        AND status = 'pending'
+      `;
+      params = [userId];
+    }
+
+    const [rows] = await db.query(query, params);
+    const count = rows[0]?.count || 0;
+
+    res.json({ count });
+
+  } catch (err) {
+    console.error('Error fetching requisition count:', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+
+
+
+
 
 router.post('/requisitions/:id/reject', async (req, res) => {
   try {

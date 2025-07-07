@@ -81,34 +81,60 @@ const ClientFileList = () => {
 
 const handleDownload = async (fileId, fileName) => {
   const token = localStorage.getItem('token');
-  if (!token) return;
+  if (!token) {
+    alert('Please login to download files');
+    return;
+  }
 
   try {
-    const response = await axios.get(`${BASE_URL}/files/download/${fileId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      responseType: 'blob',
+    console.log(`Starting download for file ${fileId}`);
+    
+    const response = await fetch(`${BASE_URL}/files/download/${fileId}`, {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Cache-Control': 'no-cache'
+      }
     });
 
-    const contentType = response.headers['content-type'];
-    if (contentType && contentType.includes('application/json')) {
-      const text = await new Response(response.data).text();
-      const json = JSON.parse(text);
-      throw new Error(json.message || 'Unexpected server response');
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `Server returned ${response.status}`);
     }
 
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    // Get filename from headers or use default
+    const contentDisposition = response.headers.get('content-disposition');
+    let finalFileName = fileName;
+    
+    if (contentDisposition) {
+      const match = contentDisposition.match(/filename="?(.+?)"?(;|$)/i);
+      if (match) finalFileName = match[1];
+    }
+
+    // Get blob and create download link
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
+    
     link.href = url;
-    link.setAttribute('download', fileName || 'downloaded-file');
+    link.download = finalFileName;
+    link.style.display = 'none';
     document.body.appendChild(link);
+    
+    console.log('Triggering download...');
     link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+
+    // Cleanup
+    setTimeout(() => {
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      console.log('Download cleanup complete');
+    }, 200);
+
   } catch (err) {
-    console.error('Download failed:', err.message || err);
+    console.error('Download error:', err);
+    alert(`Download failed: ${err.message || 'Please try again'}`);
   }
 };
-
 
 
 

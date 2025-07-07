@@ -169,6 +169,82 @@ router.get('/memos/user/:userId', async (req, res) => {
 });
 
 
+//fro memo count logic 
+
+router.get('/memos/counts/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.query;
+
+    // First get full user info
+    const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userRows[0];
+    const userRole = role?.toLowerCase() || user.role.toLowerCase();
+    const department = user.department;
+
+    const approvalRoles = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
+    const isApprover = approvalRoles.includes(userRole);
+
+    let query = '';
+    let params = [];
+
+    if (isApprover) {
+      const approvalField = `approved_by_${userRole}`;
+      
+      if (['finance', 'gmd', 'chairman'].includes(userRole)) {
+        // Global approvers (no department restriction)
+        query = `
+          SELECT COUNT(*) as count
+          FROM memos
+          WHERE (
+            (memo_type = 'normal' AND ${approvalField} IS NULL AND requires_approval = 1)
+            OR
+            (memo_type = 'report' AND JSON_CONTAINS(acknowledgments, JSON_QUOTE(?)))
+          )
+          ${userRole === 'chairman' ? 'AND approved_by_gmd = 1' : ''}
+        `;
+        params = [userRole];
+      } else {
+        // Department-restricted approvers (manager/executive)
+        query = `
+          SELECT COUNT(*) as count
+          FROM memos m
+          JOIN users u ON m.created_by = u.id
+          WHERE (
+            (m.memo_type = 'normal' AND m.${approvalField} IS NULL AND m.requires_approval = 1 AND u.department = ?)
+            OR
+            (m.memo_type = 'report' AND JSON_CONTAINS(m.acknowledgments, JSON_QUOTE(?)) AND u.department = ?)
+          )
+        `;
+        params = [department, userRole, department];
+      }
+    } else {
+      // Regular users - only their own memos
+      query = `
+        SELECT COUNT(*) as count 
+        FROM memos 
+        WHERE created_by = ?
+      `;
+      params = [userId];
+    }
+
+    const [rows] = await db.query(query, params);
+    const count = rows[0]?.count || 0;
+
+    res.json({ count });
+
+  } catch (err) {
+    console.error('Error fetching memo counts:', err);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      details: err.message 
+    });
+  }
+});
 
 
 router.post('/memos/:id/acknowledge', async (req, res) => {
@@ -560,16 +636,7 @@ router.get('/memos/approval/:userId', async (req, res) => {
 
 
 
-// Get memo count
-router.get('/count', async (req, res) => {
-  try {
-    const [results] = await db.query('SELECT COUNT(*) as count FROM memos');
-    res.json({ count: results[0].count });
-  } catch (err) {
-    console.error('Error fetching memo count:', err);
-    res.status(500).json({ message: 'Database error' });
-  }
-});
+
 
 
 
