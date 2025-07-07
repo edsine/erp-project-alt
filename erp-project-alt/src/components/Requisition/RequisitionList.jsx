@@ -12,36 +12,49 @@ const RequisitionList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchRequisitions = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${BASE_URL}/requisitions/user/${user.id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        const data = await response.json();
+ 
 
-        if (response.ok) {
-          setRequisitions(data.data);
-        } else {
-          throw new Error(data.message || 'Failed to fetch requisitions');
+
+
+
+useEffect(() => {
+  const fetchRequisitions = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/requisitions/user/${user?.id}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        setRequisitions(result.data);
+      } else {
+        throw new Error(result.message || 'Failed to fetch requisitions');
       }
-    };
+    } catch (err) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  if (user?.id) {
     fetchRequisitions();
-  }, [user.id]);
+  }
+}, [user?.id, BASE_URL]);
 
-  const filteredRequisitions = requisitions.filter(req =>
-    req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    req.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+
+
+ const filteredRequisitions = requisitions.filter(req =>
+  req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  req.description.toLowerCase().includes(searchTerm.toLowerCase())
+);
 
   const handleRequisitionClick = (requisition) => {
     setSelectedRequisition(requisition);
@@ -56,44 +69,55 @@ const RequisitionList = () => {
     });
   };
 
-  const handleApprove = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ user_id: user.id })
-      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to approve requisition');
-      }
+const handleApprove = async (id) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ user_id: user.id })
+    });
 
-      setRequisitions(prev =>
-        prev.map(req => {
-          if (req.id === id) {
-            const updated = { ...req };
-            if (user.role.toLowerCase() === 'gmd') updated.approved_by_gmd = true;
-            else if (user.role.toLowerCase() === 'gmd2') updated.approved_by_gmd2 = true;
-            else if (user.role.toLowerCase() === 'finance') updated.approved_by_finance = true;
-            else if (user.role.toLowerCase() === 'chairman') updated.approved_by_chairman = true;
+    const result = await response.json();
 
-            updated.status = 'approved';
-            return updated;
-          }
-          return req;
-        })
-      );
-      setSelectedRequisition(null);
-    } catch (error) {
-      console.error('Approve error:', error);
-      alert(error.message);
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to approve requisition');
     }
-  };
+
+    // Update requisitions list
+    setRequisitions(prev =>
+      prev.map(req => {
+        if (req.id === id) {
+          return {
+            ...req,
+            [result.field]: 'approved',
+            status: 'approved'
+          };
+        }
+        return req;
+      })
+    );
+
+    // ✅ Update selectedRequisition to reflect latest approval
+    if (selectedRequisition?.id === id) {
+      setSelectedRequisition(prev => ({
+        ...prev,
+        [result.field]: 'approved',
+        status: 'approved'
+      }));
+    }
+
+  } catch (error) {
+    console.error('Approve error:', error);
+    alert(error.message);
+  }
+};
+
+
 
   const handleReject = async (id) => {
     try {
@@ -264,33 +288,39 @@ const RequisitionList = () => {
 
             <div className="mb-6">
               <h4 className="text-sm font-medium text-gray-500 mb-2">Approvals</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {['gmd', 'gmd2', 'finance', 'chairman'].map(role => {
-                  const approved = selectedRequisition[`approved_by_${role}`];
-                  const rejected = selectedRequisition[`rejected_by_${role}`];
+             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+  {[
+    { role: 'manager', label: 'Manager' },
+    { role: 'executive', label: 'Executive' },
+    { role: 'finance', label: 'Finance' },
+    { role: 'gmd', label: 'GMD' },
+    { role: 'chairman', label: 'Chairman' },
+  ].map(({ role, label }) => {
+    const status = selectedRequisition[`approval_${role}`]; // 'pending' | 'approved' | 'rejected'
 
-                  let statusLabel = 'Pending';
-                  let statusClass = 'bg-gray-100 text-gray-600';
+    let statusLabel = 'Pending';
+    let statusClass = 'bg-gray-100 text-gray-600';
 
-                  if (approved === 1 || approved === true) {
-                    statusLabel = 'Approved';
-                    statusClass = 'bg-green-100 text-green-800';
-                  } else if (rejected === 1 || rejected === true) {
-                    statusLabel = 'Rejected';
-                    statusClass = 'bg-red-100 text-red-800';
-                  }
+    if (status === 'approved') {
+      statusLabel = 'Approved';
+      statusClass = 'bg-green-100 text-green-800';
+    } else if (status === 'rejected') {
+      statusLabel = 'Rejected';
+      statusClass = 'bg-red-100 text-red-800';
+    }
 
-                  return (
-                    <div
-                      key={role}
-                      className={`p-2 rounded-md text-center ${statusClass}`}
-                    >
-                      <div className="text-xs font-medium">{role.toUpperCase()}</div>
-                      <div className="text-xs">{statusLabel}</div>
-                    </div>
-                  );
-                })}
-              </div>
+    return (
+      <div
+        key={role}
+        className={`p-2 rounded-md text-center ${statusClass}`}
+      >
+        <div className="text-xs font-medium">{label}</div>
+        <div className="text-xs">{statusLabel}</div>
+      </div>
+    );
+  })}
+</div>
+
             </div>
 
             {selectedRequisition.status === 'pending' && (

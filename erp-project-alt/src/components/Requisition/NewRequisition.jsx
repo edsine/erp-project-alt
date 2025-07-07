@@ -144,7 +144,7 @@ const handleSubmit = async (e) => {
 
     const result = await response.json();
     window.alert(`Requisition created successfully! ID: ${result.requisitionId}`);
-    navigate('/requisitions');
+    navigate('/dashboard/requisitions');
   } catch (err) {
     setError(err.message || 'Failed to create requisition');
     console.error('Submission error:', err);

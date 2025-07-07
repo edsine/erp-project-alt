@@ -10,7 +10,7 @@ const UserList = () => {
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
-     password: '',
+    password: '',
     role: 'staff',
     department: '',
     is_admin: 0
@@ -50,44 +50,44 @@ const UserList = () => {
     }));
   };
 
- const handleAddUser = async () => {
-  if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
-    setError('Please fill all required fields');
-    return;
-  }
-
-  try {
-    const response = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(newUser)
-    });
-
-    const responseData = await response.json();
-
-    if (!response.ok) {
-      throw new Error(responseData.message || 'Failed to add user');
+  const handleAddUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.department || !newUser.password) {
+      setError('Please fill all required fields');
+      return;
     }
 
-    alert('User added successfully!');
+    try {
+      const response = await fetch(`${BASE_URL}/users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newUser)
+      });
 
-    setUsers([...users, { ...newUser, id: responseData.user_id }]); // Assumes your API returns { user_id: ... }
+      const responseData = await response.json();
 
-    setNewUser({
-      name: '',
-      email: '',
-      password: '',
-      role: 'staff',
-      department: '',
-      is_admin: 0
-    });
-    setError(null);
-  } catch (err) {
-    setError(err.message);
-  }
-};
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to add user');
+      }
+
+      alert('User added successfully!');
+
+      setUsers([...users, { ...newUser, id: responseData.user_id }]); // Assumes your API returns { user_id: ... }
+
+      setNewUser({
+        name: '',
+        email: '',
+        password: '',
+        role: 'staff',
+        department: '',
+        is_admin: 0
+      });
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
 
   const handleStatusChange = async (id, currentStatus) => {
@@ -192,7 +192,7 @@ const UserList = () => {
               <option value="ICT">ICT</option>
               <option value="Finance">Finance</option>
               <option value="Operations">Tender</option>
-              <option value="Executive">Executive</option>
+              
               <option value="HR">HR</option>
               <option value="Admin">Admin</option>
             </select>
@@ -208,7 +208,8 @@ const UserList = () => {
               <option value="gmd">GMD</option>
               <option value="finance">Finance</option>
               <option value="chairman">Chairman</option>
-              <option value="chairman">Manager</option>
+              <option value="manager">Manager</option>
+              <option value="Executive">Executive</option>
               <option value="admin">Admin</option>
             </select>
           </div>

@@ -136,6 +136,67 @@ router.post('/users', async (req, res) => {
     res.status(500).json({ message: 'Failed to create user', error: error.message });
   }
 });
+
+// POST /users - Create or update a user
+router.put('/users', async (req, res) => {
+  const {
+    id,
+    name,
+    email,
+    password,
+    role,
+    department,
+    is_admin = 0,
+  } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ message: 'Name, email, and role are required.' });
+  }
+
+  try {
+    // If ID is provided, update the existing user
+    if (id) {
+      const updates = { name, email, role, department, is_admin };
+      
+      // If password is provided, hash and include it
+      if (password) {
+        updates.password = await bcrypt.hash(password, 10);
+      }
+
+      await db.query('UPDATE users SET ? WHERE id = ?', [updates, id]);
+
+      return res.status(200).json({ message: 'User updated successfully', user_id: id });
+    }
+
+    // Otherwise, create a new user
+    const [existingUsers] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existingUsers.length > 0) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = {
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      department,
+      is_admin,
+    };
+
+    const [result] = await db.query('INSERT INTO users SET ?', newUser);
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user_id: result.insertId,
+    });
+  } catch (error) {
+    console.error('❌ Error saving user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // DELETE /users/:id - Delete a user by ID
 router.delete('/users/:id', async (req, res) => {
   const userId = req.params.id;
