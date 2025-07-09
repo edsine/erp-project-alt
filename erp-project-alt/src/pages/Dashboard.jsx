@@ -25,7 +25,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchTaskCount = async () => {
       try {
-        const res = await fetch(`http://localhost:7000/api/tasks/counts/user/${user.id}`);
+        const res = await fetch(`${BASE_URL}/api/tasks/counts/user/${user.id}`);
         const data = await res.json();
         if (data.success) {
           setTaskCount(data.count);
