@@ -317,22 +317,41 @@ exports.downloadFile = async (req, res) => {
     const file = files[0];
     console.log('Found file:', file.name);
     
-    // 2. Verify file exists (normalize path for Windows)
-    const filePath = file.path.replace(/\\/g, '/');
-    console.log('Checking file at:', filePath);
+    // 2. Transform Windows paths to server-compatible paths
+    let filePath = file.path.replace(/\\/g, '/'); // Convert backslashes to forward slashes
+    
+    // Extract just the relative path portion (after 'server_erp/uploads/')
+    const relativePathMatch = filePath.match(/server_erp\/uploads\/(.+)/);
+    if (relativePathMatch) {
+      filePath = path.join(__dirname, '../uploads', relativePathMatch[1]);
+    } else {
+      console.error('Invalid file path format:', filePath);
+      return res.status(404).json({ error: 'Invalid file path format' });
+    }
+    
+    console.log('Resolved file path:', filePath);
 
+    // 3. Verify file exists
     if (!fs.existsSync(filePath)) {
       console.error('File not found at path:', filePath);
-      return res.status(404).json({ error: 'File not found on server' });
+      return res.status(404).json({ 
+        error: 'File not found on server',
+        details: {
+          originalPath: file.path,
+          resolvedPath: filePath,
+          suggestion: 'Check if file was moved or deleted'
+        }
+      });
     }
 
-    // 3. Set proper headers
+    // ... rest of your download logic remains the same ...
+    // 4. Set proper headers
     res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
     res.setHeader('Content-Type', file.type);
     res.setHeader('Content-Length', file.size);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
 
-    // 4. Stream the file
+    // 5. Stream the file
     const fileStream = fs.createReadStream(filePath);
     
     fileStream.on('open', () => {
