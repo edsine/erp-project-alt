@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const fileController = require('../Controllers/fileController');
 const authMiddleware = require('../Middleware/authMiddleware');
-const upload = require('../Middleware/uploadMiddleware'); // ✅ moved here
+const { uploadSingle, uploadMultiple } = require('../Middleware/uploadMiddleware');
 
 // Client routes
 router.get('/files/clients', authMiddleware, fileController.getAllClients);
@@ -17,7 +17,10 @@ router.get('/files/:id', authMiddleware, fileController.getFileById);
 router.get('/files/download/:id', fileController.downloadFile);
 
 router.get('/files/view/:id', authMiddleware, fileController.viewFile);
-router.post('/files', authMiddleware, upload.single('file'), fileController.uploadFile);
 router.delete('/files/:id', authMiddleware, fileController.deleteFile);
+router.post('/files', authMiddleware, uploadSingle, fileController.uploadFile);
+router.post('/files/multiple', authMiddleware, uploadMultiple, fileController.uploadMultipleFiles);
+
+
 
 module.exports = router;
