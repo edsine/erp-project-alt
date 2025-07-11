@@ -302,80 +302,32 @@ exports.viewFile = async (req, res) => {
 
 
 exports.downloadFile = async (req, res) => {
-  const { id } = req.params;
-  console.log(`Download request for file ID: ${id}`);
-
   try {
-    // 1. Get file from database
-    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [id]);
-    
-    if (files.length === 0) {
-      console.log('File not found in database');
-      return res.status(404).json({ error: 'File not found in database' });
+    const fileId = req.params.id;
+
+    const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
+    if (!files || files.length === 0) {
+      return res.status(404).json({ success: false, message: 'File not found in database' });
     }
 
     const file = files[0];
-    console.log('Found file:', file.name);
-    
-    // 2. Transform Windows paths to server-compatible paths
-    let filePath = file.path.replace(/\\/g, '/'); // Convert backslashes to forward slashes
-    
-    // Extract just the relative path portion (after 'server_erp/uploads/')
-    const relativePathMatch = filePath.match(/server_erp\/uploads\/(.+)/);
-    if (relativePathMatch) {
-      filePath = path.join(__dirname, '../uploads', relativePathMatch[1]);
-    } else {
-      console.error('Invalid file path format:', filePath);
-      return res.status(404).json({ error: 'Invalid file path format' });
-    }
-    
-    console.log('Resolved file path:', filePath);
+    const filePath = path.resolve(file.path);
+    const safeFileName = path.basename(file.name);
 
-    // 3. Verify file exists
     if (!fs.existsSync(filePath)) {
-      console.error('File not found at path:', filePath);
-      return res.status(404).json({ 
-        error: 'File not found on server',
-        details: {
-          originalPath: file.path,
-          resolvedPath: filePath,
-          suggestion: 'Check if file was moved or deleted'
-        }
-      });
+      return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // ... rest of your download logic remains the same ...
-    // 4. Set proper headers
-    res.setHeader('Content-Disposition', `attachment; filename="${file.name}"`);
-    res.setHeader('Content-Type', file.type);
-    res.setHeader('Content-Length', file.size);
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Type, Content-Length');
-
-    // 5. Stream the file
-    const fileStream = fs.createReadStream(filePath);
-    
-    fileStream.on('open', () => {
-      console.log('File stream opened, starting download');
-      fileStream.pipe(res);
-    });
-
-    fileStream.on('error', (err) => {
-      console.error('Stream error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'File streaming error' });
+    // No role or ownership checks here
+    res.download(filePath, safeFileName, (err) => {
+      if (err) {
+        console.error('Download error:', err);
+        res.status(500).end('Error downloading file');
       }
     });
-
-    req.on('close', () => {
-      console.log('Client disconnected, cleaning up');
-      fileStream.destroy();
-    });
-
   } catch (err) {
-    console.error('Download error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error' });
-    }
+    console.error('DownloadFile Error:', err);
+    res.status(500).json({ success: false, message: 'Failed to download file' });
   }
 };
 
