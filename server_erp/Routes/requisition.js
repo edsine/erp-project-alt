@@ -442,4 +442,30 @@ router.get('/count', async (req, res) => {
     res.status(500).json({ message: 'Database error' });
   }
 });
-module.exports = router;
+module.exports = router; 
+
+/*
+
+ UI = user interface is kek
+ AD/ OD
+ @ d phase on of mgration
+ launch data
+ strategic uncentive deployment
+  force staff to use
+  enforcement
+  please
+  sumamissen
+  fall in line gm
+  filgm
+  it dept
+  chamoions of change
+  focus on op data
+  let mg n gms insist on.....
+  trained focal people// people of focus
+  its abt time
+  time travel
+  travel on time
+  forget about circular
+  roll out procedure
+  
+*/

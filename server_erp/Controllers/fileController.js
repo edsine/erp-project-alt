@@ -378,3 +378,21 @@ exports.downloadFile = async (req, res) => {
     }
   }
 };
+
+
+
+
+
+
+
+
+
+
+
+/*
+things to do incase of being lost in the sauce
+
+var 1 : download error!
+var 2 : upload to server protocol faulty
+var 3 : 
+*/
