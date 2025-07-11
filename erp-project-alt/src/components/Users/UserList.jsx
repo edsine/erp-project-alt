@@ -313,6 +313,7 @@ const UserList = () => {
               <option value="chairman">Chairman</option>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
+              <option value="executive">Executive</option>
             </select>
           </div>
           <div>

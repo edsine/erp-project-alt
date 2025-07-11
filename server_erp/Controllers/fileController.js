@@ -379,20 +379,56 @@ exports.downloadFile = async (req, res) => {
   }
 };
 
+exports.uploadMultipleFiles = async (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ success: false, message: 'No files uploaded' });
+  }
 
+  const { client_id, category, uploaded_by } = req.body;
+  if (!client_id || !category) {
+    return res.status(400).json({ success: false, message: 'Client ID and category are required' });
+  }
 
+  try {
+    // Process each file
+    const uploadPromises = req.files.map(async (file, index) => {
+      const name = req.body.names?.[index] || file.originalname;
+      const description = req.body.descriptions?.[index] || '';
 
+      const [result] = await db.query(
+        'INSERT INTO files (client_id, name, description, category, path, type, size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [
+          client_id,
+          name,
+          description,
+          category,
+          file.path,
+          file.mimetype,
+          file.size,
+          uploaded_by
+        ]
+      );
 
+      return {
+        id: result.insertId,
+        name,
+        description,
+        category,
+        path: file.path,
+        type: file.mimetype,
+        size: file.size
+      };
+    });
 
+    const uploadedFiles = await Promise.all(uploadPromises);
 
-
-
-
-
-/*
-things to do incase of being lost in the sauce
-
-var 1 : download error!
-var 2 : upload to server protocol faulty
-var 3 : 
-*/
+    res.status(201).json({ 
+      success: true, 
+      data: uploadedFiles,
+      message: `${uploadedFiles.length} files uploaded successfully`
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Failed to upload files' });
+  }
+};
