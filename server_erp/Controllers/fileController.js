@@ -384,3 +384,66 @@ exports.uploadMultipleFiles = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to upload files' });
   }
 };
+// Delete multiple files
+exports.deleteMultipleFiles = async (req, res) => {
+  try {
+    const { fileIds } = req.body;
+
+    // Validate input
+    if (!fileIds || !Array.isArray(fileIds)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid file IDs provided' 
+      });
+    }
+
+    // First get all files to delete with their metadata
+    const [filesToDelete] = await db.query(
+      'SELECT * FROM files WHERE id IN (?)', 
+      [fileIds]
+    );
+
+    // Check if all files exist
+    if (filesToDelete.length !== fileIds.length) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Some files not found' 
+      });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
+      const unauthorizedFiles = filesToDelete.filter(
+        file => file.uploaded_by !== req.user.id
+      );
+      if (unauthorizedFiles.length > 0) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Unauthorized to delete some files' 
+        });
+      }
+    }
+
+    // Delete files from filesystem
+    filesToDelete.forEach(file => {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error(`Failed to delete file ${file.path}:`, err);
+      });
+    });
+
+    // Delete from database
+    await db.query('DELETE FROM files WHERE id IN (?)', [fileIds]);
+
+    res.json({ 
+      success: true, 
+      message: `${fileIds.length} file(s) deleted successfully` 
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete files' 
+    });
+  }
+};
