@@ -246,56 +246,41 @@ exports.deleteFile = async (req, res) => {
 exports.viewFile = async (req, res) => {
   try {
     const fileId = req.params.id;
+    const token = req.query.token || req.headers.authorization?.split(' ')[1];
 
+    if (!token) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
     // Fetch file metadata
     const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
     if (!files || files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found in database' });
+      return res.status(404).json({ success: false, message: 'File not found' });
     }
 
     const file = files[0];
-
-    // Permission check
-    const isOwner = file.uploaded_by === req.user.id;
-    const isPrivileged = ['gmd', 'chairman'].includes(req.user.role);
-    if (!isPrivileged && !isOwner) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
     const filePath = path.resolve(file.path);
-    const fileName = file.name;
-    const fileType = file.type || 'application/octet-stream';
 
-    // File existence check
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Viewable MIME types
-    const viewableTypes = [
-      'image/jpeg', 'image/png', 'image/gif',
-      'application/pdf', 'text/plain'
-    ];
-
-    const isViewable = viewableTypes.includes(fileType);
-
-    // Headers
-    res.setHeader(
-      'Content-Disposition',
-      `${isViewable ? 'inline' : 'attachment'}; filename="${fileName}"`
-    );
-    res.setHeader('Content-Type', fileType);
-
+    // Set appropriate headers
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Type', file.type);
+    
     // Stream the file
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
 
-    stream.on('error', (err) => {
-      console.error('Stream error:', err);
-      res.status(500).end('Error reading file');
-    });
   } catch (err) {
     console.error('ViewFile Error:', err);
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired' });
+    }
     res.status(500).json({ success: false, message: 'Failed to serve file' });
   }
 };
