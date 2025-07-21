@@ -194,6 +194,7 @@ const ClientFileList = () => {
     }
   };
 
+
   const handleView = async (fileId, fileName, fileType) => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -202,34 +203,22 @@ const ClientFileList = () => {
     }
 
     try {
-      const response = await axios.get(`${BASE_URL}/files/view/${fileId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-        responseType: 'blob',
-      });
-
       const isViewable = [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'application/pdf',
-        'text/plain',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg',
+    'image/png',
+    'text/plain'
       ].includes(fileType);
 
-      const blob = new Blob([response.data], { type: fileType });
-      const url = window.URL.createObjectURL(blob);
-
       if (isViewable) {
-        window.open(url, '_blank');
+        window.open(`${BASE_URL}/files/view/${fileId}`, '_blank');
       } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', fileName || 'download');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+        handleDownload(fileId, fileName);
       }
-
-      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err) {
       console.error('View failed:', err);
       setError(err.response?.data?.message || 'Failed to view file');
@@ -322,11 +311,10 @@ const ClientFileList = () => {
       )}
 
       <div className="overflow-x-auto">
-        {/* Desktop Table */}
-        <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+        <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -334,18 +322,18 @@ const ClientFileList = () => {
                   className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                 />
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredFiles.length > 0 ? (
               filteredFiles.map(file => (
                 <tr key={file.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
                       checked={selectedFiles.includes(file.id)}
@@ -353,22 +341,28 @@ const ClientFileList = () => {
                       className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div 
-                        className="flex-shrink-0 h-10 w-10 cursor-pointer"
+                        className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 cursor-pointer"
                         onClick={() => handleView(file.id, file.name, file.type)}
-                        title="View file"
+                        title={`Click to ${[
+                          'image/jpeg',
+                          'image/png',
+                          'image/gif',
+                          'application/pdf',
+                          'text/plain'
+                        ].includes(file.type) ? 'view' : 'download'} ${file.name}`}
                       >
                         {getFileIcon(file.type)}
                       </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">{file.name}</div>
-                        <div className="text-sm text-gray-500">{file.description}</div>
+                      <div className="ml-2 sm:ml-4">
+                        <div className="text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{file.name}</div>
+                        <div className="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-none">{file.description}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       file.category === 'requisition' ? 'bg-green-100 text-green-800' :
                       file.category === 'memo' ? 'bg-blue-100 text-blue-800' :
@@ -378,34 +372,34 @@ const ClientFileList = () => {
                       {file.category}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                     {new Date(file.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
                     {formatFileSize(file.size)}
                   </td>
-<td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-  <div className="flex space-x-2">
-    <button
-      onClick={() => handleDownload(file.id, file.name)}
-      className="text-blue-600 hover:text-blue-900"
-      title="Download"
-    >
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-      </svg>
-    </button>
-    <button
-      onClick={() => handleDelete(file.id)}
-      className="text-red-600 hover:text-red-900"
-      title="Delete"
-    >
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-      </svg>
-    </button>
-  </div>
-</td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleDownload(file.id, file.name)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Download"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(file.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : (
@@ -417,93 +411,6 @@ const ClientFileList = () => {
             )}
           </tbody>
         </table>
-
-        {/* Mobile List */}
-        <div className="sm:hidden space-y-4">
-          {filteredFiles.length > 0 ? (
-            filteredFiles.map(file => (
-              <div key={file.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedFiles.includes(file.id)}
-                      onChange={() => toggleFileSelection(file.id)}
-                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                    />
-                    <div 
-                      className="flex-shrink-0 h-8 w-8 cursor-pointer"
-                      onClick={() => handleView(file.id, file.name, file.type)}
-                    >
-                      {getFileIcon(file.type)}
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-900">{file.name}</div>
-                      <div className="text-xs text-gray-500">{formatFileSize(file.size)}</div>
-                    </div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handleView(file.id, file.name, file.type)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                      title="View"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDownload(file.id, file.name)}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Download"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="mt-3 pl-11">
-                  {file.description && (
-                    <div className="text-sm text-gray-500 mb-2">{file.description}</div>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      file.category === 'requisition' ? 'bg-green-100 text-green-800' :
-                      file.category === 'memo' ? 'bg-blue-100 text-blue-800' :
-                      file.category === 'contract' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {file.category}
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(file.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-                  <div className="mt-2">
-                    <button
-                      onClick={() => handleDelete(file.id)}
-                      className="text-xs text-red-600 hover:text-red-900 flex items-center"
-                    >
-                      <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center text-gray-500 py-8">
-              No files found
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

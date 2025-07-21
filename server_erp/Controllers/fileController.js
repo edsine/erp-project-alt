@@ -246,19 +246,10 @@ exports.deleteFile = async (req, res) => {
 exports.viewFile = async (req, res) => {
   try {
     const fileId = req.params.id;
-    const token = req.query.token || req.headers.authorization?.split(' ')[1];
 
-    if (!token) {
-      return res.status(401).json({ success: false, message: 'Authentication required' });
-    }
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Fetch file metadata
     const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
     if (!files || files.length === 0) {
-      return res.status(404).json({ success: false, message: 'File not found' });
+      return res.status(404).json({ success: false, message: 'File not found in database' });
     }
 
     const file = files[0];
@@ -268,22 +259,15 @@ exports.viewFile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Set appropriate headers
-    res.setHeader('Content-Disposition', 'inline');
-    res.setHeader('Content-Type', file.type);
-    
-    // Stream the file
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-
+    // Serve file inline to allow viewing (e.g., in browser)
+    res.sendFile(filePath);
   } catch (err) {
     console.error('ViewFile Error:', err);
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ success: false, message: 'Token expired' });
-    }
-    res.status(500).json({ success: false, message: 'Failed to serve file' });
+    res.status(500).json({ success: false, message: 'Failed to view file' });
   }
 };
+
+
 
 
 exports.downloadFile = async (req, res) => {
