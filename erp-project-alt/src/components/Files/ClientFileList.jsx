@@ -8,13 +8,17 @@ const ClientFileList = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  
   const [client, setClient] = useState(null);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
-  const [success, setSuccess] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [selectAll, setSelectAll] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,6 +60,70 @@ const ClientFileList = () => {
     return matchesSearch && matchesFilter;
   });
 
+  const toggleFileSelection = (fileId) => {
+    setSelectedFiles(prev =>
+      prev.includes(fileId)
+        ? prev.filter(id => id !== fileId)
+        : [...prev, fileId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedFiles([]);
+    } else {
+      setSelectedFiles(filteredFiles.map(file => file.id));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedFiles.length === 0) {
+      setError('Please select files to delete');
+      return;
+    }
+
+    if (!window.confirm(`Are you sure you want to delete ${selectedFiles.length} file(s)?`)) {
+      return;
+    }
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('Authentication required. Please login again.');
+      navigate('/login');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const response = await axios.delete(
+        `${BASE_URL}/files/delete-multiple`,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          data: { fileIds: selectedFiles }
+        }
+      );
+
+      if (response.data.success) {
+        setFiles(files.filter(file => !selectedFiles.includes(file.id)));
+        setSelectedFiles([]);
+        setSelectAll(false);
+        setSuccess(`${selectedFiles.length} file(s) deleted successfully!`);
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(response.data.message || 'Failed to delete files');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+      setError(err.response?.data?.message || 'Failed to delete files');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleDelete = async (fileId) => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -78,109 +146,84 @@ const ClientFileList = () => {
     }
   };
 
+  const handleDownload = async (fileId, fileName) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Please login to download files');
+      return;
+    }
 
-const handleDownload = async (fileId, fileName) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    alert('Please login to download files');
-    return;
-  }
+    try {
+      const response = await fetch(`${BASE_URL}/files/download/${fileId}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Cache-Control': 'no-cache'
+        }
+      });
 
-  try {
-    console.log(`Starting download for file ${fileId}`);
-    
-    const response = await fetch(`${BASE_URL}/files/download/${fileId}`, {
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Cache-Control': 'no-cache'
+      if (!response.ok) {
+        throw new Error(`Server returned ${response.status}`);
       }
-    });
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || `Server returned ${response.status}`);
-    }
+      const contentDisposition = response.headers.get('content-disposition');
+      let finalFileName = fileName;
+      
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?(.+?)"?(;|$)/i);
+        if (match) finalFileName = match[1];
+      }
 
-    // Get filename from headers or use default
-    const contentDisposition = response.headers.get('content-disposition');
-    let finalFileName = fileName;
-    
-    if (contentDisposition) {
-      const match = contentDisposition.match(/filename="?(.+?)"?(;|$)/i);
-      if (match) finalFileName = match[1];
-    }
-
-    // Get blob and create download link
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    
-    link.href = url;
-    link.download = finalFileName;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    
-    console.log('Triggering download...');
-    link.click();
-
-    // Cleanup
-    setTimeout(() => {
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      console.log('Download cleanup complete');
-    }, 200);
-
-  } catch (err) {
-    console.error('Download error:', err);
-    alert(`Download failed: ${err.message || 'Please try again'}`);
-  }
-};
-
-
-
-
- const handleView = async (fileId, fileName, fileType) => {
-  const token = localStorage.getItem('token');
-  if (!token) {
-    navigate('/login');
-    return;
-  }
-
-  try {
-    const response = await axios.get(`${BASE_URL}/files/view/${fileId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      responseType: 'blob',
-    });
-
-    const isViewable = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'application/pdf',
-      'text/plain',
-    ].includes(fileType);
-
-    const blob = new Blob([response.data], { type: fileType });
-    const url = window.URL.createObjectURL(blob);
-
-    if (isViewable) {
-      window.open(url, '_blank');
-    } else {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
+      
       link.href = url;
-      link.setAttribute('download', fileName || 'download');
+      link.download = finalFileName;
+      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-      link.remove();
+
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 200);
+
+    } catch (err) {
+      console.error('Download error:', err);
+      alert(`Download failed: ${err.message || 'Please try again'}`);
+    }
+  };
+
+
+  const handleView = async (fileId, fileName, fileType) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
     }
 
-    setTimeout(() => window.URL.revokeObjectURL(url), 1000); // allow time for open/click to complete
-  } catch (err) {
-    console.error('View failed:', err);
-    setError(err.response?.data?.message || 'Failed to view file');
-  }
-};
+    try {
+      const isViewable = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'image/jpeg',
+    'image/png',
+    'text/plain'
+      ].includes(fileType);
 
+      if (isViewable) {
+        window.open(`${BASE_URL}/files/view/${fileId}`, '_blank');
+      } else {
+        handleDownload(fileId, fileName);
+      }
+    } catch (err) {
+      console.error('View failed:', err);
+      setError(err.response?.data?.message || 'Failed to view file');
+    }
+  };
 
   if (loading) return <div className="text-center py-8">Loading files...</div>;
   if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
@@ -215,6 +258,18 @@ const handleDownload = async (fileId, fileName) => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
+          
+          {selectedFiles.length > 0 && (
+            <button
+              onClick={handleDeleteSelected}
+              disabled={isDeleting}
+              className={`px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm sm:text-base ${
+                isDeleting ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
+            >
+              {isDeleting ? 'Deleting...' : `Delete (${selectedFiles.length})`}
+            </button>
+          )}
           
           <Link
             to={`/dashboard/files/${clientId}/upload`}
@@ -259,6 +314,14 @@ const handleDownload = async (fileId, fileName) => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                />
+              </th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
               <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
@@ -271,11 +334,25 @@ const handleDownload = async (fileId, fileName) => {
               filteredFiles.map(file => (
                 <tr key={file.id} className="hover:bg-gray-50">
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedFiles.includes(file.id)}
+                      onChange={() => toggleFileSelection(file.id)}
+                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                    />
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div 
                         className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 cursor-pointer"
                         onClick={() => handleView(file.id, file.name, file.type)}
-                        title="View file"
+                        title={`Click to ${[
+                          'image/jpeg',
+                          'image/png',
+                          'image/gif',
+                          'application/pdf',
+                          'text/plain'
+                        ].includes(file.type) ? 'view' : 'download'} ${file.name}`}
                       >
                         {getFileIcon(file.type)}
                       </div>
@@ -327,7 +404,7 @@ const handleDownload = async (fileId, fileName) => {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                   No files found
                 </td>
               </tr>
@@ -343,7 +420,6 @@ function getFileIcon(fileType) {
   const type = fileType?.split('/')[0];
   const subtype = fileType?.split('/')[1];
   
-  // PDF
   if (fileType === 'application/pdf') {
     return (
       <svg className="h-full w-full text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -352,7 +428,6 @@ function getFileIcon(fileType) {
     );
   }
   
-  // Images
   if (type === 'image') {
     return (
       <svg className="h-full w-full text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -361,7 +436,6 @@ function getFileIcon(fileType) {
     );
   }
   
-  // Word Documents
   if (fileType === 'application/msword' || 
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
     return (
@@ -371,7 +445,6 @@ function getFileIcon(fileType) {
     );
   }
   
-  // Excel Spreadsheets
   if (fileType === 'application/vnd.ms-excel' || 
       fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
     return (
@@ -381,7 +454,6 @@ function getFileIcon(fileType) {
     );
   }
   
-  // Text files
   if (type === 'text') {
     return (
       <svg className="h-full w-full text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,7 +462,6 @@ function getFileIcon(fileType) {
     );
   }
   
-  // Default file icon
   return (
     <svg className="h-full w-full text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -403,7 +474,7 @@ function formatFileSize(bytes) {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]);
 }
 
 export default ClientFileList;

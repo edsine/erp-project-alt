@@ -247,58 +247,27 @@ exports.viewFile = async (req, res) => {
   try {
     const fileId = req.params.id;
 
-    // Fetch file metadata
     const [files] = await db.query('SELECT * FROM files WHERE id = ?', [fileId]);
     if (!files || files.length === 0) {
       return res.status(404).json({ success: false, message: 'File not found in database' });
     }
 
     const file = files[0];
-
-    // Permission check
-    const isOwner = file.uploaded_by === req.user.id;
-    const isPrivileged = ['gmd', 'chairman'].includes(req.user.role);
-    if (!isPrivileged && !isOwner) {
-      return res.status(403).json({ success: false, message: 'Unauthorized to access this file' });
-    }
-
     const filePath = path.resolve(file.path);
-    const fileName = file.name;
-    const fileType = file.type || 'application/octet-stream';
 
-    // File existence check
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: 'File not found on server' });
     }
 
-    // Viewable MIME types
-    const viewableTypes = [
-      'image/jpeg', 'image/png', 'image/gif',
-      'application/pdf', 'text/plain'
-    ];
-
-    const isViewable = viewableTypes.includes(fileType);
-
-    // Headers
-    res.setHeader(
-      'Content-Disposition',
-      `${isViewable ? 'inline' : 'attachment'}; filename="${fileName}"`
-    );
-    res.setHeader('Content-Type', fileType);
-
-    // Stream the file
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-
-    stream.on('error', (err) => {
-      console.error('Stream error:', err);
-      res.status(500).end('Error reading file');
-    });
+    // Serve file inline to allow viewing (e.g., in browser)
+    res.sendFile(filePath);
   } catch (err) {
     console.error('ViewFile Error:', err);
-    res.status(500).json({ success: false, message: 'Failed to serve file' });
+    res.status(500).json({ success: false, message: 'Failed to view file' });
   }
 };
+
+
 
 
 exports.downloadFile = async (req, res) => {
@@ -382,5 +351,68 @@ exports.uploadMultipleFiles = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Failed to upload files' });
+  }
+};
+// Delete multiple files
+exports.deleteMultipleFiles = async (req, res) => {
+  try {
+    const { fileIds } = req.body;
+
+    // Validate input
+    if (!fileIds || !Array.isArray(fileIds)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid file IDs provided' 
+      });
+    }
+
+    // First get all files to delete with their metadata
+    const [filesToDelete] = await db.query(
+      'SELECT * FROM files WHERE id IN (?)', 
+      [fileIds]
+    );
+
+    // Check if all files exist
+    if (filesToDelete.length !== fileIds.length) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Some files not found' 
+      });
+    }
+
+    // Check permissions
+    if (req.user.role !== 'gmd' && req.user.role !== 'chairman') {
+      const unauthorizedFiles = filesToDelete.filter(
+        file => file.uploaded_by !== req.user.id
+      );
+      if (unauthorizedFiles.length > 0) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Unauthorized to delete some files' 
+        });
+      }
+    }
+
+    // Delete files from filesystem
+    filesToDelete.forEach(file => {
+      fs.unlink(file.path, (err) => {
+        if (err) console.error(`Failed to delete file ${file.path}:`, err);
+      });
+    });
+
+    // Delete from database
+    await db.query('DELETE FROM files WHERE id IN (?)', [fileIds]);
+
+    res.json({ 
+      success: true, 
+      message: `${fileIds.length} file(s) deleted successfully` 
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete files' 
+    });
   }
 };

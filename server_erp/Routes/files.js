@@ -16,7 +16,8 @@ router.get('/files', authMiddleware, fileController.getAllFiles);
 router.get('/files/:id', authMiddleware, fileController.getFileById);
 router.get('/files/download/:id', fileController.downloadFile);
 
-router.get('/files/view/:id', authMiddleware, fileController.viewFile);
+router.get('/files/view/:id', fileController.viewFile);
+router.delete('/files/delete-multiple', authMiddleware, fileController.deleteMultipleFiles);
 router.delete('/files/:id', authMiddleware, fileController.deleteFile);
 router.post('/files', authMiddleware, uploadSingle, fileController.uploadFile);
 router.post('/files/multiple', authMiddleware, uploadMultiple, fileController.uploadMultipleFiles);
