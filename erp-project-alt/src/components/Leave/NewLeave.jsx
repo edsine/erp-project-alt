@@ -55,67 +55,73 @@ const NewLeave = () => {
     })
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-    setSuccess('')
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  setSuccess('');
 
-    if (!formData.type || !formData.startDate || !formData.endDate || !formData.reason) {
-      setError('Please fill all required fields')
-      setLoading(false)
-      return
-    }
-
-    if (new Date(formData.startDate) > new Date(formData.endDate)) {
-      setError('End date must be after start date')
-      setLoading(false)
-      return
-    }
-
-    try {
-      const token = localStorage.getItem('token')
-      if (!token || !user?.id) {
-        throw new Error('Authentication required. Please login again.')
-      }
-
-      const payload = new FormData()
-      payload.append('user_id', user.id)
-      payload.append('type', formData.type)
-      payload.append('start_date', formData.startDate)
-      payload.append('end_date', formData.endDate)
-      payload.append('reason', formData.reason)
-      payload.append('contact', formData.contact)
-
-      // Only upload one file, as your backend expects single file under `attachment`
-      if (formData.attachments.length > 0) {
-        payload.append('attachment', formData.attachments[0])
-      }
-
-      const response = await fetch(`${BASE_URL}/leave`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: payload
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit leave request')
-      }
-
-      setSuccess('Leave request submitted successfully!')
-      setTimeout(() => {
-        navigate('/dashboard/leaves') // Fixed navigation path
-      }, 1500)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+  if (!formData.type || !formData.startDate || !formData.endDate || !formData.reason) {
+    setError('Please fill all required fields');
+    setLoading(false);
+    return;
   }
+
+  if (new Date(formData.startDate) > new Date(formData.endDate)) {
+    setError('End date must be after start date');
+    setLoading(false);
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    if (!token || !user?.id) {
+      throw new Error('Authentication required. Please login again.');
+    }
+
+    const payload = new FormData();
+    payload.append('user_id', user.id);
+    payload.append('type', formData.type);
+    payload.append('start_date', formData.startDate);
+    payload.append('end_date', formData.endDate);
+    payload.append('reason', formData.reason);
+    payload.append('contact', formData.contact);
+
+    // ✅ Add total_days
+    const start = new Date(formData.startDate);
+    const end = new Date(formData.endDate);
+    const totalDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    payload.append('total_days', totalDays);
+
+    if (formData.attachments.length > 0) {
+      payload.append('attachment', formData.attachments[0]);
+    }
+
+    const response = await fetch(`${BASE_URL}/leave`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: payload
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to submit leave request');
+    }
+
+    setSuccess('Leave request submitted successfully!');
+    setTimeout(() => {
+      navigate('/dashboard/leaves');
+    }, 1500);
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mx-auto max-w-3xl">

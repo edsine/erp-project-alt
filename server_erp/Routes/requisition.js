@@ -3,6 +3,8 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const db = require('../db');
+const fs = require('fs');
+
 
 // Multer setup: store files in 'uploads' folder, keep original filename
 const storage = multer.diskStorage({
@@ -440,6 +442,43 @@ router.get('/count', async (req, res) => {
   } catch (err) {
     console.error('Error fetching requisition count:', err);
     res.status(500).json({ message: 'Database error' });
+  }
+});
+
+
+router.get('/requisitions/download/:id', async (req, res) => {
+  try {
+    const requisitionId = req.params.id;
+
+    const [results] = await db.query('SELECT attachment, title FROM requisitions WHERE id = ?', [requisitionId]);
+
+    if (!results || results.length === 0) {
+      return res.status(404).json({ message: 'Requisition not found' });
+    }
+
+    const requisition = results[0];
+
+    if (!requisition.attachment) {
+      return res.status(404).json({ message: 'No attachment found for this requisition' });
+    }
+
+    const filePath = path.resolve(requisition.attachment);
+    const fileName = requisition.title.replace(/\s+/g, '_') + path.extname(filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'Attachment file missing on server' });
+    }
+
+    res.download(filePath, fileName, (err) => {
+      if (err) {
+        console.error('Error sending file:', err);
+        res.status(500).end('Error downloading file');
+      }
+    });
+
+  } catch (err) {
+    console.error('Download error:', err);
+    res.status(500).json({ message: 'Failed to download attachment' });
   }
 });
 module.exports = router; 

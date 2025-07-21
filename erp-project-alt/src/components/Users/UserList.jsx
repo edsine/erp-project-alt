@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-
+import { useAuth } from '../../context/AuthContext';
 const UserList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
+  const { user } = useAuth()
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,50 +121,43 @@ const UserList = () => {
     });
   };
 
-  const handleUpdateUser = async () => {
-    if (!editUser.name || !editUser.email || !editUser.department) {
-      setError('Please fill all required fields');
+ const handleUpdateUser = async () => {
+  const userData = {
+    id: editingUserId,
+    ...editUser,
+  };
+
+  try {
+    const response = await fetch(`${BASE_URL}/users`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Update failed:', result.message);
+      alert(result.message || 'Something went wrong');
       return;
     }
 
-    try {
-      // Only include password in the update if it's not empty
-      const updateData = {
-        name: editUser.name,
-        email: editUser.email,
-        role: editUser.role,
-        department: editUser.department,
-        is_admin: editUser.is_admin
-      };
+    // Update local list
+    setUsers(prev =>
+      prev.map(u => (u.id === userData.id ? { ...u, ...userData } : u))
+    );
 
-      if (editUser.password) {
-        updateData.password = editUser.password;
-      }
+    alert('User updated successfully!');
+    setEditingUserId(null);
+  } catch (error) {
+    console.error('❌ API error:', error);
+    alert('Failed to update user. Please try again.');
+  }
+};
 
-      const response = await fetch(`${BASE_URL}/users/${editingUserId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData)
-      });
 
-      if (!response.ok) {
-        throw new Error('Failed to update user');
-      }
-
-      alert('User updated successfully!');
-
-      setUsers(users.map(user =>
-        user.id === editingUserId ? { ...user, ...updateData } : user
-      ));
-
-      setEditingUserId(null);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   const handleCancelEdit = () => {
     setEditingUserId(null);
@@ -295,8 +288,8 @@ const UserList = () => {
               <option value="ICT">ICT</option>
               <option value="Finance">Finance</option>
               <option value="Operations">Tender</option>
-              
-              <option value="HR">HR</option>
+
+              <option value="hr">HR</option>
               <option value="Admin">Admin</option>
             </select>
           </div>
@@ -308,6 +301,7 @@ const UserList = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="staff">Staff</option>
+              <option value="hr">HR</option>
               <option value="gmd">GMD</option>
               <option value="finance">Finance</option>
               <option value="chairman">Chairman</option>
@@ -325,6 +319,9 @@ const UserList = () => {
                 >
                   Update
                 </button>
+
+
+
                 <button
                   onClick={handleCancelEdit}
                   className="w-full px-3 py-2 bg-gray-500 text-white rounded-md text-sm hover:bg-gray-600"

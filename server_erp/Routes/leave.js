@@ -30,44 +30,50 @@ const upload = multer({ storage, fileFilter });
 
 
 router.post('/leave', upload.single('attachment'), async (req, res) => {
+  const {
+    user_id,
+    type,
+    start_date,
+    end_date,
+    total_days,
+    reason,
+    contact
+  } = req.body;
+
+  const attachment_url = req.file ? `/uploads/${req.file.filename}` : null;
+
   try {
-    const {
-      user_id,
-      type,
-      start_date,
-      end_date,
-      reason,
-      contact
-    } = req.body;
-
-    if (!user_id || !type || !start_date || !end_date || !reason) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const total_days = Math.ceil(
-      (new Date(end_date) - new Date(start_date)) / (1000 * 60 * 60 * 24)
-    ) + 1;
-
-    const filePath = req.file ? `/uploads/${req.file.filename}` : null;
-    const fileUrl = req.file ? `${req.protocol}://${req.get('host')}${filePath}` : null;
-
-    const [result] = await db.execute(
-      `INSERT INTO leave_requests 
-      (user_id, type, start_date, end_date, total_days, reason, contact, attachment_url)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [user_id, type, start_date, end_date, total_days, reason, contact, filePath]
+    const [result] = await db.query(
+      `INSERT INTO leave_requests (
+        user_id, type, start_date, end_date, total_days,
+        reason, contact, attachment_url, status,
+        approved_by_manager, approved_by_executive, approved_by_hr,
+        approved_by_gmd, approved_by_chairman,
+        rejected_by_manager, rejected_by_executive, rejected_by_hr,
+        rejected_by_gmd, rejected_by_chairman
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)`,
+      [
+        user_id,
+        type,
+        start_date,
+        end_date,
+        total_days,
+        reason,
+        contact,
+        attachment_url
+      ]
     );
 
     res.status(201).json({
-      message: 'Leave request created',
-      id: result.insertId,
-      attachment_url: fileUrl
+      message: 'Leave request submitted successfully',
+      leave_request_id: result.insertId
     });
-  } catch (err) {
-    console.error('Upload or DB error:', err);
-    res.status(500).json({ error: err.message || 'Server error' });
+  } catch (error) {
+    console.error('❌ Error saving leave request:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
+
 
 
 router.get('/leave', async (req, res) => {
@@ -104,15 +110,52 @@ router.get('/leave/user/:user_id', async (req, res) => {
   const { user_id } = req.params;
 
   try {
-    const [rows] = await db.execute(
-      'SELECT * FROM leave_requests WHERE user_id = ? ORDER BY created_at DESC',
+    // Step 1: Fetch user's role and department
+    const [userResult] = await db.query(
+      'SELECT role, department FROM users WHERE id = ?',
       [user_id]
     );
 
+    if (userResult.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { role, department } = userResult[0];
+
+    let query = '';
+    let params = [];
+
+    // Step 2: Build query based on role
+    if (role === 'staff') {
+      query = `SELECT * FROM leave_requests WHERE user_id = ? ORDER BY created_at DESC`;
+      params = [user_id];
+    } else if (role === 'manager' || role === 'executive') {
+      query = `
+        SELECT lr.*, u.name AS requester_name
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        WHERE u.department = ? AND lr.user_id != ?
+        ORDER BY lr.created_at DESC
+      `;
+      params = [department, user_id];
+    } else if (['hr', 'gmd', 'chairman'].includes(role)) {
+      query = `
+        SELECT lr.*, u.name AS requester_name, u.department
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        ORDER BY lr.created_at DESC
+      `;
+    } else {
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    // Step 3: Run query
+    const [rows] = await db.query(query, params);
     res.json(rows);
+
   } catch (err) {
-    console.error('Error fetching leave by user_id:', err);
-    res.status(500).json({ error: 'Failed to fetch leave requests for user' });
+    console.error('❌ Error in /leave/user/:user_id:', err);
+    res.status(500).json({ error: 'Failed to fetch leave requests' });
   }
 });
 
@@ -120,67 +163,49 @@ router.get('/leave/user/:user_id', async (req, res) => {
 
 // Approve leave request
 router.post('/leave/:id/approve', async (req, res) => {
+  const leaveId = req.params.id;
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return res.status(400).json({ message: 'User ID is required for approval.' });
+  }
+
+  // Map roles to approval fields and their dependencies
+  const roleApprovalMap = {
+    manager:   { field: 'approved_by_manager',   dependsOn: null },
+    executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+    hr:        { field: 'approved_by_hr',        dependsOn: 'approved_by_executive' },
+    gmd:       { field: 'approved_by_gmd',       dependsOn: 'approved_by_hr' },
+    chairman:  { field: 'approved_by_chairman',  dependsOn: 'approved_by_gmd' },
+  };
+
   try {
-    const leaveId = req.params.id;
-    const { user_id } = req.body;
-
-    if (!user_id) {
-      return res.status(400).json({ message: 'User ID is required for approval.' });
-    }
-
-    const roleApprovalMap = {
-      gmd:      { field: 'approved_by_gmd',     dependsOn: null },
-      finance:  { field: 'approved_by_finance', dependsOn: 'approved_by_gmd' },
-      gmd2:     { field: 'approved_by_gmd2',    dependsOn: 'approved_by_finance' },
-      chairman: { field: 'approved_by_chairman',dependsOn: 'approved_by_gmd2' }
-    };
-
-    // Get user's role
+    // 1. Get user's role
     const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
+
     if (userResults.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const role = userResults[0].role?.trim().toLowerCase();
-    console.log('🛂 Approval Attempt:', { user_id, role });
 
     if (!roleApprovalMap[role]) {
-      return res.status(403).json({ message: `User role (${role}) is not authorized to approve` });
+      return res.status(403).json({ message: `User role (${role}) is not authorized to approve.` });
     }
 
-    // Special handling for gmd (can approve gmd2 if flow is satisfied)
-    if (role === 'gmd') {
-      const [checkResults] = await db.query(`
-        SELECT approved_by_gmd, approved_by_finance, approved_by_gmd2 FROM leave_requests WHERE id = ?
-      `, [leaveId]);
-
-      if (checkResults.length === 0) {
-        return res.status(404).json({ message: 'Leave request not found' });
-      }
-
-      const leave = checkResults[0];
-
-      if (leave.approved_by_gmd === 0) {
-        await db.query('UPDATE leave_requests SET approved_by_gmd = 1 WHERE id = ?', [leaveId]);
-        return res.status(200).json({ message: 'Approved by GMD', field: 'approved_by_gmd' });
-      } else if (leave.approved_by_gmd === 1 && leave.approved_by_finance === 1 && leave.approved_by_gmd2 === 0) {
-        await db.query('UPDATE leave_requests SET approved_by_gmd2 = 1 WHERE id = ?', [leaveId]);
-        return res.status(200).json({ message: 'Approved by GMD2', field: 'approved_by_gmd2' });
-      } else {
-        return res.status(400).json({ message: 'GMD cannot approve at this stage or already approved' });
-      }
-    }
-
-    // For finance, gmd2, chairman
     const { field, dependsOn } = roleApprovalMap[role];
-    const checkSql = `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM leave_requests WHERE id = ?`;
-    const [checkResults] = await db.query(checkSql, [leaveId]);
 
-    if (checkResults.length === 0) {
-      return res.status(404).json({ message: 'Leave request not found' });
+    // 2. Get current approval status
+    const [leaveCheck] = await db.query(
+      `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM leave_requests WHERE id = ?`,
+      [leaveId]
+    );
+
+    if (leaveCheck.length === 0) {
+      return res.status(404).json({ message: 'Leave request not found.' });
     }
 
-    const leave = checkResults[0];
+    const leave = leaveCheck[0];
 
     if (leave[field] === 1) {
       return res.status(400).json({ message: `Already approved by ${role}` });
@@ -192,18 +217,17 @@ router.post('/leave/:id/approve', async (req, res) => {
       });
     }
 
-    // Approve
+    // 3. Approve the request
     await db.query(`UPDATE leave_requests SET ${field} = 1 WHERE id = ?`, [leaveId]);
 
-    // Final status update
-    const [allResults] = await db.query(`
-      SELECT approved_by_gmd, approved_by_finance, approved_by_gmd2, approved_by_chairman
-      FROM leave_requests
-      WHERE id = ?
+    // 4. Check if all stages are approved
+    const [all] = await db.query(`
+      SELECT approved_by_manager, approved_by_executive, approved_by_hr, approved_by_gmd, approved_by_chairman
+      FROM leave_requests WHERE id = ?
     `, [leaveId]);
 
-    if (allResults.length > 0) {
-      const allApproved = Object.values(allResults[0]).every(val => val === 1);
+    if (all.length > 0) {
+      const allApproved = Object.values(all[0]).every(val => val === 1);
       if (allApproved) {
         await db.query(`UPDATE leave_requests SET status = 'approved' WHERE id = ?`, [leaveId]);
       }
@@ -216,6 +240,7 @@ router.post('/leave/:id/approve', async (req, res) => {
     return res.status(500).json({ message: 'Error updating approval status' });
   }
 });
+
 
 
 

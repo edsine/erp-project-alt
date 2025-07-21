@@ -12,34 +12,47 @@ const LeaveList = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // Fetch leave requests
+
+   // Fetch leave requests
   useEffect(() => {
     const fetchLeaves = async () => {
       try {
+        setLoading(true);
         const token = localStorage.getItem('token');
-        const res = await fetch(`${BASE_URL}/leave`, {
+
+        const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
-        const data = await res.json()
-        setLeaves(data)
-        
+
+        if (!response.ok) {
+          throw new Error('Error fetching leave data');
+        }
+
+        const data = await response.json();
+        setLeaves(data);
       } catch (err) {
-        setError('Failed to load leave requests')
+        console.error('❌ Failed to fetch leaves:', err);
+        setError('Failed to load leave requests');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
+    };
+
+    if (user?.id) {
+      fetchLeaves();
     }
+  }, [user?.id, BASE_URL]);
 
-    fetchLeaves()
-  }, [])
 
+ // Filtered leaves based on search
   const filteredLeaves = leaves.filter(leave =>
-    leave.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    leave.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    leave.status.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+    leave.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    leave.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    leave.requester_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleLeaveClick = (leave) => {
     setSelectedLeave(leave)
@@ -56,7 +69,7 @@ const LeaveList = () => {
       if (newStatus === 'approved') {
         const res = await fetch(`${BASE_URL}/leave/${id}/approve`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -75,7 +88,7 @@ const LeaveList = () => {
       } else if (newStatus === 'rejected') {
         const res = await fetch(`${BASE_URL}/leave/${id}/reject`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
@@ -123,29 +136,28 @@ const LeaveList = () => {
               </Link>
             </div>
           </div>
-          
+
           <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
             {filteredLeaves.length > 0 ? (
               filteredLeaves.map(leave => (
                 <div
                   key={leave.id}
                   onClick={() => handleLeaveClick(leave)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedLeave?.id === leave.id ? 'bg-gray-100 border-primary' : ''
-                  }`}
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors ${selectedLeave?.id === leave.id ? 'bg-gray-100 border-primary' : ''
+                    }`}
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0">
                       <h3 className="font-medium text-sm sm:text-base truncate">{leave.type}</h3>
                       <p className="text-xs sm:text-sm text-gray-500">
-                        {leave.startDate} to {leave.endDate} ({leave.days} days)
+                        ({leave.total_days} days)
                       </p>
+
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      leave.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        leave.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                      }`}>
                       {leave.status}
                     </span>
                   </div>
@@ -191,24 +203,22 @@ const LeaveList = () => {
 
             {/* Approval Status Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
-              {[
-                { label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
-                { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
-                { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
-                { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
-              ].map((approver) => {
+              {[{ label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
+              { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
+              { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
+              { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
+              { label: 'Chairman', approve: 'approved_by_chairman', reject: 'rejected_by_chairman' },].map((approver) => {
                 const approved = selectedLeave[approver.approve] === 1;
                 const rejected = selectedLeave[approver.reject] === 1;
                 const pending = !approved && !rejected;
 
                 return (
-                  <div 
-                    key={approver.label} 
-                    className={`p-2 rounded text-center text-xs sm:text-sm ${
-                      approved ? 'bg-green-100 text-green-800' :
-                      rejected ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-500'
-                    }`}
+                  <div
+                    key={approver.label}
+                    className={`p-2 rounded text-center text-xs sm:text-sm ${approved ? 'bg-green-100 text-green-800' :
+                        rejected ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-500'
+                      }`}
                   >
                     <div className="font-medium">{approver.label}</div>
                     <div>
