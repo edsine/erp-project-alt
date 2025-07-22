@@ -286,11 +286,8 @@ const UserList = () => {
             >
               <option value="">Select Department</option>
               <option value="ICT">ICT</option>
-              <option value="Finance">Finance</option>
-              <option value="Operations">Tender</option>
+              <option value="Finance">Operations</option>
 
-              <option value="hr">HR</option>
-              <option value="Admin">Admin</option>
             </select>
           </div>
           <div>
