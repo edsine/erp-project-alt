@@ -64,34 +64,69 @@ const MemoList = () => {
     })
   };
 
-
-  const handleApprove = async (memo) => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/approve`,
-        {
-          user_id: user.id,
-          role: user.role, // ✅ pass the role
-          send_directly_to_chairman: sendDirectlyToChairman,
+const handleApprove = async (memo) => {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/approve`,
+      {
+        user_id: user.id,
+        role: user.role,
+      },
+      {
+        headers: {
+          Authorization: user?.token ? `Bearer ${user.token}` : '',
         },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert(`✅ Success: ${response.data.message}`);
-        const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
-        setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
-        setSelectedMemo(updatedMemo)
       }
-    } catch (error) {
-      console.error('Approval failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+    );
+
+    if (response.status === 200) {
+      alert(`✅ Success: ${response.data.message}`);
+      const updatedMemo = { 
+        ...memo, 
+        ...response.data.updatedFields,
+        status: response.data.status || memo.status
+      };
+      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+      setSelectedMemo(updatedMemo);
+
+      if (response.data.nextApprover) {
+        alert(`Next approver: ${response.data.nextApprover}`);
+      }
     }
-  };
+  } catch (error) {
+    console.error('Approval failed:', error.response?.data || error.message);
+    alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  }
+};
+
+
+  // const handleApprove = async (memo) => {
+  //   try {
+  //     const response = await axios.post(
+  //       `${BASE_URL}/memos/${memo.id}/approve`,
+  //       {
+  //         user_id: user.id,
+  //         role: user.role, // ✅ pass the role
+       
+  //       },
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${user.token}`,
+  //         },
+  //       }
+  //     );
+
+  //     if (response.status === 200) {
+  //       alert(`✅ Success: ${response.data.message}`);
+  //       const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
+  //       setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+  //       setSelectedMemo(updatedMemo)
+  //     }
+  //   } catch (error) {
+  //     console.error('Approval failed:', error.response?.data || error.message);
+  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  //   }
+  // };
 
   const handleReject = async (memo) => {
     if (!memo) return;
@@ -507,8 +542,8 @@ const MemoList = () => {
                       <input
                         type="checkbox"
                         id="sendDirectly"
-                        checked={sendDirectlyToChairman}
-                        onChange={(e) => setSendDirectlyToChairman(e.target.checked)}
+                        checked={console.log("hi")}
+                        onChange={console.log("hi")}
                         className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                       />
                       <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
