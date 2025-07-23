@@ -8,6 +8,8 @@ const MemoList = () => {
 
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
+  const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
+  const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
   const [acknowledgments, setAcknowledgments] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,40 +66,41 @@ const MemoList = () => {
     })
   };
 
-const handleApprove = async (memo) => {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/approve`,
-      {
-        user_id: user.id,
-        role: user.role,
-      },
-      {
-        headers: {
-          Authorization: user?.token ? `Bearer ${user.token}` : '',
+  const handleApprove = async (memo) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/approve`,
+        {
+          user_id: user.id,
+          role: user.role,
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: user?.token ? `Bearer ${user.token}` : '',
+          },
+        }
+      );
 
-    if (response.status === 200) {
-      alert(`✅ Success: ${response.data.message}`);
-      const updatedMemo = { 
-        ...memo, 
-        ...response.data.updatedFields,
-        status: response.data.status || memo.status
-      };
-      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-      setSelectedMemo(updatedMemo);
+      if (response.status === 200) {
+        alert(`✅ Success: ${response.data.message}`);
+        const updatedMemo = {
+          ...memo,
+          ...response.data.updatedFields,
+          status: response.data.status || memo.status
+        };
+        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+        setSelectedMemo(updatedMemo);
 
-      if (response.data.nextApprover) {
-        alert(`Next approver: ${response.data.nextApprover}`);
+        if (response.data.nextApprover) {
+          alert(`Next approver: ${response.data.nextApprover}`);
+        }
       }
+    } catch (error) {
+      console.error('Approval failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
-  } catch (error) {
-    console.error('Approval failed:', error.response?.data || error.message);
-    alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
-  }
-};
+  };
+
 
 
   // const handleApprove = async (memo) => {
@@ -107,7 +110,7 @@ const handleApprove = async (memo) => {
   //       {
   //         user_id: user.id,
   //         role: user.role, // ✅ pass the role
-       
+
   //       },
   //       {
   //         headers: {
