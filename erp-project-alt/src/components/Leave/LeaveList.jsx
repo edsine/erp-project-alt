@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const LeaveList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const [users, setUsers] = useState({});
   const navigate = useNavigate();
   const { user } = useAuth();
   const [leaves, setLeaves] = useState([])
@@ -13,38 +14,64 @@ const LeaveList = () => {
   const [error, setError] = useState('')
 
 
-   // Fetch leave requests
-  useEffect(() => {
-    const fetchLeaves = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-
-        const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Error fetching leave data');
+ // Fetch leave requests
+useEffect(() => {
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
+      });
+      const usersData = await response.json();
 
-        const data = await response.json();
-        setLeaves(data);
-      } catch (err) {
-        console.error('❌ Failed to fetch leaves:', err);
-        setError('Failed to load leave requests');
-      } finally {
-        setLoading(false);
-      }
-    };
+      // Convert array to object with ID as key
+      const usersMap = usersData.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {});
 
-    if (user?.id) {
-      fetchLeaves();
+      setUsers(usersMap);
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
     }
-  }, [user?.id, BASE_URL]);
+  };
+
+  fetchUsers();
+}, []);
+
+useEffect(() => {
+  const fetchLeaves = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error fetching leave data');
+      }
+
+      const data = await response.json();
+      setLeaves(data);
+    } catch (err) {
+      console.error('❌ Failed to fetch leaves:', err);
+      setError('Failed to load leave requests');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (user?.id) {
+    fetchLeaves();
+  }
+}, [user?.id, BASE_URL]);
 
 
  // Filtered leaves based on search
@@ -172,13 +199,15 @@ const LeaveList = () => {
       </div>
 
       {/* Leave Detail Panel */}
-      {selectedLeave && (
-        <div className="lg:w-2/3">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-lg sm:text-xl font-bold">{selectedLeave.type}</h2>
-                <p className="text-sm text-gray-500">
+{selectedLeave && (
+  <div className="lg:w-2/3">
+    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold">{selectedLeave.type}</h2>
+          <p className="text-sm text-gray-500">
+            Requested by: {users[selectedLeave.user_id]?.name || `User ${selectedLeave.user_id}`}
+
                   {selectedLeave.startDate} to {selectedLeave.endDate} ({selectedLeave.days} days)
                 </p>
                 <p className="text-xs text-gray-400">Status: {selectedLeave.status}</p>

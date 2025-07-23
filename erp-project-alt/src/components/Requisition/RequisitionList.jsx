@@ -11,50 +11,59 @@ const RequisitionList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [users, setUsers] = useState({});
 
- 
+  useEffect(() => {
+    const fetchRequisitions = async () => {
+      setLoading(true);
+      setError('');
 
+      try {
+        const token = localStorage.getItem('token');
+        const [reqResponse, usersResponse] = await Promise.all([
+          fetch(`${BASE_URL}/requisitions/user/${user?.id}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }),
+          fetch(`${BASE_URL}/users`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+        ]);
 
+        const result = await reqResponse.json();
+        const usersData = await usersResponse.json();
 
-
-useEffect(() => {
-  const fetchRequisitions = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/requisitions/user/${user?.id}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+        if (reqResponse.ok && result.success) {
+          setRequisitions(result.data);
+          
+          const usersMap = usersData.reduce((acc, user) => {
+            acc[user.id] = user;
+            return acc;
+          }, {});
+          setUsers(usersMap);
+        } else {
+          throw new Error(result.message || 'Failed to fetch requisitions');
         }
-      });
-
-      const result = await response.json();
-      if (response.ok && result.success) {
-        setRequisitions(result.data);
-      } else {
-        throw new Error(result.message || 'Failed to fetch requisitions');
+      } catch (err) {
+        setError(err.message || 'Something went wrong');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError(err.message || 'Something went wrong');
-    } finally {
-      setLoading(false);
+    };
+
+    if (user?.id) {
+      fetchRequisitions();
     }
-  };
+  }, [user?.id, BASE_URL]);
 
-  if (user?.id) {
-    fetchRequisitions();
-  }
-}, [user?.id, BASE_URL]);
-
-
-
- const filteredRequisitions = requisitions.filter(req =>
-  req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  req.description.toLowerCase().includes(searchTerm.toLowerCase())
-);
+  const filteredRequisitions = requisitions.filter(req =>
+    req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    req.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleRequisitionClick = (requisition) => {
     setSelectedRequisition(requisition);
@@ -69,55 +78,49 @@ useEffect(() => {
     });
   };
 
+  const handleApprove = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ user_id: user.id })
+      });
 
-const handleApprove = async (id) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ user_id: user.id })
-    });
+      const result = await response.json();
 
-    const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to approve requisition');
+      }
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to approve requisition');
+      setRequisitions(prev =>
+        prev.map(req => {
+          if (req.id === id) {
+            return {
+              ...req,
+              [result.field]: 'approved',
+              status: 'approved'
+            };
+          }
+          return req;
+        })
+      );
+
+      if (selectedRequisition?.id === id) {
+        setSelectedRequisition(prev => ({
+          ...prev,
+          [result.field]: 'approved',
+          status: 'approved'
+        }));
+      }
+    } catch (error) {
+      console.error('Approve error:', error);
+      alert(error.message);
     }
-
-    // Update requisitions list
-    setRequisitions(prev =>
-      prev.map(req => {
-        if (req.id === id) {
-          return {
-            ...req,
-            [result.field]: 'approved',
-            status: 'approved'
-          };
-        }
-        return req;
-      })
-    );
-
-    // ✅ Update selectedRequisition to reflect latest approval
-    if (selectedRequisition?.id === id) {
-      setSelectedRequisition(prev => ({
-        ...prev,
-        [result.field]: 'approved',
-        status: 'approved'
-      }));
-    }
-
-  } catch (error) {
-    console.error('Approve error:', error);
-    alert(error.message);
-  }
-};
-
-
+  };
 
   const handleReject = async (id) => {
     try {
@@ -211,7 +214,9 @@ const handleApprove = async (id) => {
                       {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{formatDate(req.created_at)}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {formatDate(req.created_at)} • {users[req.created_by]?.name || `User ${req.created_by}`}
+                  </p>
                 </div>
               ))
             ) : (
@@ -228,7 +233,7 @@ const handleApprove = async (id) => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h2 className="text-lg sm:text-xl font-bold">{selectedRequisition.title}</h2>
-                <p className="text-sm text-gray-500">Created: {formatDate(selectedRequisition.created_at)}</p>
+                <p className="text-sm text-gray-500">Created: {formatDate(selectedRequisition.created_at)} by {users[selectedRequisition.created_by]?.name || `User ${selectedRequisition.created_by}`}</p>
                 <p className="text-xs text-gray-400">Last updated: {formatDate(selectedRequisition.updated_at)}</p>
               </div>
               <button
@@ -339,8 +344,7 @@ const handleApprove = async (id) => {
                   Approve
                 </button>
               </div>
-            )}
-          </div>
+            )}          </div>
         </div>
       )}
     </div>

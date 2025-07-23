@@ -5,7 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 
 const MemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
   const [acknowledgments, setAcknowledgments] = useState([]);
@@ -13,26 +12,38 @@ const MemoList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState({});
 
   useEffect(() => {
-
-    const fetchMemos = async () => {
+    const fetchData = async () => {
       try {
-        const response = await axios.get(
-          `${BASE_URL}/memos/user/${user.id}?role=${user.role}`,
-          {
+        const token = localStorage.getItem('token');
+        const [memosResponse, usersResponse] = await Promise.all([
+          axios.get(`${BASE_URL}/memos/user/${user.id}?role=${user.role}`, {
             headers: {
-              Authorization: `Bearer ${user.token}`,
+              Authorization: `Bearer ${token}`,
             },
-          }
-        );
+          }),
+          axios.get(`${BASE_URL}/users`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        ]);
 
+        const memosArray = memosResponse.data;
+        const usersData = usersResponse.data;
 
-        const memosArray = response.data; // Directly the array
+        const usersMap = usersData.reduce((acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        }, {});
+
+        setUsers(usersMap);
 
         const transformedMemos = memosArray.map(memo => ({
           ...memo,
-          sender: `User ${memo.created_by}`, // Replace with actual username if you have a lookup
+          sender: usersMap[memo.created_by]?.name || `User ${memo.created_by}`,
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
@@ -47,8 +58,7 @@ const MemoList = () => {
       }
     };
 
-
-    fetchMemos();
+    fetchData();
   }, [user]);
 
   const filteredMemos = memos.filter(memo =>
@@ -61,9 +71,8 @@ const MemoList = () => {
     setSelectedMemo({
       ...memo,
       acknowledged: isMemoAcknowledgedByUser(memo, user.id)
-    })
+    });
   };
-
 
   const handleApprove = async (memo) => {
     try {
@@ -71,8 +80,7 @@ const MemoList = () => {
         `${BASE_URL}/memos/${memo.id}/approve`,
         {
           user_id: user.id,
-          role: user.role, // ✅ pass the role
-          send_directly_to_chairman: sendDirectlyToChairman,
+          role: user.role,
         },
         {
           headers: {
@@ -85,7 +93,7 @@ const MemoList = () => {
         alert(`✅ Success: ${response.data.message}`);
         const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
         setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
-        setSelectedMemo(updatedMemo)
+        setSelectedMemo(updatedMemo);
       }
     } catch (error) {
       console.error('Approval failed:', error.response?.data || error.message);
@@ -207,7 +215,6 @@ const MemoList = () => {
       if (response.status === 200) {
         alert(`✅ Acknowledged: ${response.data.message}`);
 
-        // Ensure that acknowledgments is parsed into an array of objects
         let updatedAcks = response.data.acknowledgments;
         if (typeof updatedAcks === 'string') {
           try {
@@ -232,7 +239,6 @@ const MemoList = () => {
     }
   };
 
-
   const isMemoAcknowledgedByUser = (memo, userId) => {
     if (!memo.acknowledgments) return false;
     const acks = Array.isArray(memo.acknowledgments)
@@ -240,11 +246,6 @@ const MemoList = () => {
       : [];
     return acks.some(a => typeof a === 'object' && a.id === userId);
   };
-
-
-
-  if (loading) return <p className="text-center py-4">Loading memos...</p>;
-  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   const getMemoTypeBadge = (type) => {
     if (type === 'report') {
@@ -258,6 +259,9 @@ const MemoList = () => {
       className: 'bg-blue-100 text-blue-800 border border-blue-300'
     };
   };
+
+  if (loading) return <p className="text-center py-4">Loading memos...</p>;
+  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -321,7 +325,6 @@ const MemoList = () => {
               <p className="text-center text-gray-500 py-4">No memos found</p>
             )}
           </div>
-
         </div>
       </div>
 
@@ -332,6 +335,7 @@ const MemoList = () => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h2 className="text-xl font-bold flex items-center gap-2">
+                  {selectedMemo.title}
                   {selectedMemo.memo_type === 'report' && selectedMemo.acknowledged && (
                     <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -340,9 +344,7 @@ const MemoList = () => {
                       Acknowledged
                     </span>
                   )}
-
                 </h2>
-
                 <p className="text-sm text-gray-500">From: {selectedMemo.sender}</p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
                 <div className="mt-2">
@@ -350,7 +352,6 @@ const MemoList = () => {
                     {getStatusBadge(selectedMemo.status).icon}
                     {getStatusBadge(selectedMemo.status).text}
                   </span>
-
                 </div>
               </div>
               <button

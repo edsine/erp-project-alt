@@ -285,10 +285,12 @@ const UserList = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
               <option value="">Select Department</option>
-              <option value="ICT">ICT</option>
-              <option value="Operations">Operations</option>
-              <option value="Executive">Executive</option>
-
+              <option value="ICT">ICT</option>  
+              <option value="Finance">Finance</option>
+              <option value="Tender">Tender</option>
+              <option value="Utility">Utility</option>
+              <option value="HR">HR</option>
+              <option value="Admin">Admin</option>
             </select>
           </div>
           <div>
