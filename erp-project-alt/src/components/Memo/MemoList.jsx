@@ -510,20 +510,7 @@ const MemoList = () => {
                 user?.role === 'chairman') && (
                 <div className="mt-6 space-y-4">
                   {/* Show checkbox for executive, finance, and GMD to send directly to chairman */}
-                  {(user?.role === 'executive' || user?.role === 'finance' || user?.role === 'gmd') && (
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="sendDirectly"
-                        checked={sendDirectly}
-                        onChange={(e) => setSendDirectly(e.target.checked)}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
-                        Send directly to Chairman
-                      </label>
-                    </div>
-                  )}
+
 
                   <div className="flex justify-end space-x-3">
                     <button
