@@ -277,6 +277,7 @@ const UserList = () => {
               </button>
             </div>
           </div>
+
           <div>
             <select
               name="department"
@@ -293,6 +294,7 @@ const UserList = () => {
               <option value="Admin">Admin</option>
             </select>
           </div>
+
           <div>
             <select
               name="role"
@@ -310,6 +312,7 @@ const UserList = () => {
               <option value="executive">Executive</option>
             </select>
           </div>
+
           <div>
             {editingUserId ? (
               <div className="flex space-x-2">

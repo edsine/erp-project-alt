@@ -13,6 +13,7 @@ const MemoList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
+  const [sendDirectly, setSendDirectly] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -81,6 +82,7 @@ const MemoList = () => {
         {
           user_id: user.id,
           role: user.role,
+          send_directly: sendDirectly
         },
         {
           headers: {
@@ -91,9 +93,17 @@ const MemoList = () => {
 
       if (response.status === 200) {
         alert(`✅ Success: ${response.data.message}`);
-        const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
-        setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+        const updatedMemo = {
+          ...memo,
+          ...response.data.updatedFields,
+          status: response.data.status || memo.status
+        };
+        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
         setSelectedMemo(updatedMemo);
+
+        if (response.data.nextApprover) {
+          alert(`Next approver: ${response.data.nextApprover}`);
+        }
       }
     } catch (error) {
       console.error('Approval failed:', error.response?.data || error.message);
@@ -446,7 +456,6 @@ const MemoList = () => {
               </div>
             </div>
 
-
             {/* Acknowledgment checkbox for reports */}
             {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (
               <div className="mt-6 border-t pt-4">
@@ -477,13 +486,12 @@ const MemoList = () => {
               </div>
             )}
 
-
             {selectedMemo.memo_type === 'report' && selectedMemo.acknowledgments?.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium mb-2">Acknowledged by:</h4>
                 <ul className="list-disc list-inside text-sm text-gray-700">
                   {selectedMemo.acknowledgments
-                    .filter(a => typeof a === 'object') // filter only actual acknowledgment objects
+                    .filter(a => typeof a === 'object')
                     .map((a) => (
                       <li key={a.id}>
                         {a.name} — {a.role} ({a.dept})
@@ -492,7 +500,6 @@ const MemoList = () => {
                 </ul>
               </div>
             )}
-
 
             {/* Approval buttons for authorized roles */}
             {selectedMemo.status === 'submitted' &&
@@ -508,8 +515,8 @@ const MemoList = () => {
                       <input
                         type="checkbox"
                         id="sendDirectly"
-                        checked={sendDirectlyToChairman}
-                        onChange={(e) => setSendDirectlyToChairman(e.target.checked)}
+                        checked={sendDirectly}
+                        onChange={(e) => setSendDirectly(e.target.checked)}
                         className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                       />
                       <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
@@ -538,7 +545,6 @@ const MemoList = () => {
                   </div>
                 </div>
               )}
-
           </div>
         </div>
       )}
