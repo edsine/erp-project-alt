@@ -62,11 +62,19 @@ const MemoList = () => {
     fetchData();
   }, [user]);
 
-  const filteredMemos = memos.filter(memo =>
+const filteredMemos = memos.filter(memo => {
+  const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
+  const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
+  
+  return (
     memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
+    // You can also include your conditions here if needed:
+    // && isFinanceCreator
+    // && isNotIctCreator
   );
+});
 
   const handleMemoClick = (memo) => {
     setSelectedMemo({
@@ -82,11 +90,10 @@ const MemoList = () => {
         {
           user_id: user.id,
           role: user.role,
-          send_directly: sendDirectly
         },
         {
           headers: {
-            Authorization: `Bearer ${user.token}`,
+            Authorization: user?.token ? `Bearer ${user.token}` : '',
           },
         }
       );
@@ -110,6 +117,36 @@ const MemoList = () => {
       alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
   };
+
+
+
+  // const handleApprove = async (memo) => {
+  //   try {
+  //     const response = await axios.post(
+  //       `${BASE_URL}/memos/${memo.id}/approve`,
+  //       {
+  //         user_id: user.id,
+  //         role: user.role, // ✅ pass the role
+
+  //       },
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${user.token}`,
+  //         },
+  //       }
+  //     );
+
+  //     if (response.status === 200) {
+  //       alert(`✅ Success: ${response.data.message}`);
+  //       const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
+  //       setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+  //       setSelectedMemo(updatedMemo)
+  //     }
+  //   } catch (error) {
+  //     console.error('Approval failed:', error.response?.data || error.message);
+  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  //   }
+  // };
 
   const handleReject = async (memo) => {
     if (!memo) return;
@@ -510,7 +547,20 @@ const MemoList = () => {
                 user?.role === 'chairman') && (
                 <div className="mt-6 space-y-4">
                   {/* Show checkbox for executive, finance, and GMD to send directly to chairman */}
-
+                  {(user?.role === 'executive' || user?.role === 'finance' || user?.role === 'gmd') && (
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="sendDirectly"
+                        checked={console.log("hi")}
+                        onChange={console.log("hi")}
+                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                      />
+                      <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
+                        Send directly to Chairman
+                      </label>
+                    </div>
+                  )}
 
                   <div className="flex justify-end space-x-3">
                     <button
