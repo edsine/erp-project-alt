@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const MemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
   const [acknowledgments, setAcknowledgments] = useState([]);
@@ -12,39 +13,54 @@ const MemoList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [users, setUsers] = useState({});
-  const [sendDirectly, setSendDirectly] = useState(false);
+  const [users, setUsers] = useState({}); // New state for user data
 
+  // Fetch all users when component mounts
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchUsers = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const [memosResponse, usersResponse] = await Promise.all([
-          axios.get(`${BASE_URL}/memos/user/${user.id}?role=${user.role}`, {
+        const response = await axios.get(
+          `${BASE_URL}/users`,
+          {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${user.token}`,
             },
-          }),
-          axios.get(`${BASE_URL}/users`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          })
-        ]);
-
-        const memosArray = memosResponse.data;
-        const usersData = usersResponse.data;
-
-        const usersMap = usersData.reduce((acc, user) => {
+          }
+        );
+        
+        // Convert array to object with ID as key for easy lookup
+        const usersMap = response.data.reduce((acc, user) => {
           acc[user.id] = user;
           return acc;
         }, {});
-
+        
         setUsers(usersMap);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
+
+    fetchUsers();
+  }, [BASE_URL, user.token]);
+
+  useEffect(() => {
+    const fetchMemos = async () => {
+      try {
+        const response = await axios.get(
+          `${BASE_URL}/memos/user/${user.id}?role=${user.role}`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
+        const memosArray = response.data;
 
         const transformedMemos = memosArray.map(memo => ({
           ...memo,
-          sender: usersMap[memo.created_by]?.name || `User ${memo.created_by}`,
+          sender: users[memo.created_by]?.name || `User ${memo.created_by}`, // Use actual username if available
+          senderDetails: users[memo.created_by], // Store full user details
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
@@ -59,22 +75,19 @@ const MemoList = () => {
       }
     };
 
-    fetchData();
-  }, [user]);
+    fetchMemos();
+  }, [user, users]); // Add users to dependency array
 
-const filteredMemos = memos.filter(memo => {
-  const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
-  const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
-  
-  return (
-    memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    // You can also include your conditions here if needed:
-    // && isFinanceCreator
-    // && isNotIctCreator
-  );
-});
+  const filteredMemos = memos.filter(memo => {
+    const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
+    const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
+    
+    return (
+      memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
 
   const handleMemoClick = (memo) => {
     setSelectedMemo({
@@ -117,36 +130,6 @@ const filteredMemos = memos.filter(memo => {
       alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
   };
-
-
-
-  // const handleApprove = async (memo) => {
-  //   try {
-  //     const response = await axios.post(
-  //       `${BASE_URL}/memos/${memo.id}/approve`,
-  //       {
-  //         user_id: user.id,
-  //         role: user.role, // ✅ pass the role
-
-  //       },
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${user.token}`,
-  //         },
-  //       }
-  //     );
-
-  //     if (response.status === 200) {
-  //       alert(`✅ Success: ${response.data.message}`);
-  //       const updatedMemo = { ...memo, ...response.data.updatedFields, status: 'approved' };
-  //       setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
-  //       setSelectedMemo(updatedMemo)
-  //     }
-  //   } catch (error) {
-  //     console.error('Approval failed:', error.response?.data || error.message);
-  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
-  //   }
-  // };
 
   const handleReject = async (memo) => {
     if (!memo) return;
@@ -271,6 +254,17 @@ const filteredMemos = memos.filter(memo => {
           }
         }
 
+        // Map acknowledgment user IDs to names
+        updatedAcks = updatedAcks.map(ack => {
+          if (typeof ack === 'object' && ack.id) {
+            return {
+              ...ack,
+              name: users[ack.id]?.name || `User ${ack.id}`
+            };
+          }
+          return ack;
+        });
+
         const updatedMemo = {
           ...memo,
           acknowledged: true,
@@ -294,6 +288,9 @@ const filteredMemos = memos.filter(memo => {
     return acks.some(a => typeof a === 'object' && a.id === userId);
   };
 
+  if (loading) return <p className="text-center py-4">Loading memos...</p>;
+  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
+
   const getMemoTypeBadge = (type) => {
     if (type === 'report') {
       return {
@@ -306,9 +303,6 @@ const filteredMemos = memos.filter(memo => {
       className: 'bg-blue-100 text-blue-800 border border-blue-300'
     };
   };
-
-  if (loading) return <p className="text-center py-4">Loading memos...</p>;
-  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
@@ -364,7 +358,9 @@ const filteredMemos = memos.filter(memo => {
                       </div>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-500">{memo.sender}</p>
+                  <p className="text-sm text-gray-500">
+                    From: {memo.sender} {memo.senderDetails?.department && `(${memo.senderDetails.department})`}
+                  </p>
                   <p className="text-xs text-gray-400">{memo.date}</p>
                 </div>
               ))
@@ -392,7 +388,11 @@ const filteredMemos = memos.filter(memo => {
                     </span>
                   )}
                 </h2>
-                <p className="text-sm text-gray-500">From: {selectedMemo.sender}</p>
+
+                <p className="text-sm text-gray-500">
+                  From: {selectedMemo.sender} 
+                  {selectedMemo.senderDetails?.department && ` (${selectedMemo.senderDetails.department})`}
+                </p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo.status).className}`}>
@@ -417,80 +417,32 @@ const filteredMemos = memos.filter(memo => {
 
             {/* Approval status indicators */}
             <div className="grid grid-cols-4 gap-2 mb-6">
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_manager === 1
-                ? 'bg-green-100 text-green-800'
-                : selectedMemo.approved_by_manager === -1
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100'
-                }`}>
-                Manager: {
-                  selectedMemo.approved_by_manager === 1
-                    ? 'Approved'
-                    : selectedMemo.approved_by_manager === -1
-                      ? 'Rejected'
-                      : 'Pending'
-                }
-              </div>
-
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_executive === 1
-                ? 'bg-green-100 text-green-800'
-                : selectedMemo.approved_by_executive === -1
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100'
-                }`}>
-                Executive: {
-                  selectedMemo.approved_by_executive === 1
-                    ? 'Approved'
-                    : selectedMemo.approved_by_executive === -1
-                      ? 'Rejected'
-                      : 'Pending'
-                }
-              </div>
-
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_finance === 1
-                ? 'bg-green-100 text-green-800'
-                : selectedMemo.approved_by_finance === -1
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100'
-                }`}>
-                Finance: {
-                  selectedMemo.approved_by_finance === 1
-                    ? 'Approved'
-                    : selectedMemo.approved_by_finance === -1
-                      ? 'Rejected'
-                      : 'Pending'
-                }
-              </div>
-
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_gmd === 1
-                ? 'bg-green-100 text-green-800'
-                : selectedMemo.approved_by_gmd === -1
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100'
-                }`}>
-                GMD: {
-                  selectedMemo.approved_by_gmd === 1
-                    ? 'Approved'
-                    : selectedMemo.approved_by_gmd === -1
-                      ? 'Rejected'
-                      : 'Pending'
-                }
-              </div>
-
-              <div className={`p-2 rounded text-center text-xs ${selectedMemo.approved_by_chairman === 1
-                ? 'bg-green-100 text-green-800'
-                : selectedMemo.approved_by_chairman === -1
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-gray-100'
-                }`}>
-                Chairman: {
-                  selectedMemo.approved_by_chairman === 1
-                    ? 'Approved'
-                    : selectedMemo.approved_by_chairman === -1
-                      ? 'Rejected'
-                      : 'Pending'
-                }
-              </div>
+              {[
+                { role: 'manager', label: 'Manager' },
+                { role: 'executive', label: 'Executive' },
+                { role: 'finance', label: 'Finance' },
+                { role: 'gmd', label: 'GMD' },
+                { role: 'chairman', label: 'Chairman' }
+              ].map(({ role, label }) => {
+                const approved = selectedMemo[`approved_by_${role}`] === 1;
+                const rejected = selectedMemo[`rejected_by_${role}`] === 1;
+                
+                return (
+                  <div
+                    key={role}
+                    className={`p-2 rounded text-center text-xs ${
+                      approved ? 'bg-green-100 text-green-800' :
+                      rejected ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100'
+                    }`}
+                  >
+                    <div className="font-medium">{label}</div>
+                    <div>
+                      {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Acknowledgment checkbox for reports */}
@@ -510,6 +462,7 @@ const filteredMemos = memos.filter(memo => {
                 </label>
               </div>
             )}
+
             {selectedMemo.memo_type === 'report' && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium mb-1">Pending Acknowledgment From:</h4>
@@ -531,7 +484,7 @@ const filteredMemos = memos.filter(memo => {
                     .filter(a => typeof a === 'object')
                     .map((a) => (
                       <li key={a.id}>
-                        {a.name} — {a.role} ({a.dept})
+                        {a.name} — {a.role} {a.dept && `(${a.dept})`}
                       </li>
                     ))}
                 </ul>
@@ -546,22 +499,6 @@ const filteredMemos = memos.filter(memo => {
                 user?.role === 'gmd' ||
                 user?.role === 'chairman') && (
                 <div className="mt-6 space-y-4">
-                  {/* Show checkbox for executive, finance, and GMD to send directly to chairman */}
-                  {(user?.role === 'executive' || user?.role === 'finance' || user?.role === 'gmd') && (
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="sendDirectly"
-                        checked={console.log("hi")}
-                        onChange={console.log("hi")}
-                        className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                      />
-                      <label htmlFor="sendDirectly" className="ml-2 block text-sm text-gray-700">
-                        Send directly to Chairman
-                      </label>
-                    </div>
-                  )}
-
                   <div className="flex justify-end space-x-3">
                     <button
                       onClick={() => handleReject(selectedMemo)}
