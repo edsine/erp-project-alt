@@ -8,8 +8,6 @@ const MemoList = () => {
 
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
-  const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
-  const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
   const [acknowledgments, setAcknowledgments] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,11 +51,19 @@ const MemoList = () => {
     fetchMemos();
   }, [user]);
 
-  const filteredMemos = memos.filter(memo =>
+const filteredMemos = memos.filter(memo => {
+  const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
+  const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
+  
+  return (
     memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
+    // You can also include your conditions here if needed:
+    // && isFinanceCreator
+    // && isNotIctCreator
   );
+});
 
   const handleMemoClick = (memo) => {
     setSelectedMemo({

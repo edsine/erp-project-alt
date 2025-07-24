@@ -121,41 +121,41 @@ const UserList = () => {
     });
   };
 
- const handleUpdateUser = async () => {
-  const userData = {
-    id: editingUserId,
-    ...editUser,
-  };
+  const handleUpdateUser = async () => {
+    const userData = {
+      id: editingUserId,
+      ...editUser,
+    };
 
-  try {
-    const response = await fetch(`${BASE_URL}/users`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
-    });
+    try {
+      const response = await fetch(`${BASE_URL}/users`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
-      console.error('Update failed:', result.message);
-      alert(result.message || 'Something went wrong');
-      return;
+      if (!response.ok) {
+        console.error('Update failed:', result.message);
+        alert(result.message || 'Something went wrong');
+        return;
+      }
+
+      // Update local list
+      setUsers(prev =>
+        prev.map(u => (u.id === userData.id ? { ...u, ...userData } : u))
+      );
+
+      alert('User updated successfully!');
+      setEditingUserId(null);
+    } catch (error) {
+      console.error('❌ API error:', error);
+      alert('Failed to update user. Please try again.');
     }
-
-    // Update local list
-    setUsers(prev =>
-      prev.map(u => (u.id === userData.id ? { ...u, ...userData } : u))
-    );
-
-    alert('User updated successfully!');
-    setEditingUserId(null);
-  } catch (error) {
-    console.error('❌ API error:', error);
-    alert('Failed to update user. Please try again.');
-  }
-};
+  };
 
 
 
@@ -370,6 +370,7 @@ const UserList = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
+                
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="font-medium text-gray-900">{user.name}</div>
@@ -383,8 +384,8 @@ const UserList = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {user.department}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">
-                    {user.role}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {user.role || 'Not assigned'} {/* Add fallback */}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_admin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
