@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { 
+  FiFile, FiImage, FiDownload, FiTrash2, FiUpload, 
+  FiSearch, FiFilter, FiCheck, FiX, FiAlertCircle,
+  FiCheckCircle, FiChevronLeft, FiFileText, FiFilePlus,
+  FiFileMinus, FiFileType
+} from 'react-icons/fi';
 
 const ClientFileList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -194,7 +200,6 @@ const ClientFileList = () => {
     }
   };
 
-
   const handleView = async (fileId, fileName, fileType) => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -204,14 +209,14 @@ const ClientFileList = () => {
 
     try {
       const isViewable = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'image/jpeg',
-    'image/png',
-    'text/plain'
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'image/jpeg',
+        'image/png',
+        'text/plain'
       ].includes(fileType);
 
       if (isViewable) {
@@ -225,69 +230,128 @@ const ClientFileList = () => {
     }
   };
 
-  if (loading) return <div className="text-center py-8">Loading files...</div>;
-  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
-  if (!client) return <div className="text-center py-8">Client not found</div>;
+  if (loading) return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-pulse flex flex-col items-center">
+        <div className="h-12 w-12 bg-gray-200 rounded-full mb-4"></div>
+        <div className="h-4 bg-gray-200 rounded w-32"></div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+      <div className="flex">
+        <FiAlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+        <div className="ml-3">
+          <p className="text-sm text-red-700">{error}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!client) return (
+    <div className="text-center py-8">
+      <FiFileText className="mx-auto h-12 w-12 text-gray-400" />
+      <h3 className="mt-2 text-lg font-medium text-gray-900">Client not found</h3>
+      <p className="mt-1 text-sm text-gray-500">The requested client does not exist</p>
+      <button
+        onClick={() => navigate('/dashboard/files')}
+        className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+      >
+        <FiChevronLeft className="mr-2" /> Back to Files
+      </button>
+    </div>
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold">{client.name}</h2>
-          <p className="text-sm sm:text-base text-gray-500">{client.code}</p>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Header */}
+      <div className="bg-white shadow-sm rounded-lg p-4 sm:p-6 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{client.name}</h1>
+            <p className="text-sm text-gray-500 mt-1">Client ID: {client.code}</p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiFilter className="h-5 w-5 text-gray-400" />
+              </div>
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm appearance-none"
+              >
+                <option value="all">All Categories</option>
+                <option value="requisition">Requisitions</option>
+                <option value="memo">Memos</option>
+                <option value="contract">Contracts</option>
+                <option value="report">Reports</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FiSearch className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search files..."
+                className="pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            checked={selectAll}
+            onChange={toggleSelectAll}
+            className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+          />
+          <span className="ml-2 text-sm text-gray-700">
+            {selectedFiles.length > 0 ? `${selectedFiles.length} selected` : 'Select all'}
+          </span>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
-          >
-            <option value="all">All Categories</option>
-            <option value="requisition">Requisitions</option>
-            <option value="memo">Memos</option>
-            <option value="contract">Contracts</option>
-            <option value="report">Reports</option>
-            <option value="other">Other</option>
-          </select>
-          
-          <input
-            type="text"
-            placeholder="Search files..."
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          
           {selectedFiles.length > 0 && (
             <button
               onClick={handleDeleteSelected}
               disabled={isDeleting}
-              className={`px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm sm:text-base ${
+              className={`inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
                 isDeleting ? 'opacity-70 cursor-not-allowed' : ''
               }`}
             >
-              {isDeleting ? 'Deleting...' : `Delete (${selectedFiles.length})`}
+              <FiTrash2 className="mr-2" />
+              {isDeleting ? 'Deleting...' : `Delete Selected`}
             </button>
           )}
           
           <Link
             to={`/dashboard/files/${clientId}/upload`}
-            className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark text-sm sm:text-base text-center"
+            className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
           >
+            <FiUpload className="mr-2" />
             Upload File
           </Link>
         </div>
       </div>
 
+      {/* Alerts */}
       {error && (
-        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 sm:p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
+        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-r">
+          <div className="flex">
+            <FiAlertCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
             <div className="ml-3">
               <p className="text-sm text-red-700">{error}</p>
             </div>
@@ -296,13 +360,9 @@ const ClientFileList = () => {
       )}
 
       {success && (
-        <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-3 sm:p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
+        <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-4 rounded-r">
+          <div className="flex">
+            <FiCheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
             <div className="ml-3">
               <p className="text-sm text-green-700">{success}</p>
             </div>
@@ -310,107 +370,100 @@ const ClientFileList = () => {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <input
-                  type="checkbox"
-                  checked={selectAll}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredFiles.length > 0 ? (
-              filteredFiles.map(file => (
-                <tr key={file.id} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+      {/* Files List */}
+      <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-200">
+        {filteredFiles.length > 0 ? (
+          <div className="divide-y divide-gray-200">
+            {filteredFiles.map(file => (
+              <div key={file.id} className={`p-4 hover:bg-gray-50 transition-colors ${
+                selectedFiles.includes(file.id) ? 'bg-blue-50' : ''
+              }`}>
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 mr-4">
                     <input
                       type="checkbox"
                       checked={selectedFiles.includes(file.id)}
                       onChange={() => toggleFileSelection(file.id)}
                       className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                     />
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div 
-                        className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 cursor-pointer"
-                        onClick={() => handleView(file.id, file.name, file.type)}
-                        title={`Click to ${[
-                          'image/jpeg',
-                          'image/png',
-                          'image/gif',
-                          'application/pdf',
-                          'text/plain'
-                        ].includes(file.type) ? 'view' : 'download'} ${file.name}`}
-                      >
-                        {getFileIcon(file.type)}
-                      </div>
-                      <div className="ml-2 sm:ml-4">
-                        <div className="text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{file.name}</div>
-                        <div className="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-none">{file.description}</div>
+                  </div>
+                  
+                  <div 
+                    className="flex-shrink-0 h-10 w-10 cursor-pointer text-primary"
+                    onClick={() => handleView(file.id, file.name, file.type)}
+                    title={`Click to ${[
+                      'image/jpeg',
+                      'image/png',
+                      'image/gif',
+                      'application/pdf',
+                      'text/plain'
+                    ].includes(file.type) ? 'view' : 'download'} ${file.name}`}
+                  >
+                    {getFileIcon(file.type)}
+                  </div>
+                  
+                  <div className="ml-4 flex-1 min-w-0">
+                    <div className="flex justify-between">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {file.name}
+                      </p>
+                      <div className="ml-2 flex-shrink-0 flex">
+                        <button
+                          onClick={() => handleDownload(file.id, file.name)}
+                          className="text-gray-400 hover:text-primary p-1"
+                          title="Download"
+                        >
+                          <FiDownload className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(file.id)}
+                          className="text-gray-400 hover:text-red-500 p-1 ml-2"
+                          title="Delete"
+                        >
+                          <FiTrash2 className="h-5 w-5" />
+                        </button>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      file.category === 'requisition' ? 'bg-green-100 text-green-800' :
-                      file.category === 'memo' ? 'bg-blue-100 text-blue-800' :
-                      file.category === 'contract' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {file.category}
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                    {new Date(file.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                    {formatFileSize(file.size)}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleDownload(file.id, file.name)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Download"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(file.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                    <p className="text-sm text-gray-500 truncate">{file.description}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        file.category === 'requisition' ? 'bg-green-100 text-green-800' :
+                        file.category === 'memo' ? 'bg-blue-100 text-blue-800' :
+                        file.category === 'contract' ? 'bg-purple-100 text-purple-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {file.category}
+                      </span>
+                      <span className="inline-flex items-center text-xs text-gray-500">
+                        {formatFileSize(file.size)}
+                      </span>
+                      <span className="inline-flex items-center text-xs text-gray-500">
+                        {new Date(file.created_at).toLocaleDateString()}
+                      </span>
                     </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                  No files found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <FiFile className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-lg font-medium text-gray-900">No files found</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              {searchTerm ? 'Try a different search term' : 'Get started by uploading a file'}
+            </p>
+            <div className="mt-6">
+              <Link
+                to={`/dashboard/files/${clientId}/upload`}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              >
+                <FiUpload className="mr-2" />
+                Upload File
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -421,52 +474,28 @@ function getFileIcon(fileType) {
   const subtype = fileType?.split('/')[1];
   
   if (fileType === 'application/pdf') {
-    return (
-      <svg className="h-full w-full text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
+    return <FiFileType className="h-full w-full text-red-500" />;
   }
   
   if (type === 'image') {
-    return (
-      <svg className="h-full w-full text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    );
+    return <FiImage className="h-full w-full text-blue-500" />;
   }
   
   if (fileType === 'application/msword' || 
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return (
-      <svg className="h-full w-full text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
+    return <FiFileText className="h-full w-full text-blue-600" />;
   }
   
   if (fileType === 'application/vnd.ms-excel' || 
       fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-    return (
-      <svg className="h-full w-full text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
+    return <FiFilePlus className="h-full w-full text-green-600" />;
   }
   
   if (type === 'text') {
-    return (
-      <svg className="h-full w-full text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
+    return <FiFileText className="h-full w-full text-gray-600" />;
   }
   
-  return (
-    <svg className="h-full w-full text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  );
+  return <FiFile className="h-full w-full text-gray-400" />;
 }
 
 function formatFileSize(bytes) {

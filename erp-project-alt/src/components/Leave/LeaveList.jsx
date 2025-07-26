@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext';
+import { 
+  FiPlus, FiSearch, FiX, FiCalendar, FiUser,
+  FiCheck, FiClock, FiAlertCircle, FiChevronRight
+} from 'react-icons/fi';
 
 const LeaveList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -13,68 +17,66 @@ const LeaveList = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Fetch users
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${BASE_URL}/users`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const usersData = await response.json();
 
- // Fetch leave requests
-useEffect(() => {
-  const fetchUsers = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const usersData = await response.json();
+        const usersMap = usersData.reduce((acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        }, {});
 
-      // Convert array to object with ID as key
-      const usersMap = usersData.reduce((acc, user) => {
-        acc[user.id] = user;
-        return acc;
-      }, {});
-
-      setUsers(usersMap);
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-    }
-  };
-
-  fetchUsers();
-}, []);
-
-useEffect(() => {
-  const fetchLeaves = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error fetching leave data');
+        setUsers(usersMap);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
       }
+    };
 
-      const data = await response.json();
-      setLeaves(data);
-    } catch (err) {
-      console.error('❌ Failed to fetch leaves:', err);
-      setError('Failed to load leave requests');
-    } finally {
-      setLoading(false);
+    fetchUsers();
+  }, []);
+
+  // Fetch leave requests
+  useEffect(() => {
+    const fetchLeaves = async () => {
+      try {
+        setLoading(true);
+        const token = localStorage.getItem('token');
+
+        const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Error fetching leave data');
+        }
+
+        const data = await response.json();
+        setLeaves(data);
+      } catch (err) {
+        console.error('Failed to fetch leaves:', err);
+        setError('Failed to load leave requests');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchLeaves();
     }
-  };
+  }, [user?.id, BASE_URL]);
 
-  if (user?.id) {
-    fetchLeaves();
-  }
-}, [user?.id, BASE_URL]);
-
-
- // Filtered leaves based on search
+  // Filtered leaves based on search
   const filteredLeaves = leaves.filter(leave =>
     leave.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     leave.status?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,185 +95,224 @@ useEffect(() => {
 
     try {
       const token = localStorage.getItem('token');
-      if (newStatus === 'approved') {
-        const res = await fetch(`${BASE_URL}/leave/${id}/approve`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ user_id: user.id })
-        });
+      const endpoint = newStatus === 'approved' ? 'approve' : 'reject';
+      
+      const res = await fetch(`${BASE_URL}/leave/${id}/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ user_id: user.id })
+      });
 
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message || 'Approval failed');
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || `${endpoint} failed`);
 
-        setLeaves(prev =>
-          prev.map(leave =>
-            leave.id === id ? { ...leave, status: 'approved' } : leave
-          )
-        );
-        setSelectedLeave(null);
-      } else if (newStatus === 'rejected') {
-        const res = await fetch(`${BASE_URL}/leave/${id}/reject`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ user_id: user.id })
-        });
-
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message || 'Rejection failed');
-
-        setLeaves(prev =>
-          prev.map(leave =>
-            leave.id === id ? { ...leave, status: 'rejected' } : leave
-          )
-        );
-        setSelectedLeave(null);
-      }
+      setLeaves(prev =>
+        prev.map(leave =>
+          leave.id === id ? { ...leave, status: newStatus } : leave
+        )
+      );
+      setSelectedLeave(null);
     } catch (err) {
       alert(err.message);
     }
   };
 
-  if (loading) return <div className="text-center py-8">Loading leave requests...</div>;
-  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
+  if (loading) return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="h-16 bg-gray-100 rounded-lg"></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-red-50 border-l-4 border-red-500 p-4">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <FiAlertCircle className="h-5 w-5 text-red-500" />
+          </div>
+          <div className="ml-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-2 sm:p-4">
+    <div className="flex flex-col lg:flex-row gap-6 p-2 sm:p-4">
       {/* Leave List Panel */}
       <div className={`${selectedLeave ? 'hidden lg:block lg:w-1/3' : 'w-full'}`}>
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-            <h2 className="text-lg font-semibold">Leave Requests</h2>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <input
-                type="text"
-                placeholder="Search requests..."
-                className="flex-grow sm:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-xl font-light text-gray-800">Leave Requests</h2>
+              <p className="text-sm text-gray-500">Manage employee leave applications</p>
+            </div>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <div className="relative flex-grow sm:w-64">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FiSearch className="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search requests..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
               <Link
                 to="/dashboard/leaves/new"
-                className="px-3 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary-dark whitespace-nowrap"
+                className="flex items-center px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors whitespace-nowrap"
               >
+                <FiPlus className="mr-1 h-4 w-4" />
                 New Request
               </Link>
             </div>
           </div>
 
-          <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div className="space-y-3 max-h-[calc(100vh-220px)] overflow-y-auto">
             {filteredLeaves.length > 0 ? (
               filteredLeaves.map(leave => (
                 <div
                   key={leave.id}
                   onClick={() => handleLeaveClick(leave)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors ${selectedLeave?.id === leave.id ? 'bg-gray-100 border-primary' : ''
-                    }`}
+                  className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedLeave?.id === leave.id ? 
+                    'border-primary bg-blue-50' : 
+                    'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
                 >
-                  <div className="flex justify-between items-start gap-2">
+                  <div className="flex justify-between items-start gap-3">
                     <div className="min-w-0">
-                      <h3 className="font-medium text-sm sm:text-base truncate">{leave.type}</h3>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        ({leave.total_days} days)
+                      <div className="flex items-center space-x-2">
+                        <FiCalendar className="flex-shrink-0 h-4 w-4 text-gray-400" />
+                        <h3 className="font-medium text-gray-900 truncate">{leave.type}</h3>
+                      </div>
+                      <div className="flex items-center mt-1 text-xs text-gray-500">
+                        <FiUser className="mr-1 h-3 w-3" />
+                        <span>{users[leave.user_id]?.name || `User ${leave.user_id}`}</span>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1 truncate">
+                        {leave.startDate} - {leave.endDate} • {leave.total_days} day{leave.total_days !== 1 ? 's' : ''}
                       </p>
-
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        leave.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                      }`}>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      leave.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      leave.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
                       {leave.status}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1 truncate">{leave.reason}</p>
                 </div>
               ))
             ) : (
-              <p className="text-center text-gray-500 py-4">No leave requests found</p>
+              <div className="text-center py-8">
+                <FiClock className="mx-auto h-12 w-12 text-gray-300" />
+                <h3 className="mt-2 text-sm font-medium text-gray-500">No leave requests found</h3>
+                <p className="mt-1 text-xs text-gray-400">
+                  {searchTerm ? 'Try a different search term' : 'Create your first leave request'}
+                </p>
+              </div>
             )}
           </div>
         </div>
       </div>
 
       {/* Leave Detail Panel */}
-{selectedLeave && (
-  <div className="lg:w-2/3">
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold">{selectedLeave.type}</h2>
-          <p className="text-sm text-gray-500">
-            Requested by: {users[selectedLeave.user_id]?.name || `User ${selectedLeave.user_id}`}
-
-                  {selectedLeave.startDate} to {selectedLeave.endDate} ({selectedLeave.days} days)
-                </p>
-                <p className="text-xs text-gray-400">Status: {selectedLeave.status}</p>
+      {selectedLeave && (
+        <div className="lg:w-2/3">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">{selectedLeave.type}</h2>
+                <div className="flex items-center mt-2 text-sm text-gray-500">
+                  <FiUser className="mr-1 h-4 w-4" />
+                  <span>{users[selectedLeave.user_id]?.name || `User ${selectedLeave.user_id}`}</span>
+                </div>
+                <div className="flex items-center mt-1 text-sm text-gray-500">
+                  <FiCalendar className="mr-1 h-4 w-4" />
+                  <span>
+                    {selectedLeave.startDate} to {selectedLeave.endDate} • {selectedLeave.total_days} day{selectedLeave.total_days !== 1 ? 's' : ''}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedLeave(null)}
-                className="lg:hidden text-gray-500 hover:text-gray-700"
+                className="lg:hidden text-gray-400 hover:text-gray-600 transition-colors"
                 aria-label="Close details"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <FiX className="h-5 w-5" />
               </button>
             </div>
 
             <div className="mb-6">
-              <h3 className="text-md sm:text-lg font-medium mb-2">Reason</h3>
-              <div className="bg-gray-50 p-3 sm:p-4 rounded-md">
-                <p className="text-sm sm:text-base">{selectedLeave.reason}</p>
+              <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">Reason</h3>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-gray-700">{selectedLeave.reason}</p>
               </div>
             </div>
 
-            {/* Approval Status Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
-              {[{ label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
-              { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
-              { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
-              { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
-              { label: 'Chairman', approve: 'approved_by_chairman', reject: 'rejected_by_chairman' },].map((approver) => {
-                const approved = selectedLeave[approver.approve] === 1;
-                const rejected = selectedLeave[approver.reject] === 1;
-                const pending = !approved && !rejected;
+            {/* Approval Status */}
+            <div className="mb-8">
+              <h3 className="text-sm font-medium text-gray-700 uppercase tracking-wider mb-3">Approval Status</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {[
+                  { label: 'Line Manager', approve: 'approved_by_manager', reject: 'rejected_by_manager' },
+                  { label: 'Executive', approve: 'approved_by_executive', reject: 'rejected_by_executive' },
+                  { label: 'HR', approve: 'approved_by_hr', reject: 'rejected_by_hr' },
+                  { label: 'GMD', approve: 'approved_by_gmd', reject: 'rejected_by_gmd' },
+                  { label: 'Chairman', approve: 'approved_by_chairman', reject: 'rejected_by_chairman' }
+                ].map((approver) => {
+                  const approved = selectedLeave[approver.approve] === 1;
+                  const rejected = selectedLeave[approver.reject] === 1;
+                  const status = approved ? 'approved' : rejected ? 'rejected' : 'pending';
 
-                return (
-                  <div
-                    key={approver.label}
-                    className={`p-2 rounded text-center text-xs sm:text-sm ${approved ? 'bg-green-100 text-green-800' :
-                        rejected ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-500'
+                  return (
+                    <div
+                      key={approver.label}
+                      className={`p-3 rounded-lg text-center ${
+                        approved ? 'bg-green-50 text-green-700' :
+                        rejected ? 'bg-red-50 text-red-700' :
+                        'bg-gray-50 text-gray-500'
                       }`}
-                  >
-                    <div className="font-medium">{approver.label}</div>
-                    <div>
-                      {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
+                    >
+                      <div className="text-xs font-medium mb-1">{approver.label}</div>
+                      <div className="flex items-center justify-center text-sm">
+                        {status === 'approved' && <FiCheck className="mr-1 h-4 w-4" />}
+                        <span className="capitalize">{status}</span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
 
             {/* Action Buttons */}
             {selectedLeave.status === 'pending' && (
-              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
+              <div className="flex flex-col sm:flex-row justify-end gap-3">
                 <button
                   onClick={() => handleStatusChange(selectedLeave.id, 'rejected')}
-                  className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
+                  className="flex items-center justify-center px-4 py-2 border border-red-500 text-red-500 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
                 >
-                  Reject
+                  Reject Request
                 </button>
                 <button
                   onClick={() => handleStatusChange(selectedLeave.id, 'approved')}
-                  className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark transition-colors"
+                  className="flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                 >
-                  Approve
+                  <FiCheck className="mr-2 h-4 w-4" />
+                  Approve Request
                 </button>
               </div>
             )}
