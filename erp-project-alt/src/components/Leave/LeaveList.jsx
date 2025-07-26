@@ -84,7 +84,12 @@ const LeaveList = () => {
   );
 
   const handleLeaveClick = (leave) => {
-    setSelectedLeave(leave)
+    // Toggle functionality - close if same leave is clicked
+    if (selectedLeave?.id === leave.id) {
+      setSelectedLeave(null)
+    } else {
+      setSelectedLeave(leave)
+    }
   }
 
   const handleStatusChange = async (id, newStatus) => {
@@ -153,31 +158,33 @@ const LeaveList = () => {
       {/* Leave List Panel */}
       <div className={`${selectedLeave ? 'hidden lg:block lg:w-1/3' : 'w-full'}`}>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <h2 className="text-xl font-light text-gray-800">Leave Requests</h2>
-              <p className="text-sm text-gray-500">Manage employee leave applications</p>
-            </div>
-            <div className="flex gap-3 w-full sm:w-auto">
-              <div className="relative flex-grow sm:w-64">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search requests..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+          <div className="mb-6">
+            <div className="flex flex-col gap-4">
+              <div>
+                <h2 className="text-xl font-light text-gray-800">Leave Requests</h2>
+                <p className="text-sm text-gray-500">Manage employee leave applications</p>
               </div>
-              <Link
-                to="/dashboard/leaves/new"
-                className="flex items-center px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors whitespace-nowrap"
-              >
-                <FiPlus className="mr-1 h-4 w-4" />
-                New Request
-              </Link>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <FiSearch className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search requests..."
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary text-sm transition-colors"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Link
+                  to="/dashboard/leaves/new"
+                  className="flex items-center justify-center px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors whitespace-nowrap flex-shrink-0"
+                >
+                  <FiPlus className="mr-1 h-4 w-4" />
+                  New Request
+                </Link>
+              </div>
             </div>
           </div>
 

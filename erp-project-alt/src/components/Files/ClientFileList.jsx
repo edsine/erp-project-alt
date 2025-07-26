@@ -6,8 +6,12 @@ import {
   FiFile, FiImage, FiDownload, FiTrash2, FiUpload, 
   FiSearch, FiFilter, FiCheck, FiX, FiAlertCircle,
   FiCheckCircle, FiChevronLeft, FiFileText, FiFilePlus,
-  FiFileMinus, FiFileType
+  FiFileMinus, 
 } from 'react-icons/fi';
+import { MdDescription as FileTypeIcon } from 'react-icons/md';
+
+
+
 
 const ClientFileList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -474,7 +478,7 @@ function getFileIcon(fileType) {
   const subtype = fileType?.split('/')[1];
   
   if (fileType === 'application/pdf') {
-    return <FiFileType className="h-full w-full text-red-500" />;
+    return <FileTypeIcon className="h-full w-full text-red-500" />;
   }
   
   if (type === 'image') {
