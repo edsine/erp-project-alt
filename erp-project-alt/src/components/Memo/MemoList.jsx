@@ -27,13 +27,13 @@ const MemoList = () => {
             },
           }
         );
-        
+
         // Convert array to object with ID as key for easy lookup
         const usersMap = response.data.reduce((acc, user) => {
           acc[user.id] = user;
           return acc;
         }, {});
-        
+
         setUsers(usersMap);
       } catch (err) {
         console.error('Failed to fetch users:', err);
@@ -81,7 +81,7 @@ const MemoList = () => {
   const filteredMemos = memos.filter(memo => {
     const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
     const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
-    
+
     return (
       memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -96,40 +96,120 @@ const MemoList = () => {
     });
   };
 
+  // const handleApprove = async (memo) => {
+  //   try {
+  //     const response = await axios.post(
+  //       `${BASE_URL}/memos/${memo.id}/approve`,
+  //       {
+  //         user_id: user.id,
+  //         role: user.role,
+  //       },
+  //       {
+  //         headers: {
+  //           Authorization: user?.token ? `Bearer ${user.token}` : '',
+  //         },
+  //       }
+  //     );
+
+  //     if (response.status === 200) {
+  //       alert(`✅ Success: ${response.data.message}`);
+  //       const updatedMemo = {
+  //         ...memo,
+  //         ...response.data.updatedFields,
+  //         status: response.data.status || memo.status
+  //       };
+  //       setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+  //       setSelectedMemo(updatedMemo);
+
+  //       if (response.data.nextApprover) {
+  //         alert(`Next approver: ${response.data.nextApprover}`);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('Approval failed:', error.response?.data || error.message);
+  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  //   }
+  // };
+
+
+
+
+  // const handleApprove = async (memo) => {
+  //   try {
+  //     const response = await axios.post(
+  //       `${BASE_URL}/memos/${memo.id}/approve`,
+  //       {
+  //         user_id: user.id,
+  //         role: user.role,
+  //       },
+  //       {
+  //         headers: {
+  //           Authorization: user?.token ? `Bearer ${user.token}` : '',
+  //         },
+  //       }
+  //     );
+
+  //     if (response.status === 200) {
+  //       alert(`✅ Success: ${response.data.message}`);
+  //       const updatedMemo = {
+  //         ...memo,
+  //         ...response.data.updatedFields,
+  //         status: 'approved submitted' // Set both statuses here
+  //       };
+  //       setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+  //       setSelectedMemo(updatedMemo);
+
+  //       if (response.data.nextApprover) {
+  //         alert(`Next approver: ${response.data.nextApprover}`);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('Approval failed:', error.response?.data || error.message);
+  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  //   }
+  // };
+
+
+
+
   const handleApprove = async (memo) => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/approve`,
-        {
-          user_id: user.id,
-          role: user.role,
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/approve`,
+      {
+        user_id: user.id,
+        role: user.role,
+      },
+      {
+        headers: {
+          Authorization: user?.token ? `Bearer ${user.token}` : '',
         },
-        {
-          headers: {
-            Authorization: user?.token ? `Bearer ${user.token}` : '',
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert(`✅ Success: ${response.data.message}`);
-        const updatedMemo = {
-          ...memo,
-          ...response.data.updatedFields,
-          status: response.data.status || memo.status
-        };
-        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-        setSelectedMemo(updatedMemo);
-
-        if (response.data.nextApprover) {
-          alert(`Next approver: ${response.data.nextApprover}`);
-        }
       }
-    } catch (error) {
-      console.error('Approval failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+    );
+
+    if (response.status === 200) {
+      alert(`✅ Success: ${response.data.message}`);
+      const updatedMemo = {
+        ...memo,
+        ...response.data.updatedFields,
+        status: 'approved submitted',
+        // Explicitly set the approval field for current user's role
+        [`approved_by_${user.role}`]: 1,
+        [`rejected_by_${user.role}`]: 0
+      };
+      
+      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+      setSelectedMemo(updatedMemo);
+
+      if (response.data.nextApprover) {
+        alert(`Next approver: ${response.data.nextApprover}`);
+      }
     }
-  };
+  } catch (error) {
+    console.error('Approval failed:', error.response?.data || error.message);
+    alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  }
+};
 
   const handleReject = async (memo) => {
     if (!memo) return;
@@ -176,6 +256,19 @@ const MemoList = () => {
   };
 
   const getStatusBadge = (status) => {
+    const statusLower = status.toLowerCase();
+
+    if (statusLower.includes('approved') && statusLower.includes('submitted')) {
+      return {
+        className: 'bg-green-100 text-green-800 border-green-200',
+        text: 'Approved & Submitted',
+        icon: (
+          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        )
+      };
+    }
     switch (status.toLowerCase()) {
       case 'approved':
         return {
@@ -390,7 +483,7 @@ const MemoList = () => {
                 </h2>
 
                 <p className="text-sm text-gray-500">
-                  From: {selectedMemo.sender} 
+                  From: {selectedMemo.sender}
                   {selectedMemo.senderDetails?.department && ` (${selectedMemo.senderDetails.department})`}
                 </p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
@@ -426,15 +519,14 @@ const MemoList = () => {
               ].map(({ role, label }) => {
                 const approved = selectedMemo[`approved_by_${role}`] === 1;
                 const rejected = selectedMemo[`rejected_by_${role}`] === 1;
-                
+
                 return (
                   <div
                     key={role}
-                    className={`p-2 rounded text-center text-xs ${
-                      approved ? 'bg-green-100 text-green-800' :
-                      rejected ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100'
-                    }`}
+                    className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
+                        rejected ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100'
+                      }`}
                   >
                     <div className="font-medium">{label}</div>
                     <div>
@@ -492,7 +584,7 @@ const MemoList = () => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {selectedMemo.status === 'pending' || 'submitted' &&
+            {(selectedMemo.status === 'pending' || selectedMemo.status === 'submitted') &&
               (user?.role === 'manager' ||
                 user?.role === 'executive' ||
                 user?.role === 'finance' ||
