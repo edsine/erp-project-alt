@@ -492,7 +492,7 @@ const MemoList = () => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {selectedMemo.status === 'submitted' &&
+            {selectedMemo.status === 'pending' || 'submitted' &&
               (user?.role === 'manager' ||
                 user?.role === 'executive' ||
                 user?.role === 'finance' ||
