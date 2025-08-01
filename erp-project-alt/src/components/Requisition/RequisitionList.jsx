@@ -12,6 +12,7 @@ const RequisitionList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [users, setUsers] = useState({});
+  const [activeTab, setActiveTab] = useState('all'); // New state for active tab
 
   useEffect(() => {
     const fetchRequisitions = async () => {
@@ -60,13 +61,60 @@ const RequisitionList = () => {
     }
   }, [user?.id, BASE_URL]);
 
-  const filteredRequisitions = requisitions.filter(req =>
+  // Filter requisitions based on search term
+  const searchFilteredRequisitions = requisitions.filter(req =>
     req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     req.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Filter requisitions by status based on active tab
+  const getFilteredRequisitionsByStatus = () => {
+    switch (activeTab) {
+      case 'pending':
+        return searchFilteredRequisitions.filter(req => 
+          req.status.toLowerCase() === 'pending'
+        );
+      case 'approved':
+        return searchFilteredRequisitions.filter(req => 
+          req.status.toLowerCase() === 'approved'
+        );
+      case 'rejected':
+        return searchFilteredRequisitions.filter(req => 
+          req.status.toLowerCase() === 'rejected'
+        );
+      default:
+        return searchFilteredRequisitions;
+    }
+  };
+
+  const filteredRequisitions = getFilteredRequisitionsByStatus();
+
+  // Get counts for each status
+  const getStatusCounts = () => {
+    const pending = searchFilteredRequisitions.filter(req => 
+      req.status.toLowerCase() === 'pending'
+    ).length;
+    
+    const approved = searchFilteredRequisitions.filter(req => 
+      req.status.toLowerCase() === 'approved'
+    ).length;
+    
+    const rejected = searchFilteredRequisitions.filter(req => 
+      req.status.toLowerCase() === 'rejected'
+    ).length;
+
+    return { pending, approved, rejected, all: searchFilteredRequisitions.length };
+  };
+
+  const statusCounts = getStatusCounts();
+
   const handleRequisitionClick = (requisition) => {
-    setSelectedRequisition(requisition);
+    // Toggle requisition: if clicking the same requisition, close it; otherwise, open the new one
+    if (selectedRequisition && selectedRequisition.id === requisition.id) {
+      setSelectedRequisition(null);
+    } else {
+      setSelectedRequisition(requisition);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -190,7 +238,54 @@ const RequisitionList = () => {
               </Link>
             </div>
           </div>
+
+          {/* Status Tabs */}
+          <div className="mb-4">
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'all'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All ({statusCounts.all})
+              </button>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'pending'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Pending ({statusCounts.pending})
+              </button>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'approved'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Approved ({statusCounts.approved})
+              </button>
+              <button
+                onClick={() => setActiveTab('rejected')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'rejected'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Rejected ({statusCounts.rejected})
+              </button>
+            </div>
+          </div>
           
+          {/* Requisitions List */}
           <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
             {filteredRequisitions.length > 0 ? (
               filteredRequisitions.map(req => (
@@ -220,7 +315,9 @@ const RequisitionList = () => {
                 </div>
               ))
             ) : (
-              <p className="text-center text-gray-500 py-4">No requisitions found</p>
+              <p className="text-center text-gray-500 py-4">
+                {activeTab === 'all' ? 'No requisitions found' : `No ${activeTab} requisitions found`}
+              </p>
             )}
           </div>
         </div>
@@ -294,39 +391,38 @@ const RequisitionList = () => {
 
             <div className="mb-6">
               <h4 className="text-sm font-medium text-gray-500 mb-2">Approvals</h4>
-             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-  {[
-    { role: 'manager', label: 'Manager' },
-    { role: 'executive', label: 'Executive' },
-    { role: 'finance', label: 'Finance' },
-    { role: 'gmd', label: 'GMD' },
-    { role: 'chairman', label: 'Chairman' },
-  ].map(({ role, label }) => {
-    const status = selectedRequisition[`approval_${role}`]; // 'pending' | 'approved' | 'rejected'
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { role: 'manager', label: 'Manager' },
+                  { role: 'executive', label: 'Executive' },
+                  { role: 'finance', label: 'Finance' },
+                  { role: 'gmd', label: 'GMD' },
+                  { role: 'chairman', label: 'Chairman' },
+                ].map(({ role, label }) => {
+                  const status = selectedRequisition[`approval_${role}`]; // 'pending' | 'approved' | 'rejected'
 
-    let statusLabel = 'Pending';
-    let statusClass = 'bg-gray-100 text-gray-600';
+                  let statusLabel = 'Pending';
+                  let statusClass = 'bg-gray-100 text-gray-600';
 
-    if (status === 'approved') {
-      statusLabel = 'Approved';
-      statusClass = 'bg-green-100 text-green-800';
-    } else if (status === 'rejected') {
-      statusLabel = 'Rejected';
-      statusClass = 'bg-red-100 text-red-800';
-    }
+                  if (status === 'approved') {
+                    statusLabel = 'Approved';
+                    statusClass = 'bg-green-100 text-green-800';
+                  } else if (status === 'rejected') {
+                    statusLabel = 'Rejected';
+                    statusClass = 'bg-red-100 text-red-800';
+                  }
 
-    return (
-      <div
-        key={role}
-        className={`p-2 rounded-md text-center ${statusClass}`}
-      >
-        <div className="text-xs font-medium">{label}</div>
-        <div className="text-xs">{statusLabel}</div>
-      </div>
-    );
-  })}
-</div>
-
+                  return (
+                    <div
+                      key={role}
+                      className={`p-2 rounded-md text-center ${statusClass}`}
+                    >
+                      <div className="text-xs font-medium">{label}</div>
+                      <div className="text-xs">{statusLabel}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {selectedRequisition.status === 'pending' && (
@@ -344,7 +440,8 @@ const RequisitionList = () => {
                   Approve
                 </button>
               </div>
-            )}          </div>
+            )}
+          </div>
         </div>
       )}
     </div>

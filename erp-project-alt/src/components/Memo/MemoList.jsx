@@ -14,6 +14,7 @@ const MemoList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({}); // New state for user data
+  const [activeTab, setActiveTab] = useState('all'); // New state for active tab
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -78,7 +79,8 @@ const MemoList = () => {
     fetchMemos();
   }, [user, users]); // Add users to dependency array
 
-  const filteredMemos = memos.filter(memo => {
+  // Filter memos based on search term
+  const searchFilteredMemos = memos.filter(memo => {
     const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
     const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
 
@@ -89,127 +91,99 @@ const MemoList = () => {
     );
   });
 
-  const handleMemoClick = (memo) => {
-    setSelectedMemo({
-      ...memo,
-      acknowledged: isMemoAcknowledgedByUser(memo, user.id)
-    });
+  // Filter memos by status based on active tab
+  const getFilteredMemosByStatus = () => {
+    switch (activeTab) {
+      case 'pending':
+        return searchFilteredMemos.filter(memo => 
+          memo.status.toLowerCase() === 'pending' || 
+          memo.status.toLowerCase() === 'submitted'
+        );
+      case 'approved':
+        return searchFilteredMemos.filter(memo => 
+          memo.status.toLowerCase().includes('approved')
+        );
+      case 'rejected':
+        return searchFilteredMemos.filter(memo => 
+          memo.status.toLowerCase() === 'rejected'
+        );
+      default:
+        return searchFilteredMemos;
+    }
   };
 
-  // const handleApprove = async (memo) => {
-  //   try {
-  //     const response = await axios.post(
-  //       `${BASE_URL}/memos/${memo.id}/approve`,
-  //       {
-  //         user_id: user.id,
-  //         role: user.role,
-  //       },
-  //       {
-  //         headers: {
-  //           Authorization: user?.token ? `Bearer ${user.token}` : '',
-  //         },
-  //       }
-  //     );
+  const filteredMemos = getFilteredMemosByStatus();
 
-  //     if (response.status === 200) {
-  //       alert(`✅ Success: ${response.data.message}`);
-  //       const updatedMemo = {
-  //         ...memo,
-  //         ...response.data.updatedFields,
-  //         status: response.data.status || memo.status
-  //       };
-  //       setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-  //       setSelectedMemo(updatedMemo);
+  // Get counts for each status
+  const getStatusCounts = () => {
+    const pending = searchFilteredMemos.filter(memo => 
+      memo.status.toLowerCase() === 'pending' || 
+      memo.status.toLowerCase() === 'submitted'
+    ).length;
+    
+    const approved = searchFilteredMemos.filter(memo => 
+      memo.status.toLowerCase().includes('approved')
+    ).length;
+    
+    const rejected = searchFilteredMemos.filter(memo => 
+      memo.status.toLowerCase() === 'rejected'
+    ).length;
 
-  //       if (response.data.nextApprover) {
-  //         alert(`Next approver: ${response.data.nextApprover}`);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error('Approval failed:', error.response?.data || error.message);
-  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
-  //   }
-  // };
+    return { pending, approved, rejected, all: searchFilteredMemos.length };
+  };
 
+  const statusCounts = getStatusCounts();
 
-
-
-  // const handleApprove = async (memo) => {
-  //   try {
-  //     const response = await axios.post(
-  //       `${BASE_URL}/memos/${memo.id}/approve`,
-  //       {
-  //         user_id: user.id,
-  //         role: user.role,
-  //       },
-  //       {
-  //         headers: {
-  //           Authorization: user?.token ? `Bearer ${user.token}` : '',
-  //         },
-  //       }
-  //     );
-
-  //     if (response.status === 200) {
-  //       alert(`✅ Success: ${response.data.message}`);
-  //       const updatedMemo = {
-  //         ...memo,
-  //         ...response.data.updatedFields,
-  //         status: 'approved submitted' // Set both statuses here
-  //       };
-  //       setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-  //       setSelectedMemo(updatedMemo);
-
-  //       if (response.data.nextApprover) {
-  //         alert(`Next approver: ${response.data.nextApprover}`);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     console.error('Approval failed:', error.response?.data || error.message);
-  //     alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
-  //   }
-  // };
-
-
-
+  const handleMemoClick = (memo) => {
+    // Toggle memo: if clicking the same memo, close it; otherwise, open the new one
+    if (selectedMemo && selectedMemo.id === memo.id) {
+      setSelectedMemo(null);
+    } else {
+      setSelectedMemo({
+        ...memo,
+        acknowledged: isMemoAcknowledgedByUser(memo, user.id)
+      });
+    }
+  };
 
   const handleApprove = async (memo) => {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/approve`,
-      {
-        user_id: user.id,
-        role: user.role,
-      },
-      {
-        headers: {
-          Authorization: user?.token ? `Bearer ${user.token}` : '',
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/approve`,
+        {
+          user_id: user.id,
+          role: user.role,
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: user?.token ? `Bearer ${user.token}` : '',
+          },
+        }
+      );
 
-    if (response.status === 200) {
-      alert(`✅ Success: ${response.data.message}`);
-      const updatedMemo = {
-        ...memo,
-        ...response.data.updatedFields,
-        status: 'approved submitted',
-        // Explicitly set the approval field for current user's role
-        [`approved_by_${user.role}`]: 1,
-        [`rejected_by_${user.role}`]: 0
-      };
-      
-      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-      setSelectedMemo(updatedMemo);
+      if (response.status === 200) {
+        alert(`✅ Success: ${response.data.message}`);
+        const updatedMemo = {
+          ...memo,
+          ...response.data.updatedFields,
+          status: 'approved submitted',
+          // Explicitly set the approval field for current user's role
+          [`approved_by_${user.role}`]: 1,
+          [`rejected_by_${user.role}`]: 0
+        };
+        
+        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+        setSelectedMemo(updatedMemo);
 
-      if (response.data.nextApprover) {
-        alert(`Next approver: ${response.data.nextApprover}`);
+        if (response.data.nextApprover) {
+          alert(`Next approver: ${response.data.nextApprover}`);
+        }
       }
+    } catch (error) {
+      console.error('Approval failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
-  } catch (error) {
-    console.error('Approval failed:', error.response?.data || error.message);
-    alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
-  }
-};
+  };
 
   const handleReject = async (memo) => {
     if (!memo) return;
@@ -414,6 +388,7 @@ const MemoList = () => {
             )}
           </div>
 
+          {/* Search Input */}
           <div className="mb-4">
             <input
               type="text"
@@ -424,6 +399,53 @@ const MemoList = () => {
             />
           </div>
 
+          {/* Status Tabs */}
+          <div className="mb-4">
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'all'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                All ({statusCounts.all})
+              </button>
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'pending'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Pending ({statusCounts.pending})
+              </button>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'approved'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Approved ({statusCounts.approved})
+              </button>
+              <button
+                onClick={() => setActiveTab('rejected')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'rejected'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Rejected ({statusCounts.rejected})
+              </button>
+            </div>
+          </div>
+
+          {/* Memos List */}
           <div className="space-y-2">
             {filteredMemos.length > 0 ? (
               filteredMemos.map(memo => (
@@ -458,7 +480,9 @@ const MemoList = () => {
                 </div>
               ))
             ) : (
-              <p className="text-center text-gray-500 py-4">No memos found</p>
+              <p className="text-center text-gray-500 py-4">
+                {activeTab === 'all' ? 'No memos found' : `No ${activeTab} memos found`}
+              </p>
             )}
           </div>
         </div>
@@ -584,7 +608,7 @@ const MemoList = () => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {(selectedMemo.status === 'pending' || selectedMemo.status === 'submitted') &&
+            {(selectedMemo.status === 'pending' || 'submitted') &&
               (user?.role === 'manager' ||
                 user?.role === 'executive' ||
                 user?.role === 'finance' ||
