@@ -347,14 +347,15 @@ router.get('/memos', async (req, res) => {
 //   }
 // });
 
+
 router.get('/memos/user/:userId', async (req, res) => {
   const { userId } = req.params;
-  let { role } = req.query;
+  let { role, status } = req.query;
 
   const approvalRoles = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
 
   try {
-    // 🔸 Get user's department and actual role from DB
+    // Get user's department and actual role from DB
     const [userRows] = await db.query(`SELECT department, role FROM users WHERE id = ?`, [userId]);
 
     if (userRows.length === 0) {
@@ -362,78 +363,120 @@ router.get('/memos/user/:userId', async (req, res) => {
     }
 
     const { department, role: actualRole } = userRows[0];
+    const userRole = actualRole.toLowerCase();
 
-    // 🔸 Normalize role
+    // Normalize role from query
     let normalizedRole = role?.toLowerCase();
 
-    // 🔸 OVERRIDE role if dept ≠ ICT and actual role is finance
-    if (department.toLowerCase() !== 'ict' && actualRole.toLowerCase() === 'finance') {
+    // OVERRIDE role if dept ≠ ICT and actual role is finance
+    if (department.toLowerCase() !== 'ict' && userRole === 'finance') {
       normalizedRole = 'finance';
     }
+
+    // Base query parts
+    const baseSelect = `
+      SELECT 
+        m.*, 
+        u.role AS sender_role, 
+        u.department AS sender_department,
+        m.approved_by_manager AS manager_approved,
+        m.approved_by_executive AS executive_approved,
+        m.approved_by_finance AS finance_approved,
+        m.approved_by_gmd AS gmd_approved,
+        m.approved_by_chairman AS chairman_approved
+      FROM memos m
+      JOIN users u ON m.created_by = u.id
+    `;
 
     let query = '';
     let values = [];
 
-    if (normalizedRole && approvalRoles.includes(normalizedRole)) {
+    // If no role specified or role is not an approval role, just get user's own memos
+    if (!normalizedRole || !approvalRoles.includes(normalizedRole)) {
+      let statusCondition = '';
+      if (status === 'approved') {
+        statusCondition = 'AND (m.approved_by_manager = 1 OR m.approved_by_executive = 1 OR m.approved_by_finance = 1 OR m.approved_by_gmd = 1 OR m.approved_by_chairman = 1)';
+      } else if (status === 'pending') {
+        statusCondition = 'AND m.requires_approval = 1 AND (m.approved_by_manager IS NULL OR m.approved_by_executive IS NULL OR m.approved_by_finance IS NULL OR m.approved_by_gmd IS NULL OR m.approved_by_chairman IS NULL)';
+      }
+
+      query = `
+        ${baseSelect}
+        WHERE m.created_by = ?
+        ${statusCondition}
+        ORDER BY m.created_at DESC
+      `;
+      values = [userId];
+    } else {
+      // For approvers, get memos they need to approve + memos they've approved + their own memos
       const approvalField = `approved_by_${normalizedRole}`;
       const noDeptRoles = ['finance', 'gmd', 'chairman'];
 
+      // Status conditions
+      let pendingCondition = '';
+      let approvedCondition = '';
+      
+      if (status === 'pending') {
+        pendingCondition = `AND ${approvalField} IS NULL`;
+      } else if (status === 'approved') {
+        approvedCondition = `AND ${approvalField} = 1`;
+      }
+
       if (noDeptRoles.includes(normalizedRole)) {
+        // For roles without department restrictions (finance, gmd, chairman)
         query = `
-          SELECT m.*, u.role AS sender_role, u.department AS sender_department
-          FROM memos m
-          JOIN users u ON m.created_by = u.id
+          ${baseSelect}
           WHERE (
-            (m.memo_type = 'normal' AND ${approvalField} IS NULL AND m.requires_approval = 1
+            m.created_by = ?
+            OR (
+              m.memo_type = 'normal' 
+              AND m.requires_approval = 1
               ${normalizedRole === 'chairman' ? 'AND approved_by_gmd = 1' : ''}
+              ${pendingCondition}
+              ${approvedCondition}
             )
             OR (
-              m.memo_type = 'report' AND JSON_CONTAINS(m.acknowledgments, '\"${normalizedRole}\"')
+              m.memo_type = 'report'
+              AND JSON_CONTAINS(m.acknowledgments, '\"${normalizedRole}\"')
+              ${pendingCondition}
+              ${approvedCondition}
             )
-            OR m.created_by = ?
+            OR ${approvalField} = 1  /* Memos this role has already approved */
           )
           ORDER BY m.created_at DESC
         `;
         values = [userId];
       } else {
-        // Dept-restricted roles: manager, executive
+        // For department-restricted roles (manager, executive)
         query = `
-          SELECT m.*, u.role AS sender_role, u.department AS sender_department
-          FROM memos m
-          JOIN users u ON m.created_by = u.id
+          ${baseSelect}
           WHERE (
             m.created_by = ?
             OR (
               m.memo_type = 'normal'
-              AND ${approvalField} IS NULL
               AND m.requires_approval = 1
               AND u.department = ?
+              ${pendingCondition}
+              ${approvedCondition}
             )
             OR (
               m.memo_type = 'report'
               AND JSON_CONTAINS(m.acknowledgments, '\"${normalizedRole}\"')
               AND u.department = ?
+              ${pendingCondition}
+              ${approvedCondition}
             )
+            OR ${approvalField} = 1  /* Memos this role has already approved */
           )
           ORDER BY m.created_at DESC
         `;
         values = [userId, department, department];
       }
-    } else {
-      // Fallback to user's own memos
-      query = `
-        SELECT m.*, u.role AS sender_role, u.department AS sender_department
-        FROM memos m
-        JOIN users u ON m.created_by = u.id
-        WHERE m.created_by = ?
-        ORDER BY m.created_at DESC
-      `;
-      values = [userId];
     }
 
     const [rows] = await db.query(query, values);
 
-    // Parse JSON acknowledgments
+    // Parse JSON acknowledgments and add approval status summary
     rows.forEach(memo => {
       if (memo.acknowledgments) {
         try {
@@ -443,6 +486,20 @@ router.get('/memos/user/:userId', async (req, res) => {
           memo.acknowledgments = [];
         }
       }
+      
+      // Add overall approval status
+      memo.approval_status = 'pending';
+      if (memo.approved_by_chairman) {
+        memo.approval_status = 'fully_approved';
+      } else if (memo.approved_by_gmd) {
+        memo.approval_status = 'gmd_approved';
+      } else if (memo.approved_by_finance) {
+        memo.approval_status = 'finance_approved';
+      } else if (memo.approved_by_executive) {
+        memo.approval_status = 'executive_approved';
+      } else if (memo.approved_by_manager) {
+        memo.approval_status = 'manager_approved';
+      }
     });
 
     res.status(200).json(rows);
@@ -451,7 +508,6 @@ router.get('/memos/user/:userId', async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching user memos' });
   }
 });
-
 
 
 //fro memo count logic 

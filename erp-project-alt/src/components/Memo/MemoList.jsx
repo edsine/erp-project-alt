@@ -44,6 +44,8 @@ const MemoList = () => {
     fetchUsers();
   }, [BASE_URL, user.token]);
 
+
+
   useEffect(() => {
     const fetchMemos = async () => {
       try {
@@ -91,46 +93,74 @@ const MemoList = () => {
     );
   });
 
+    // Helper function to check if memo is approved
+const isMemoApproved = (memo) => {
+  return memo.status.toLowerCase() === 'approved' ||
+         memo.approved_by_chairman === 1 ||
+         memo.approved_by_gmd === 1 ||
+         memo.approved_by_finance === 1 ||
+         memo.approved_by_executive === 1 ||
+         memo.approved_by_manager === 1;
+};
+
+// Helper function to check if memo is rejected
+const isMemoRejected = (memo) => {
+  return memo.status.toLowerCase() === 'rejected' ||
+         memo.rejected_by_chairman === 1 ||
+         memo.rejected_by_gmd === 1 ||
+         memo.rejected_by_finance === 1 ||
+         memo.rejected_by_executive === 1 ||
+         memo.rejected_by_manager === 1;
+};
+
   // Filter memos by status based on active tab
-  const getFilteredMemosByStatus = () => {
-    switch (activeTab) {
-      case 'pending':
-        return searchFilteredMemos.filter(memo => 
-          memo.status.toLowerCase() === 'pending' || 
-          memo.status.toLowerCase() === 'submitted'
-        );
-      case 'approved':
-        return searchFilteredMemos.filter(memo => 
-          memo.status.toLowerCase().includes('approved')
-        );
-      case 'rejected':
-        return searchFilteredMemos.filter(memo => 
-          memo.status.toLowerCase() === 'rejected'
-        );
-      default:
-        return searchFilteredMemos;
-    }
-  };
+const getFilteredMemosByStatus = () => {
+  switch (activeTab) {
+    case 'pending':
+      return searchFilteredMemos.filter(memo => 
+        (memo.status.toLowerCase() === 'pending' || 
+         memo.status.toLowerCase() === 'submitted') &&
+        !isMemoApproved(memo) &&
+        !isMemoRejected(memo)
+      );
+    case 'approved':
+      return searchFilteredMemos.filter(memo => 
+        isMemoApproved(memo)
+      );
+    case 'rejected':
+      return searchFilteredMemos.filter(memo => 
+        isMemoRejected(memo)
+      );
+    default:
+      return searchFilteredMemos;
+  }
+};
 
   const filteredMemos = getFilteredMemosByStatus();
 
-  // Get counts for each status
-  const getStatusCounts = () => {
-    const pending = searchFilteredMemos.filter(memo => 
-      memo.status.toLowerCase() === 'pending' || 
-      memo.status.toLowerCase() === 'submitted'
-    ).length;
-    
-    const approved = searchFilteredMemos.filter(memo => 
-      memo.status.toLowerCase().includes('approved')
-    ).length;
-    
-    const rejected = searchFilteredMemos.filter(memo => 
-      memo.status.toLowerCase() === 'rejected'
-    ).length;
 
-    return { pending, approved, rejected, all: searchFilteredMemos.length };
-  };
+
+  // Get counts for each status
+// Update getStatusCounts to use the same logic
+const getStatusCounts = () => {
+  const pending = searchFilteredMemos.filter(memo => 
+    (memo.status.toLowerCase() === 'pending' || 
+     memo.status.toLowerCase() === 'submitted') &&
+    !isMemoApproved(memo) &&
+    !isMemoRejected(memo)
+  ).length;
+  
+  const approved = searchFilteredMemos.filter(memo => 
+    isMemoApproved(memo)
+  ).length;
+  
+  const rejected = searchFilteredMemos.filter(memo => 
+    isMemoRejected(memo)
+  ).length;
+
+  return { pending, approved, rejected, all: searchFilteredMemos.length };
+};
+
 
   const statusCounts = getStatusCounts();
 
