@@ -29,15 +29,7 @@ router.post('/requisitions', upload.single('attachment'), async (req, res) => {
       items,
       quantity,
       unit_price,
-      attachment_type = 'PDF',
-      created_by,
-
-      // Optional approval fields
-      approval_manager = 'pending',
-      approval_executive = 'pending',
-      approval_finance = 'pending',
-      approval_gmd = 'pending',
-      approval_chairman = 'pending'
+      created_by
     } = req.body;
 
     // Validate required fields
@@ -45,35 +37,39 @@ router.post('/requisitions', upload.single('attachment'), async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const parsedQuantity = parseInt(quantity, 10);
-    const parsedUnitPrice = parseFloat(unit_price);
-    if (isNaN(parsedQuantity) || isNaN(parsedUnitPrice)) {
-      return res.status(400).json({ error: 'Quantity and unit price must be numbers' });
+    // Parse the items JSON string
+    let parsedItems;
+    try {
+      parsedItems = JSON.parse(items);
+    } catch (err) {
+      return res.status(400).json({ error: 'Invalid items format' });
     }
 
-    const attachmentPath = req.file ? req.file.path : null;
+    // Format items as a detailed string
+    const itemsString = parsedItems.map(item => {
+      return `${item.name} (Qty: ${item.quantity}, Price: ${item.unitPrice})`;
+    }).join('; ');
 
+    // Attachment details
+    const attachmentPath = req.file ? req.file.path : null;
+    const attachmentType = req.file ? path.extname(req.file.originalname).substring(1) : null;
+
+    // Insert into DB
     const sql = `
       INSERT INTO requisitions 
-        (title, description, items, quantity, unit_price, attachment, attachment_type, created_by, 
-         approval_manager, approval_executive, approval_finance, approval_gmd, approval_chairman) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (title, description, items, quantity, unit_price, attachment, attachment_type, created_by) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(sql, [
       title,
       description,
-      items,
-      parsedQuantity,
-      parsedUnitPrice,
+      itemsString, // Save the human-readable version
+      quantity,
+      unit_price,
       attachmentPath,
-      attachment_type,
-      created_by,
-      approval_manager,
-      approval_executive,
-      approval_finance,
-      approval_gmd,
-      approval_chairman
+      attachmentType,
+      created_by
     ]);
 
     return res.status(201).json({
@@ -83,7 +79,7 @@ router.post('/requisitions', upload.single('attachment'), async (req, res) => {
 
   } catch (err) {
     console.error('Error inserting requisition:', err);
-    return res.status(500).json({ error: 'Failed to create requisition' });
+    return res.status(500).json({ error: 'Failed to create requisition', details: err.message });
   }
 });
 

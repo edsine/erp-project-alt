@@ -326,17 +326,22 @@ const RequisitionList = () => {
       {/* Requisition Detail Panel */}
       {selectedRequisition && (
         <div className="lg:w-2/3">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-start mb-6">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold">{selectedRequisition.title}</h2>
-                <p className="text-sm text-gray-500">Created: {formatDate(selectedRequisition.created_at)} by {users[selectedRequisition.created_by]?.name || `User ${selectedRequisition.created_by}`}</p>
-                <p className="text-xs text-gray-400">Last updated: {formatDate(selectedRequisition.updated_at)}</p>
+                <h2 className="text-xl font-bold text-gray-800">{selectedRequisition.title}</h2>
+                <div className="flex items-center mt-2 text-sm text-gray-600">
+                  <span>Created: {formatDate(selectedRequisition.created_at)}</span>
+                  <span className="mx-2">•</span>
+                  <span>By: {users[selectedRequisition.created_by]?.name || `User ${selectedRequisition.created_by}`}</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Last updated: {formatDate(selectedRequisition.updated_at)}
+                </p>
               </div>
               <button
                 onClick={() => setSelectedRequisition(null)}
                 className="lg:hidden text-gray-500 hover:text-gray-700"
-                aria-label="Close details"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -344,44 +349,96 @@ const RequisitionList = () => {
               </button>
             </div>
 
-            <div className="mb-6">
-              <h3 className="text-md sm:text-lg font-medium mb-2">Details</h3>
-              <div className="bg-gray-50 p-3 sm:p-4 rounded-md">
-                <p className="text-sm sm:text-base">{selectedRequisition.description}</p>
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Items Requested:</h4>
-                  <ul className="list-disc pl-5 space-y-1 text-sm sm:text-base">
-                    {selectedRequisition.items.split(',').map((item, index) => (
-                      <li key={index}>{item.trim()}</li>
-                    ))}
-                  </ul>
-                </div>
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Details</h3>
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <p className="text-gray-700">{selectedRequisition.description}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Quantity</h4>
-                <p className="text-lg font-semibold">{selectedRequisition.quantity}</p>
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Items Requested</h3>
+              <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    </tr>
+                  </thead>
+{/* Replace the existing table body with this more robust parsing */}
+<tbody className="bg-white divide-y divide-gray-200">
+  {selectedRequisition.items.split(';').map((item, index) => {
+    // Try to parse the formatted string first
+    const formattedMatch = item.match(/(.*?) \(Qty: (\d+), Price: ([\d.]+)\)/);
+    
+    if (formattedMatch) {
+      const [, name, quantity, price] = formattedMatch;
+      const total = parseFloat(quantity) * parseFloat(price);
+      
+      return (
+        <tr key={index}>
+          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+            {name.trim()}
+          </td>
+          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+            {quantity}
+          </td>
+          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+            ₦{parseFloat(price).toFixed(2)}
+          </td>
+          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+            ₦{total.toFixed(2)}
+          </td>
+        </tr>
+      );
+    }
+    
+    // Fallback for malformed or simple items
+    return (
+      <tr key={index}>
+        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+          {item.trim()}
+        </td>
+        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+          N/A
+        </td>
+        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+          N/A
+        </td>
+        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-right">
+          N/A
+        </td>
+      </tr>
+    );
+  })}
+</tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50">
+                      <td colSpan="3" className="px-4 py-3 text-right text-sm font-medium text-gray-700">Grand Total</td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">₦{parseFloat(selectedRequisition.total).toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Unit Price</h4>
-                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.unit_price).toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Total Amount</h4>
-                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.total).toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Attachment</h4>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-500 mb-1">Attachment</h4>
                 {selectedRequisition.attachment ? (
                   <a
                     href={`${BASE_URL}/${selectedRequisition.attachment}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline text-sm sm:text-base"
+                    className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
                   >
-                    View File ({selectedRequisition.attachment_type})
+                    <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    View Attachment ({selectedRequisition.attachment_type})
                   </a>
                 ) : (
                   <p className="text-sm text-gray-500">No attachment</p>

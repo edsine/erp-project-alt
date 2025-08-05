@@ -106,7 +106,6 @@ const handleSubmit = async (e) => {
     return;
   }
 
-  // Add null check for user
   if (!user) {
     setError('You must be logged in to create a requisition');
     setLoading(false);
@@ -119,15 +118,25 @@ const handleSubmit = async (e) => {
     // Append basic fields
     formDataToSend.append('title', formData.title);
     formDataToSend.append('description', formData.description);
-    formDataToSend.append('created_by', user.id.toString()); // Use the user from component scope
+    formDataToSend.append('created_by', user.id.toString());
     
-    // Append items
-    const firstItem = formData.items[0];
-    formDataToSend.append('items', firstItem.name);
-    formDataToSend.append('quantity', firstItem.quantity.toString());
-    formDataToSend.append('unit_price', firstItem.unitPrice.toString());
+    // Append items as JSON
+    const itemsData = formData.items.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice
+    }));
+    formDataToSend.append('items', JSON.stringify(itemsData));
     
-    // Append file
+    // Calculate and append total
+    const total = formData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    formDataToSend.append('total', total.toString());
+    
+    // Append first item's quantity and unit_price for backward compatibility
+    formDataToSend.append('quantity', formData.items[0].quantity.toString());
+    formDataToSend.append('unit_price', formData.items[0].unitPrice.toString());
+    
+    // Append files
     if (formData.attachments.length > 0) {
       formDataToSend.append('attachment', formData.attachments[0]);
     }
@@ -264,7 +273,7 @@ const handleSubmit = async (e) => {
                 <div className="col-span-1">
                   <label className="block text-xs text-gray-500 mb-1">Total</label>
                   <div className="px-3 py-2 text-sm">
-                    ${(item.quantity * (Number(item.unitPrice) || 0)).toFixed(2)}
+                    ₦{(item.quantity * (Number(item.unitPrice) || 0)).toFixed(2)}
                   </div>
                 </div>
                 <div className="col-span-1">
