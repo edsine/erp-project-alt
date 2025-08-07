@@ -18,6 +18,7 @@ import UploadFile from '../components/Files/UploadFile'
 import FileDetails from '../components/Files/FileDetails'
 import NewClient from '../components/Files/NewClient'
 import EditClient from '../components/Files/EditClient'
+import ActivitiesPage from '../components/Activities/ActivitiesPage'
 
 const router = createBrowserRouter([
   {
@@ -99,6 +100,10 @@ const router = createBrowserRouter([
       {
         path: 'payroll',
         element: <PayrollList />,
+      },
+      {
+        path: 'notifications',
+        element: <ActivitiesPage />,
       },
     ],
   },

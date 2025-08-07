@@ -97,13 +97,15 @@ const DashboardLayout = () => {
         lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         ${sidebarOpen ? 'w-64' : 'lg:w-20 w-64'}
       `}>
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          {sidebarOpen || window.innerWidth >= 1024 ? (
-            <h1 className={`text-xl font-semibold text-primary ${!sidebarOpen && 'lg:hidden'}`}>
-              {sidebarOpen ? 'ERP System' : 'E'}
-            </h1>
-          ) : (
-            <h1 className="text-xl font-semibold text-primary">E</h1>
+        <div className={`flex items-center justify-between p-4 border-b border-gray-200 ${!sidebarOpen ? 'h-16' : ''}`}>
+          {sidebarOpen && (
+            <div className="flex items-center justify-center w-full">
+              <img 
+                src={logo} 
+                alt="PGL Logo" 
+                className="h-9 w-auto max-w-full object-contain"
+              />
+            </div>
           )}
           <button
             onClick={toggleSidebar}
@@ -222,13 +224,7 @@ const DashboardLayout = () => {
               </li>
             )}
           </ul>
-          <div className="p-4 mt-10 flex justify-center">
-            <img 
-              src={logo} 
-              alt="PGL Logo" 
-              className={`${sidebarOpen ? 'w-32' : 'lg:w-10 w-32'} transition-all duration-300`} 
-            />
-          </div>
+
         </nav>
       </div>
 
@@ -263,10 +259,10 @@ const DashboardLayout = () => {
 
             {/* Right side items */}
             <div className="flex items-center space-x-4">
-              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors relative">
+              {/* <Link to='/dashboard/notifications' className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-              </button>
+              </Link> */}
               
               {/* Profile dropdown */}
               <div className="relative" ref={dropdownRef}>
@@ -296,14 +292,7 @@ const DashboardLayout = () => {
                       <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
                     </div>
                     <div className="py-1">
-                      <Link
-                        to="profile"
-                        onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        <User className="h-4 w-4 mr-3" />
-                        Your Profile
-                      </Link>
+
                       <button 
                         onClick={handleLogout} 
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
