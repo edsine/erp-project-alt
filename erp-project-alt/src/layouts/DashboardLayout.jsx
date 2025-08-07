@@ -2,18 +2,22 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import logo from '../assets/pgl_logo.png'
+import { 
+  Home, FileText, ShoppingCart, Calendar, 
+  Folder, Users, CheckSquare, DollarSign,
+  Menu, X, ChevronLeft, ChevronRight,
+  Search, Bell, ChevronDown, LogOut,
+  User, Clock
+} from 'lucide-react'
 
 const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
   
-  // Debug logging
-  console.log('DashboardLayout render - loading:', loading, 'isAuthenticated:', isAuthenticated, 'user:', user)
-  
   const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
-  const [sidebarOpen, setSidebarOpen] = useState(false) // Default to closed on mobile
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const navigate = useNavigate()
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('')
   const dropdownRef = useRef(null)
 
   // Handle click outside to close dropdown
@@ -33,35 +37,34 @@ const DashboardLayout = () => {
     }
   }, [profileDropdownOpen])
 
-  // Separate useEffect for authentication check
+  // Authentication check
   useEffect(() => {
-    // Only redirect if we're not loading and user is not authenticated
     if (!loading && !isAuthenticated) {
-      navigate('/login');
+      navigate('/login')
     }
   }, [loading, isAuthenticated, navigate])
 
-  // Show loading while auth is being determined
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 bg-primary rounded-full mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-32"></div>
+        </div>
       </div>
-    );
+    )
   }
 
-  // If not loading and not authenticated, don't render anything (redirect will happen)
   if (!isAuthenticated) {
-    return null;
+    return null
   }
 
-  // If user object is still null despite being authenticated, show loading
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-lg">Loading user data...</div>
       </div>
-    );
+    )
   }
 
   const handleLogout = () => {
@@ -82,77 +85,74 @@ const DashboardLayout = () => {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden transition-opacity"
           onClick={closeSidebar}
         ></div>
       )}
 
       {/* Sidebar */}
       <div className={`
-        fixed lg:static inset-y-0 left-0 z-30 bg-white shadow-md transition-all duration-300 ease-in-out
+        fixed lg:static inset-y-0 left-0 z-30 bg-white shadow-sm transition-all duration-300 ease-in-out
+        border-r border-gray-200
         lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         ${sidebarOpen ? 'w-64' : 'lg:w-20 w-64'}
       `}>
-        <div className="flex items-center justify-between p-4 border-b">
-          {(sidebarOpen || window.innerWidth >= 1024) ? (
-            <h1 className={`text-xl font-bold text-primary ${!sidebarOpen && 'lg:hidden'}`}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          {sidebarOpen || window.innerWidth >= 1024 ? (
+            <h1 className={`text-xl font-semibold text-primary ${!sidebarOpen && 'lg:hidden'}`}>
               {sidebarOpen ? 'ERP System' : 'E'}
             </h1>
           ) : (
-            <h1 className="text-xl font-bold text-primary">E</h1>
+            <h1 className="text-xl font-semibold text-primary">E</h1>
           )}
           <button
             onClick={toggleSidebar}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none lg:block"
+            className="text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
           >
             {sidebarOpen ? (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
+              <ChevronLeft className="h-6 w-6" />
             ) : (
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <ChevronRight className="h-6 w-6" />
             )}
           </button>
         </div>
         
         <nav className="p-4 mt-5">
-          <ul className="space-y-2">
+          <ul className="space-y-1">
             <li>
               <Link
                 to=""
                 onClick={closeSidebar}
-                className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                </svg>
-                {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Dashboard</span>}
+                <Home className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                {(sidebarOpen || window.innerWidth < 1024) && (
+                  <span className="ml-3">Dashboard</span>
+                )}
               </Link>
             </li>
             <li>
               <Link
                 to="memos"
                 onClick={closeSidebar}
-                className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Memos</span>}
+                <FileText className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                {(sidebarOpen || window.innerWidth < 1024) && (
+                  <span className="ml-3">Memos</span>
+                )}
               </Link>
             </li>
             <li>
               <Link
                 to="requisitions"
                 onClick={closeSidebar}
-                className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-                {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Requisitions</span>}
+                <ShoppingCart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                {(sidebarOpen || window.innerWidth < 1024) && (
+                  <span className="ml-3">Requisitions</span>
+                )}
               </Link>
             </li>
             {user && user.role === 'staff' && (
@@ -160,12 +160,12 @@ const DashboardLayout = () => {
                 <Link
                   to="tasks"
                   onClick={closeSidebar}
-                  className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                  {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Task Management</span>}
+                  <CheckSquare className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  {(sidebarOpen || window.innerWidth < 1024) && (
+                    <span className="ml-3">Tasks</span>
+                  )}
                 </Link>
               </li>
             )}
@@ -174,12 +174,12 @@ const DashboardLayout = () => {
                 <Link
                   to="users"
                   onClick={closeSidebar}
-                  className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                  {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">User Management</span>}
+                  <Users className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  {(sidebarOpen || window.innerWidth < 1024) && (
+                    <span className="ml-3">Users</span>
+                  )}
                 </Link>
               </li>
             )}
@@ -187,24 +187,24 @@ const DashboardLayout = () => {
               <Link
                 to="leaves"
                 onClick={closeSidebar}
-                className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Leave Requests</span>}
+                <Calendar className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                {(sidebarOpen || window.innerWidth < 1024) && (
+                  <span className="ml-3">Leaves</span>
+                )}
               </Link>
             </li>
             <li>
               <Link
                 to="files"
                 onClick={closeSidebar}
-                className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                </svg>
-                {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">File Archive</span>}
+                <Folder className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                {(sidebarOpen || window.innerWidth < 1024) && (
+                  <span className="ml-3">Files</span>
+                )}
               </Link>
             </li>
             {user && user.role === 'finance' && (
@@ -212,18 +212,22 @@ const DashboardLayout = () => {
                 <Link
                   to="payroll"
                   onClick={closeSidebar}
-                  className="flex items-center p-2 text-gray-700 rounded-lg hover:bg-gray-100 group"
+                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <svg className="w-5 h-5 text-gray-500 transition duration-75 group-hover:text-gray-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  {(sidebarOpen || window.innerWidth < 1024) && <span className="ml-3">Payroll</span>}
+                  <DollarSign className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  {(sidebarOpen || window.innerWidth < 1024) && (
+                    <span className="ml-3">Payroll</span>
+                  )}
                 </Link>
               </li>
             )}
           </ul>
-          <div className="p-4 mt-36 flex justify-center">
-            <img src={logo} alt="PGL Logo" className="w- mx-auto mt-6" />
+          <div className="p-4 mt-10 flex justify-center">
+            <img 
+              src={logo} 
+              alt="PGL Logo" 
+              className={`${sidebarOpen ? 'w-32' : 'lg:w-10 w-32'} transition-all duration-300`} 
+            />
           </div>
         </nav>
       </div>
@@ -231,30 +235,26 @@ const DashboardLayout = () => {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Top Navigation */}
-        <header className="bg-white shadow-sm z-10">
-          <div className="flex items-center justify-between px-4 py-3">
+        <header className="bg-white shadow-sm z-10 border-b border-gray-200">
+          <div className="flex items-center justify-between px-6 py-4">
             {/* Mobile menu button */}
             <button
               onClick={toggleSidebar}
-              className="lg:hidden p-1 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
             >
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <Menu className="h-5 w-5" />
             </button>
 
             {/* Search bar */}
             <div className="flex items-center flex-1 max-w-md mx-4">
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+                  <Search className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
                   placeholder="Search..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-colors"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -262,39 +262,56 @@ const DashboardLayout = () => {
             </div>
 
             {/* Right side items */}
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center space-x-4">
+              <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
+              </button>
+              
               {/* Profile dropdown */}
-              <div className="relative" ref={dropdownRef}>               
+              <div className="relative" ref={dropdownRef}>
                 <button 
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center space-x-1 sm:space-x-2 focus:outline-none focus:ring-2 focus:ring-primary rounded-full p-1"
+                  className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary rounded-full p-1 transition-colors"
                 >
-                  <img
-                    src={user?.avatar || defaultAvatar}
-                    alt="User Avatar"
-                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover"
-                  />
-                  <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-24 truncate">
-                    {user?.name || 'User'}
-                  </span>
-                  <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary flex items-center justify-center text-white font-medium">
+                    {user?.name?.charAt(0) || 'U'}
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-gray-700 truncate max-w-24">
+                      {user?.name || 'User'}
+                    </p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {user?.role || 'Role'}
+                    </p>
+                  </div>
+                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? 'transform rotate-180' : ''}`} />
                 </button>
                 
                 {/* Dropdown menu */}
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border">
-                    <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                      <div className="font-medium">{user?.name || 'User'}</div>
-                      <div className="text-gray-500">{user?.email || user?.role || 'Role'}</div>
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200">
+                    <div className="px-4 py-3 border-b border-gray-200">
+                      <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+                      <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
                     </div>
-                    <button 
-                      onClick={handleLogout} 
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Sign out
-                    </button>
+                    <div className="py-1">
+                      <Link
+                        to="profile"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <User className="h-4 w-4 mr-3" />
+                        Your Profile
+                      </Link>
+                      <button 
+                        onClick={handleLogout} 
+                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4 mr-3" />
+                        Sign out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -303,7 +320,7 @@ const DashboardLayout = () => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-2 sm:p-4 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
           <Outlet />
         </main>
       </div>

@@ -1,86 +1,135 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from "../../context/AuthContext";
+import { Link } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
 
 const RequisitionList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-  const navigate = useNavigate();
+
   const { user } = useAuth();
   const [requisitions, setRequisitions] = useState([]);
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
-  const [activeTab, setActiveTab] = useState('all'); // New state for active tab
+  const [activeTab, setActiveTab] = useState('pending'); // Changed default tab to 'pending'
+
+  // Fetch all users when component mounts
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await axios.get(`${BASE_URL}/users`, {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        });
+
+        const usersMap = response.data.reduce((acc, user) => {
+          acc[user.id] = user;
+          return acc;
+        }, {});
+
+        setUsers(usersMap);
+      } catch (err) {
+        console.error('Failed to fetch users:', err);
+      }
+    };
+
+    fetchUsers();
+  }, [BASE_URL, user.token]);
 
   useEffect(() => {
     const fetchRequisitions = async () => {
-      setLoading(true);
-      setError('');
-
       try {
-        const token = localStorage.getItem('token');
-        const [reqResponse, usersResponse] = await Promise.all([
-          fetch(`${BASE_URL}/requisitions/user/${user?.id}`, {
+        const response = await axios.get(
+          `${BASE_URL}/requisitions/user/${user.id}?role=${user.role}`,
+          {
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          }),
-          fetch(`${BASE_URL}/users`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-        ]);
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
 
-        const result = await reqResponse.json();
-        const usersData = await usersResponse.json();
+        const requisitionsArray = response.data;
 
-        if (reqResponse.ok && result.success) {
-          setRequisitions(result.data);
-          
-          const usersMap = usersData.reduce((acc, user) => {
-            acc[user.id] = user;
-            return acc;
-          }, {});
-          setUsers(usersMap);
-        } else {
-          throw new Error(result.message || 'Failed to fetch requisitions');
-        }
+        const transformedRequisitions = requisitionsArray.map(req => ({
+          ...req,
+          requester: users[req.created_by]?.name || `User ${req.created_by}`,
+          requesterDetails: users[req.created_by],
+          date: new Date(req.created_at).toLocaleDateString(),
+          status: req.status || 'submitted',
+          priority: req.priority || 'medium'
+        }));
+
+        setRequisitions(transformedRequisitions);
       } catch (err) {
-        setError(err.message || 'Something went wrong');
+        setError(err.response?.data?.message || 'Failed to fetch requisitions');
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?.id) {
-      fetchRequisitions();
-    }
-  }, [user?.id, BASE_URL]);
+    fetchRequisitions();
+  }, [user, users]);
 
   // Filter requisitions based on search term
-  const searchFilteredRequisitions = requisitions.filter(req =>
-    req.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    req.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const searchFilteredRequisitions = requisitions.filter(req => {
+    return (
+      (req.title && req.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (typeof req.requester === 'string' && req.requester.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (req.description && req.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (req.items && req.items.some(item => item.name && item.name.toLowerCase().includes(searchTerm.toLowerCase())))
+    );
+  });
+
+  // Helper function to check if requisition is approved
+  const isRequisitionApproved = (req) => {
+    return req.status.toLowerCase() === 'approved' ||
+           req.approved_by_manager === 1 ||
+           req.approved_by_executive === 1 ||
+           req.approved_by_finance === 1 ||
+           req.approved_by_gmd === 1 ||
+           req.approved_by_chairman === 1;
+  };
+
+  // Helper function to check if requisition is rejected
+  const isRequisitionRejected = (req) => {
+    return req.status.toLowerCase() === 'rejected' ||
+           req.rejected_by_manager === 1 ||
+           req.rejected_by_executive === 1 ||
+           req.rejected_by_finance === 1 ||
+           req.rejected_by_gmd === 1 ||
+           req.rejected_by_chairman === 1;
+  };
+
+  // Helper function to check if requisition is completed
+  const isRequisitionCompleted = (req) => {
+    return req.status.toLowerCase() === 'completed';
+  };
 
   // Filter requisitions by status based on active tab
   const getFilteredRequisitionsByStatus = () => {
     switch (activeTab) {
       case 'pending':
         return searchFilteredRequisitions.filter(req => 
-          req.status.toLowerCase() === 'pending'
+          (req.status.toLowerCase() === 'pending' || 
+           req.status.toLowerCase() === 'submitted') &&
+          !isRequisitionApproved(req) &&
+          !isRequisitionRejected(req) &&
+          !isRequisitionCompleted(req)
         );
       case 'approved':
         return searchFilteredRequisitions.filter(req => 
-          req.status.toLowerCase() === 'approved'
+          isRequisitionApproved(req) && !isRequisitionCompleted(req)
         );
       case 'rejected':
         return searchFilteredRequisitions.filter(req => 
-          req.status.toLowerCase() === 'rejected'
+          isRequisitionRejected(req) && !isRequisitionCompleted(req)
+        );
+      case 'completed':
+        return searchFilteredRequisitions.filter(req => 
+          isRequisitionCompleted(req)
         );
       default:
         return searchFilteredRequisitions;
@@ -92,166 +141,245 @@ const RequisitionList = () => {
   // Get counts for each status
   const getStatusCounts = () => {
     const pending = searchFilteredRequisitions.filter(req => 
-      req.status.toLowerCase() === 'pending'
+      (req.status.toLowerCase() === 'pending' || 
+       req.status.toLowerCase() === 'submitted') &&
+      !isRequisitionApproved(req) &&
+      !isRequisitionRejected(req) &&
+      !isRequisitionCompleted(req)
     ).length;
     
     const approved = searchFilteredRequisitions.filter(req => 
-      req.status.toLowerCase() === 'approved'
+      isRequisitionApproved(req) && !isRequisitionCompleted(req)
     ).length;
     
     const rejected = searchFilteredRequisitions.filter(req => 
-      req.status.toLowerCase() === 'rejected'
+      isRequisitionRejected(req) && !isRequisitionCompleted(req)
     ).length;
 
-    return { pending, approved, rejected, all: searchFilteredRequisitions.length };
+    const completed = searchFilteredRequisitions.filter(req => 
+      isRequisitionCompleted(req)
+    ).length;
+
+    return { pending, approved, rejected, completed };
   };
 
   const statusCounts = getStatusCounts();
 
-  const handleRequisitionClick = (requisition) => {
-    // Toggle requisition: if clicking the same requisition, close it; otherwise, open the new one
-    if (selectedRequisition && selectedRequisition.id === requisition.id) {
+  const handleRequisitionClick = (req) => {
+    if (selectedRequisition && selectedRequisition.id === req.id) {
       setSelectedRequisition(null);
     } else {
-      setSelectedRequisition(requisition);
+      setSelectedRequisition(req);
     }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const handleApprove = async (id) => {
+  const handleApprove = async (req) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/requisitions/${id}/approve`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+      const response = await axios.post(
+        `${BASE_URL}/requisitions/${req.id}/approve`,
+        {
+          user_id: user.id,
+          role: user.role,
         },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to approve requisition');
-      }
-
-      setRequisitions(prev =>
-        prev.map(req => {
-          if (req.id === id) {
-            return {
-              ...req,
-              [result.field]: 'approved',
-              status: 'approved'
-            };
-          }
-          return req;
-        })
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
       );
 
-      if (selectedRequisition?.id === id) {
-        setSelectedRequisition(prev => ({
-          ...prev,
-          [result.field]: 'approved',
-          status: 'approved'
-        }));
+      if (response.status === 200) {
+        alert(`✅ Success: ${response.data.message}`);
+        const updatedRequisition = {
+          ...req,
+          ...response.data.updatedFields,
+          status: 'approved',
+          [`approved_by_${user.role}`]: 1,
+          [`rejected_by_${user.role}`]: 0
+        };
+        
+        setRequisitions(prev => prev.map(r => r.id === req.id ? updatedRequisition : r));
+        setSelectedRequisition(updatedRequisition);
+
+        if (response.data.nextApprover) {
+          alert(`Next approver: ${response.data.nextApprover}`);
+        }
       }
     } catch (error) {
-      console.error('Approve error:', error);
-      alert(error.message);
+      console.error('Approval failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
   };
 
-  const handleReject = async (id) => {
+  const handleReject = async (req) => {
+    if (!req) return;
+
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/requisitions/${id}/reject`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to reject requisition');
-      }
-
-      setRequisitions(prev =>
-        prev.map(req => {
-          if (req.id === id) {
-            const updated = { ...req };
-            const role = user.role.toLowerCase();
-
-            if (role === 'manager') updated.rejected_by_manager = true;
-            else if (role === 'executive') updated.rejected_by_executive = true;
-            else if (role === 'finance') updated.rejected_by_finance = true;
-            else if (role === 'gmd') updated.rejected_by_gmd = true;
-            else if (role === 'chairman') updated.rejected_by_chairman = true;
-
-            updated.status = 'rejected';
-            return updated;
-          }
-          return req;
-        })
+      const response = await axios.post(
+        `${BASE_URL}/requisitions/${req.id}/reject`,
+        { userId: user.id },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
       );
-      setSelectedRequisition(null);
-    } catch (error) {
-      console.error('Reject error:', error);
-      alert(error.message);
+
+      if (response.data?.success) {
+        const { field } = response.data;
+
+        const updatedRequisitions = requisitions.map(r =>
+          r.id === req.id
+            ? {
+              ...r,
+              status: 'rejected',
+              [field]: -1,
+            }
+            : r
+        );
+
+        setRequisitions(updatedRequisitions);
+
+        if (selectedRequisition?.id === req.id) {
+          setSelectedRequisition(prev => ({
+            ...prev,
+            status: 'rejected',
+            [field]: -1,
+          }));
+        }
+
+        setError(null);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reject requisition');
     }
   };
 
-  if (loading) return <div className="text-center py-8">Loading requisitions...</div>;
-  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
+  const getStatusBadge = (status) => {
+    const statusLower = status.toLowerCase();
+
+    switch (statusLower) {
+      case 'approved':
+        return {
+          className: 'bg-green-100 text-green-800 border-green-200',
+          text: 'Approved',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          )
+        };
+      case 'rejected':
+        return {
+          className: 'bg-red-100 text-red-800 border-red-200',
+          text: 'Rejected',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )
+        };
+      case 'completed':
+        return {
+          className: 'bg-blue-100 text-blue-800 border-blue-200',
+          text: 'Completed',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )
+        };
+      case 'submitted':
+        return {
+          className: 'bg-purple-100 text-purple-800 border-purple-200',
+          text: 'Submitted',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          )
+        };
+      default:
+        return {
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          text: 'Pending',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )
+        };
+    }
+  };
+
+  const getPriorityBadge = (priority) => {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return {
+          className: 'bg-red-100 text-red-800 border-red-200',
+          text: 'High',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+          )
+        };
+      case 'medium':
+        return {
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          text: 'Medium',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14" />
+            </svg>
+          )
+        };
+      default:
+        return {
+          className: 'bg-green-100 text-green-800 border-green-200',
+          text: 'Low',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+            </svg>
+          )
+        };
+    }
+  };
+
+  if (loading) return <p className="text-center py-4">Loading requisitions...</p>;
+  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 p-2 sm:p-4">
-      {/* Requisitions List Panel */}
-      <div className={`${selectedRequisition ? 'hidden lg:block lg:w-1/3' : 'w-full'}`}>
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+    <div className="flex flex-col md:flex-row gap-6">
+      {/* Requisition List Panel */}
+      <div className={`${selectedRequisition ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
+        <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold">Requisitions</h2>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <input
-                type="text"
-                placeholder="Search requisitions..."
-                className="flex-grow sm:w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <Link
-                to="/dashboard/requisitions/new"
-                className="px-3 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary-dark whitespace-nowrap"
-              >
-                New Requisition
-              </Link>
-            </div>
+            <Link
+              to="/dashboard/requisitions/new"
+              className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
+            >
+              New Requisition
+            </Link>
           </div>
+
+          {/* Search Input */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search requisitions..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
 
           {/* Status Tabs */}
           <div className="mb-4">
             <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'all'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                All ({statusCounts.all})
-              </button>
               <button
                 onClick={() => setActiveTab('pending')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
@@ -282,61 +410,92 @@ const RequisitionList = () => {
               >
                 Rejected ({statusCounts.rejected})
               </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'completed'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Completed ({statusCounts.completed})
+              </button>
             </div>
           </div>
-          
+
           {/* Requisitions List */}
-          <div className="space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto">
+          <div className="space-y-2">
             {filteredRequisitions.length > 0 ? (
               filteredRequisitions.map(req => (
                 <div
                   key={req.id}
                   onClick={() => handleRequisitionClick(req)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 transition-colors ${
-                    selectedRequisition?.id === req.id ? 'bg-gray-100 border-primary' : ''
-                  }`}
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${
+                    req.status === 'submitted' ? 'border-l-4 border-l-primary' : ''
+                  } ${selectedRequisition?.id === req.id ? 'bg-gray-100' : ''}`}
                 >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-sm sm:text-base truncate">{req.title}</h3>
-                      <p className="text-xs sm:text-sm text-gray-500 line-clamp-1">{req.description}</p>
-                      <p className="text-sm font-medium mt-1">₦{parseFloat(req.total).toFixed(2)}</p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">{req.title}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(req.status).className}`}
+                        >
+                          {getStatusBadge(req.status).icon}
+                          {getStatusBadge(req.status).text}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(req.priority).className}`}
+                        >
+                          {getPriorityBadge(req.priority).icon}
+                          {getPriorityBadge(req.priority).text}
+                        </span>
+                      </div>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                      ${req.status === 'pending' ? 'bg-yellow-100 text-yellow-800'
-                        : req.status === 'approved' ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'}`}>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                    <span className="text-sm font-semibold">
+                      {req.total_amount ? `₦${req.total_amount.toLocaleString()}` : ''}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {formatDate(req.created_at)} • {users[req.created_by]?.name || `User ${req.created_by}`}
+                  <p className="text-sm text-gray-500">
+                    From: {req.requester} {req.requesterDetails?.department && `(${req.requesterDetails.department})`}
                   </p>
+                  <p className="text-xs text-gray-400">{req.date}</p>
                 </div>
               ))
             ) : (
               <p className="text-center text-gray-500 py-4">
-                {activeTab === 'all' ? 'No requisitions found' : `No ${activeTab} requisitions found`}
+                {`No ${activeTab} requisitions found`}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Requisition Detail Panel */}
-      {selectedRequisition && (
-        <div className="lg:w-2/3">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+           {selectedRequisition && (
+        <div className="md:w-2/3">
+          <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-lg sm:text-xl font-bold">{selectedRequisition.title}</h2>
-                <p className="text-sm text-gray-500">Created: {formatDate(selectedRequisition.created_at)} by {users[selectedRequisition.created_by]?.name || `User ${selectedRequisition.created_by}`}</p>
-                <p className="text-xs text-gray-400">Last updated: {formatDate(selectedRequisition.updated_at)}</p>
+                <h2 className="text-xl font-bold">{selectedRequisition.title}</h2>
+                <p className="text-sm text-gray-500">
+                  From: {selectedRequisition.requester}
+                  {selectedRequisition.requesterDetails?.department && ` (${selectedRequisition.requesterDetails.department})`}
+                </p>
+                <p className="text-xs text-gray-400">Date: {selectedRequisition.date}</p>
+                <div className="mt-2 flex gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedRequisition.status).className}`}>
+                    {getStatusBadge(selectedRequisition.status).icon}
+                    {getStatusBadge(selectedRequisition.status).text}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(selectedRequisition.priority).className}`}>
+                    {getPriorityBadge(selectedRequisition.priority).icon}
+                    {getPriorityBadge(selectedRequisition.priority).text}
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedRequisition(null)}
-                className="lg:hidden text-gray-500 hover:text-gray-700"
-                aria-label="Close details"
+                className="md:hidden text-gray-500 hover:text-gray-700"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -345,105 +504,121 @@ const RequisitionList = () => {
             </div>
 
             <div className="mb-6">
-              <h3 className="text-md sm:text-lg font-medium mb-2">Details</h3>
-              <div className="bg-gray-50 p-3 sm:p-4 rounded-md">
-                <p className="text-sm sm:text-base">{selectedRequisition.description}</p>
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium mb-2">Items Requested:</h4>
-                  <ul className="list-disc pl-5 space-y-1 text-sm sm:text-base">
-                    {selectedRequisition.items.split(',').map((item, index) => (
-                      <li key={index}>{item.trim()}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              <h3 className="text-lg font-semibold mb-2">Description</h3>
+              <p className="text-gray-700">{selectedRequisition.description}</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Quantity</h4>
-                <p className="text-lg font-semibold">{selectedRequisition.quantity}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Unit Price</h4>
-                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.unit_price).toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Total Amount</h4>
-                <p className="text-lg font-semibold">₦{parseFloat(selectedRequisition.total).toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-md">
-                <h4 className="text-sm font-medium text-gray-500">Attachment</h4>
-                {selectedRequisition.attachment ? (
-                  <a
-                    href={`${BASE_URL}/${selectedRequisition.attachment}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 underline text-sm sm:text-base"
-                  >
-                    View File ({selectedRequisition.attachment_type})
-                  </a>
-                ) : (
-                  <p className="text-sm text-gray-500">No attachment</p>
-                )}
-              </div>
-            </div>
+{/* Items Section */}
+<div className="mb-6">
+  <h3 className="text-lg font-semibold mb-2">Items</h3>
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {selectedRequisition.items && selectedRequisition.items.length > 0 ? (
+          selectedRequisition.items.map((item, index) => (
+            <tr key={index}>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {item.name || 'Unnamed Item'}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {item.quantity}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ₦{item.unit_price?.toLocaleString()}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ₦{(item.quantity * item.unit_price)?.toLocaleString()}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+              No items added to this requisition
+            </td>
+          </tr>
+        )}
+        {selectedRequisition.items && selectedRequisition.items.length > 0 && (
+          <tr className="bg-gray-50">
+            <td colSpan="3" className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+              Total
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              ₦{selectedRequisition.total_amount?.toLocaleString()}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-gray-500 mb-2">Approvals</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { role: 'manager', label: 'Manager' },
-                  { role: 'executive', label: 'Executive' },
-                  { role: 'finance', label: 'Finance' },
-                  { role: 'gmd', label: 'GMD' },
-                  { role: 'chairman', label: 'Chairman' },
-                ].map(({ role, label }) => {
-                  const status = selectedRequisition[`approval_${role}`]; // 'pending' | 'approved' | 'rejected'
+            {/* Approval status indicators */}
+<div className="grid grid-cols-5 gap-2 mb-6">
+  {[
+    { role: 'manager', label: 'Manager' },
+    { role: 'executive', label: 'Executive' },
+    { role: 'finance', label: 'Finance' },
+    { role: 'gmd', label: 'GMD' },
+    { role: 'chairman', label: 'Chairman' }
+  ].map(({ role, label }) => {
+    const approved = selectedRequisition[`approved_by_${role}`] === 1;
+    const rejected = selectedRequisition[`rejected_by_${role}`] === 1;
 
-                  let statusLabel = 'Pending';
-                  let statusClass = 'bg-gray-100 text-gray-600';
+    return (
+      <div
+        key={role}
+        className={`p-2 rounded text-center text-xs ${
+          approved ? 'bg-green-100 text-green-800' :
+          rejected ? 'bg-red-100 text-red-800' :
+          'bg-gray-100'
+        }`}
+      >
+        <div className="font-medium">{label}</div>
+        <div>
+          {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
+        </div>
+      </div>
+    );
+  })}
+</div>
 
-                  if (status === 'approved') {
-                    statusLabel = 'Approved';
-                    statusClass = 'bg-green-100 text-green-800';
-                  } else if (status === 'rejected') {
-                    statusLabel = 'Rejected';
-                    statusClass = 'bg-red-100 text-red-800';
-                  }
-
-                  return (
-                    <div
-                      key={role}
-                      className={`p-2 rounded-md text-center ${statusClass}`}
-                    >
-                      <div className="text-xs font-medium">{label}</div>
-                      <div className="text-xs">{statusLabel}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {selectedRequisition.status === 'pending' && (
-              <div className="flex flex-col sm:flex-row justify-end gap-3">
-                <button
-                  onClick={() => handleReject(selectedRequisition.id)}
-                  className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 transition-colors"
-                >
-                  Reject
-                </button>
-                <button
-                  onClick={() => handleApprove(selectedRequisition.id)}
-                  className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark transition-colors"
-                >
-                  Approve
-                </button>
-              </div>
-            )}
+            {/* Approval buttons for authorized roles */}
+{(selectedRequisition.status === 'pending' || selectedRequisition.status === 'submitted') &&
+  (user?.role === 'manager' ||
+   user?.role === 'executive' ||
+   user?.role === 'finance' ||
+   user?.role === 'gmd' ||
+   user?.role === 'chairman') && (
+    <div className="mt-6 space-y-4">
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => handleReject(selectedRequisition)}
+          className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50"
+        >
+          Reject
+        </button>
+        <button
+          onClick={() => handleApprove(selectedRequisition)}
+          className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark"
+        >
+          Approve
+        </button>
+      </div>
+    </div>
+  )}
           </div>
         </div>
       )}
+
     </div>
   );
 };

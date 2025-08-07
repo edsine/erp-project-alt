@@ -1,18 +1,19 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
+
 const NewRequisition = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
-  const { user} = useAuth() 
+  
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [formData, setFormData] = useState({
     title: '',
-    
-    amount: '',
     description: '',
-    items: [],
-    attachments: []
+    priority: 'medium',
+    items: [{ name: '', quantity: 1, unit_price: 0 }],
+    total_amount: 0
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,131 +31,84 @@ const NewRequisition = () => {
     const newItems = [...formData.items]
     newItems[index] = {
       ...newItems[index],
-      [name]: name === 'quantity' || name === 'unitPrice' ? Number(value) : value
+      [name]: name === 'quantity' || name === 'unit_price' ? Number(value) : value
     }
+    
+    // Calculate total price for this item
+    newItems[index].total_price = newItems[index].quantity * newItems[index].unit_price
+    
     setFormData(prev => ({
       ...prev,
-      items: newItems
+      items: newItems,
+      total_amount: newItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
     }))
   }
 
-  const handleAddItem = () => {
+  const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { name: '', quantity: 1, unitPrice: '' }]
+      items: [...prev.items, { name: '', quantity: 1, unit_price: 0 }]
     }))
   }
 
-  const handleRemoveItem = (index) => {
-    if (formData.items.length > 1) {
-      const newItems = [...formData.items]
-      newItems.splice(index, 1)
-      setFormData(prev => ({
-        ...prev,
-        items: newItems
-      }))
+  const removeItem = (index) => {
+    const newItems = formData.items.filter((_, i) => i !== index)
+    setFormData(prev => ({
+      ...prev,
+      items: newItems,
+      total_amount: newItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
+    }))
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
+    // Validate items
+    if (formData.items.length === 0) {
+      setError('At least one item is required')
+      setLoading(false)
+      return
     }
-  }
 
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files)
-    setFormData(prev => ({
-      ...prev,
-      attachments: [...prev.attachments, ...files]
-    }))
-  }
-
-  const handleRemoveAttachment = (index) => {
-    setFormData(prev => {
-      const newAttachments = [...prev.attachments]
-      newAttachments.splice(index, 1)
-      return {
-        ...prev,
-        attachments: newAttachments
+    for (const item of formData.items) {
+      if (!item.name || item.quantity <= 0 || item.unit_price < 0) {
+        setError('Please fill all item fields with valid values')
+        setLoading(false)
+        return
       }
-    })
-  }
-
-  const calculateTotal = () => {
-    return formData.items.reduce((total, item) => {
-      return total + (item.quantity * (Number(item.unitPrice) || 0))
-    }, 0)
-  }
-
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
-
-  // Validate required fields
-  if (!formData.title || !formData.description) {
-    setError('Please fill all required fields');
-    setLoading(false);
-    return;
-  }
-
-  if (formData.items.length === 0) {
-    setError('Please add at least one item');
-    setLoading(false);
-    return;
-  }
-
-  if (formData.items.some(item => !item.name || !item.quantity || !item.unitPrice)) {
-    setError('Please fill all item fields (name, quantity, and price)');
-    setLoading(false);
-    return;
-  }
-
-  // Add null check for user
-  if (!user) {
-    setError('You must be logged in to create a requisition');
-    setLoading(false);
-    return;
-  }
-
-  try {
-    const formDataToSend = new FormData();
-    
-    // Append basic fields
-    formDataToSend.append('title', formData.title);
-    formDataToSend.append('description', formData.description);
-    formDataToSend.append('created_by', user.id.toString()); // Use the user from component scope
-    
-    // Append items
-    const firstItem = formData.items[0];
-    formDataToSend.append('items', firstItem.name);
-    formDataToSend.append('quantity', firstItem.quantity.toString());
-    formDataToSend.append('unit_price', firstItem.unitPrice.toString());
-    
-    // Append file
-    if (formData.attachments.length > 0) {
-      formDataToSend.append('attachment', formData.attachments[0]);
     }
 
-    const response = await fetch(`${BASE_URL}/requisitions`, {
-      method: 'POST',
-      body: formDataToSend,
-    });
+    try {
+      const submitData = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        created_by: user.id,
+        items: formData.items,
+        total_amount: formData.total_amount
+      }
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create requisition');
+      const response = await axios.post(`${BASE_URL}/requisitions`, submitData, {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      })
+
+      if (response.status === 201) {
+        navigate('/dashboard/requisitions')
+      }
+    } catch (err) {
+      console.error('Error creating requisition:', err)
+      setError(err.response?.data?.message || 'Failed to create requisition')
+    } finally {
+      setLoading(false)
     }
-
-    const result = await response.json();
-    window.alert(`Requisition created successfully! ID: ${result.requisitionId}`);
-    navigate('/dashboard/requisitions');
-  } catch (err) {
-    setError(err.message || 'Failed to create requisition');
-    console.error('Submission error:', err);
-  } finally {
-    setLoading(false);
   }
-};
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
+    <div className="bg-white rounded-lg shadow-md p-6 max-w-4xl mx-auto">
       <h2 className="text-xl font-bold mb-6">Create New Requisition</h2>
       
       {error && (
@@ -173,69 +127,94 @@ const handleSubmit = async (e) => {
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-              Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              required
-            />
+        {/* Basic Information */}
+        <div className="mb-6 border-b pb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+          
+          <div className="grid grid-cols-1 gap-4 mb-4">
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="title"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                rows="3"
+                value={formData.description}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="priority" className="block text-sm font-medium text-gray-700 mb-1">
+                Priority
+              </label>
+              <select
+                id="priority"
+                name="priority"
+                value={formData.priority}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
           </div>
-
-         
-
         </div>
 
-        <div className="mb-4">
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-            Description <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows="4"
-            value={formData.description}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-medium text-gray-700">Items <span className="text-red-500">*</span></h3>
+        {/* Items Section */}
+        <div className="mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Items</h3>
             <button
               type="button"
-              onClick={handleAddItem}
-              className="text-sm text-primary hover:text-primary"
+              onClick={addItem}
+              className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
             >
-              + Add Item
+              Add Item
             </button>
           </div>
-          <div className="space-y-3">
+
+          <div className="space-y-4">
             {formData.items.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-end">
+              <div key={index} className="grid grid-cols-12 gap-4 items-end">
                 <div className="col-span-5">
-                  <label htmlFor={`item-name-${index}`} className="block text-xs text-gray-500 mb-1">Item Name</label>
+                  <label htmlFor={`item-name-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                    Item Name <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="text"
                     id={`item-name-${index}`}
                     name="name"
                     value={item.name}
                     onChange={(e) => handleItemChange(index, e)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                     required
                   />
                 </div>
+
                 <div className="col-span-2">
-                  <label htmlFor={`item-quantity-${index}`} className="block text-xs text-gray-500 mb-1">Qty</label>
+                  <label htmlFor={`item-quantity-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                    Qty <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
                     id={`item-quantity-${index}`}
@@ -243,36 +222,43 @@ const handleSubmit = async (e) => {
                     min="1"
                     value={item.quantity}
                     onChange={(e) => handleItemChange(index, e)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                     required
                   />
                 </div>
+
                 <div className="col-span-3">
-                  <label htmlFor={`item-unitPrice-${index}`} className="block text-xs text-gray-500 mb-1">Unit Price</label>
+                  <label htmlFor={`item-price-${index}`} className="block text-sm font-medium text-gray-700 mb-1">
+                    Unit Price (₦) <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="number"
-                    id={`item-unitPrice-${index}`}
-                    name="unitPrice"
+                    id={`item-price-${index}`}
+                    name="unit_price"
                     min="0"
                     step="0.01"
-                    value={item.unitPrice}
+                    value={item.unit_price}
                     onChange={(e) => handleItemChange(index, e)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
                     required
                   />
                 </div>
+
                 <div className="col-span-1">
-                  <label className="block text-xs text-gray-500 mb-1">Total</label>
-                  <div className="px-3 py-2 text-sm">
-                    ${(item.quantity * (Number(item.unitPrice) || 0)).toFixed(2)}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total
+                  </label>
+                  <div className="px-3 py-2 bg-gray-50 rounded-md text-sm">
+                    ₦{(item.quantity * item.unit_price).toLocaleString()}
                   </div>
                 </div>
+
                 <div className="col-span-1">
                   {formData.items.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => handleRemoveItem(index)}
-                      className="p-2 text-red-500 hover:text-red-700"
+                      onClick={() => removeItem(index)}
+                      className="text-red-500 hover:text-red-700"
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -285,79 +271,17 @@ const handleSubmit = async (e) => {
           </div>
         </div>
 
-        <div className="mb-4 p-3 bg-gray-50 rounded-md">
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">Total Amount:</span>
-            <span className="text-lg font-bold">₦{calculateTotal().toFixed(2)}</span>
+        {/* Total Amount */}
+        <div className="flex justify-end mb-6">
+          <div className="bg-gray-50 p-4 rounded-md">
+            <div className="text-lg font-semibold">
+              Total Amount: <span className="text-primary">₦{formData.total_amount.toLocaleString()}</span>
+            </div>
           </div>
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Supporting Documents
-          </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-            <div className="space-y-1 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                stroke="currentColor"
-                fill="none"
-                viewBox="0 0 48 48"
-                aria-hidden="true"
-              >
-                <path
-                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <div className="flex text-sm text-gray-600">
-                <label
-                  htmlFor="file-upload"
-                  className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary focus-within:outline-none"
-                >
-                  <span>Upload files</span>
-                  <input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    className="sr-only"
-                    multiple
-                    onChange={handleFileUpload}
-                  />
-                </label>
-                <p className="pl-1">or drag and drop</p>
-              </div>
-              <p className="text-xs text-gray-500">PDF, DOC, XLS up to 10MB</p>
-            </div>
-          </div>
-          {formData.attachments.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {formData.attachments.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-2 border rounded-md">
-                  <div className="flex items-center">
-                    <svg className="h-5 w-5 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <span className="text-sm">{file.name}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAttachment(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end space-x-3">
+        {/* Form Actions */}
+        <div className="flex justify-end space-x-3 pt-6 border-t">
           <button
             type="button"
             onClick={() => navigate('/dashboard/requisitions')}
@@ -368,7 +292,7 @@ const handleSubmit = async (e) => {
           <button
             type="submit"
             disabled={loading}
-            className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
             {loading ? 'Submitting...' : 'Submit Requisition'}
           </button>

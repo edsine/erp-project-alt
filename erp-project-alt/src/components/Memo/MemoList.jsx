@@ -13,8 +13,8 @@ const MemoList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [users, setUsers] = useState({}); // New state for user data
-  const [activeTab, setActiveTab] = useState('all'); // New state for active tab
+  const [users, setUsers] = useState({});
+  const [activeTab, setActiveTab] = useState('pending'); // Changed default to 'pending'
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -29,7 +29,6 @@ const MemoList = () => {
           }
         );
 
-        // Convert array to object with ID as key for easy lookup
         const usersMap = response.data.reduce((acc, user) => {
           acc[user.id] = user;
           return acc;
@@ -43,8 +42,6 @@ const MemoList = () => {
 
     fetchUsers();
   }, [BASE_URL, user.token]);
-
-
 
   useEffect(() => {
     const fetchMemos = async () => {
@@ -62,8 +59,8 @@ const MemoList = () => {
 
         const transformedMemos = memosArray.map(memo => ({
           ...memo,
-          sender: users[memo.created_by]?.name || `User ${memo.created_by}`, // Use actual username if available
-          senderDetails: users[memo.created_by], // Store full user details
+          sender: users[memo.created_by]?.name || `User ${memo.created_by}`,
+          senderDetails: users[memo.created_by],
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
@@ -79,13 +76,10 @@ const MemoList = () => {
     };
 
     fetchMemos();
-  }, [user, users]); // Add users to dependency array
+  }, [user, users]);
 
   // Filter memos based on search term
   const searchFilteredMemos = memos.filter(memo => {
-    const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
-    const isNotIctCreator = memo.department?.toLowerCase() !== 'ict';
-
     return (
       memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,74 +87,91 @@ const MemoList = () => {
     );
   });
 
-    // Helper function to check if memo is approved
-const isMemoApproved = (memo) => {
-  return memo.status.toLowerCase() === 'approved' ||
-         memo.approved_by_chairman === 1 ||
-         memo.approved_by_gmd === 1 ||
-         memo.approved_by_finance === 1 ||
-         memo.approved_by_executive === 1 ||
-         memo.approved_by_manager === 1;
-};
+  // Helper function to check if memo is approved
+  const isMemoApproved = (memo) => {
+    return memo.status.toLowerCase() === 'approved' ||
+           memo.approved_by_chairman === 1 ||
+           memo.approved_by_gmd === 1 ||
+           memo.approved_by_finance === 1 ||
+           memo.approved_by_executive === 1 ||
+           memo.approved_by_manager === 1;
+  };
 
-// Helper function to check if memo is rejected
-const isMemoRejected = (memo) => {
-  return memo.status.toLowerCase() === 'rejected' ||
-         memo.rejected_by_chairman === 1 ||
-         memo.rejected_by_gmd === 1 ||
-         memo.rejected_by_finance === 1 ||
-         memo.rejected_by_executive === 1 ||
-         memo.rejected_by_manager === 1;
-};
+  // Helper function to check if memo is rejected
+  const isMemoRejected = (memo) => {
+    return memo.status.toLowerCase() === 'rejected' ||
+           memo.rejected_by_chairman === 1 ||
+           memo.rejected_by_gmd === 1 ||
+           memo.rejected_by_finance === 1 ||
+           memo.rejected_by_executive === 1 ||
+           memo.rejected_by_manager === 1;
+  };
+
+  // Helper function to check if memo is completed
+  const isMemoCompleted = (memo) => {
+    return memo.status.toLowerCase() === 'completed';
+  };
 
   // Filter memos by status based on active tab
-const getFilteredMemosByStatus = () => {
-  switch (activeTab) {
-    case 'pending':
-      return searchFilteredMemos.filter(memo => 
-        (memo.status.toLowerCase() === 'pending' || 
-         memo.status.toLowerCase() === 'submitted') &&
-        !isMemoApproved(memo) &&
-        !isMemoRejected(memo)
-      );
-    case 'approved':
-      return searchFilteredMemos.filter(memo => 
-        isMemoApproved(memo)
-      );
-    case 'rejected':
-      return searchFilteredMemos.filter(memo => 
-        isMemoRejected(memo)
-      );
-    default:
-      return searchFilteredMemos;
-  }
-};
+  const getFilteredMemosByStatus = () => {
+    switch (activeTab) {
+      case 'pending':
+        return searchFilteredMemos.filter(memo => 
+          (memo.status.toLowerCase() === 'pending' || 
+           memo.status.toLowerCase() === 'submitted') &&
+          !isMemoApproved(memo) &&
+          !isMemoRejected(memo) &&
+          !isMemoCompleted(memo)
+        );
+      case 'approved':
+        return searchFilteredMemos.filter(memo => 
+          isMemoApproved(memo) && !isMemoCompleted(memo)
+        );
+      case 'rejected':
+        return searchFilteredMemos.filter(memo => 
+          isMemoRejected(memo) && !isMemoCompleted(memo)
+        );
+      case 'completed':
+        return searchFilteredMemos.filter(memo => 
+          isMemoCompleted(memo)
+        );
+      default:
+        return searchFilteredMemos.filter(memo => 
+          (memo.status.toLowerCase() === 'pending' || 
+           memo.status.toLowerCase() === 'submitted') &&
+          !isMemoApproved(memo) &&
+          !isMemoRejected(memo) &&
+          !isMemoCompleted(memo)
+        );
+    }
+  };
 
   const filteredMemos = getFilteredMemosByStatus();
 
-
-
   // Get counts for each status
-// Update getStatusCounts to use the same logic
-const getStatusCounts = () => {
-  const pending = searchFilteredMemos.filter(memo => 
-    (memo.status.toLowerCase() === 'pending' || 
-     memo.status.toLowerCase() === 'submitted') &&
-    !isMemoApproved(memo) &&
-    !isMemoRejected(memo)
-  ).length;
-  
-  const approved = searchFilteredMemos.filter(memo => 
-    isMemoApproved(memo)
-  ).length;
-  
-  const rejected = searchFilteredMemos.filter(memo => 
-    isMemoRejected(memo)
-  ).length;
+  const getStatusCounts = () => {
+    const pending = searchFilteredMemos.filter(memo => 
+      (memo.status.toLowerCase() === 'pending' || 
+       memo.status.toLowerCase() === 'submitted') &&
+      !isMemoApproved(memo) &&
+      !isMemoRejected(memo) &&
+      !isMemoCompleted(memo)
+    ).length;
+    
+    const approved = searchFilteredMemos.filter(memo => 
+      isMemoApproved(memo) && !isMemoCompleted(memo)
+    ).length;
+    
+    const rejected = searchFilteredMemos.filter(memo => 
+      isMemoRejected(memo) && !isMemoCompleted(memo)
+    ).length;
 
-  return { pending, approved, rejected, all: searchFilteredMemos.length };
-};
+    const completed = searchFilteredMemos.filter(memo => 
+      isMemoCompleted(memo)
+    ).length;
 
+    return { pending, approved, rejected, completed };
+  };
 
   const statusCounts = getStatusCounts();
 
@@ -401,6 +412,8 @@ const getStatusCounts = () => {
     };
   };
 
+
+
   return (
     <div className="flex flex-col md:flex-row gap-6">
       {/* Memo List Panel */}
@@ -428,20 +441,9 @@ const getStatusCounts = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-
-          {/* Status Tabs */}
+          {/* Updated Status Tabs */}
           <div className="mb-4">
             <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'all'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                All ({statusCounts.all})
-              </button>
               <button
                 onClick={() => setActiveTab('pending')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
@@ -471,6 +473,16 @@ const getStatusCounts = () => {
                 }`}
               >
                 Rejected ({statusCounts.rejected})
+              </button>
+              <button
+                onClick={() => setActiveTab('completed')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'completed'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Completed ({statusCounts.completed})
               </button>
             </div>
           </div>
@@ -506,19 +518,17 @@ const getStatusCounts = () => {
                   <p className="text-sm text-gray-500">
                     From: {memo.sender} {memo.senderDetails?.department && `(${memo.senderDetails.department})`}
                   </p>
-                  <p className="text-xs text-gray-400">{memo.date}</p>
-                </div>
+                  <p className="text-xs text-gray-400">{memo.date}</p>                </div>
               ))
             ) : (
               <p className="text-center text-gray-500 py-4">
-                {activeTab === 'all' ? 'No memos found' : `No ${activeTab} memos found`}
+                {`No ${activeTab} memos found`}
               </p>
             )}
           </div>
         </div>
       </div>
 
-      {/* Memo Detail Panel */}
       {selectedMemo && (
         <div className="md:w-2/3">
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -668,7 +678,7 @@ const getStatusCounts = () => {
           </div>
         </div>
       )}
-    </div>
+        </div>
   );
 };
 

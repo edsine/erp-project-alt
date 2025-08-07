@@ -2,9 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import axios from 'axios';
+import {
+  FileText, ShoppingCart, CheckSquare, Calendar,
+  Plus, Clock, User, AlertTriangle,
+  Home, Bell, Activity, ArrowRight
+} from 'lucide-react';
 
 const Dashboard = () => {
-    const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { user } = useAuth();
   const [stats, setStats] = useState({
     memos: 0,
@@ -15,70 +20,48 @@ const Dashboard = () => {
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const [memoCount, setMemoCount] = useState(0)
-
+  const [memoCount, setMemoCount] = useState(0);
   const [requisitionCount, setRequisitionCount] = useState(0);
+  const [taskCount, setTaskCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'completed'
 
-    const [taskCount, setTaskCount] = useState(0);
-
+  // Fetch data functions
   useEffect(() => {
     const fetchTaskCount = async () => {
       try {
         const res = await fetch(`${BASE_URL}/api/tasks/counts/user/${user.id}`);
         const data = await res.json();
-        if (data.success) {
-          setTaskCount(data.count);
-        }
+        if (data.success) setTaskCount(data.count);
       } catch (error) {
         console.error('Error fetching task count:', error);
       }
     };
 
-    if (user) {
-      fetchTaskCount();
-    }
-  }, [user]);
-
-useEffect(() => {
-  fetch(`${BASE_URL}/requisitions/count/user/${user.id}`)
-    .then(res => res.json())
-    .then(data => {
-      if (data && typeof data.count === 'number') {
-        setRequisitionCount(data.count);
+    const fetchRequisitionCount = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/requisitions/count/user/${user.id}`);
+        const data = await res.json();
+        if (data && typeof data.count === 'number') {
+          setRequisitionCount(data.count);
+        }
+      } catch (err) {
+        console.error('Failed to fetch requisition count:', err);
       }
-    })
-    .catch(err => console.error('Failed to fetch requisition count:', err));
-}, [user]);
+    };
 
-useEffect(() => {
-  let interval
-  if (user?.id) {
     const fetchMemoCount = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/memos/counts/${user.id}`)
-        const data = await res.json()
-        setMemoCount(data.count || 0)
+        const res = await fetch(`${BASE_URL}/memos/counts/${user.id}`);
+        const data = await res.json();
+        setMemoCount(data.count || 0);
       } catch (err) {
-        console.error("Error fetching memo count:", err)
+        console.error("Error fetching memo count:", err);
       }
-    }
+    };
 
-    fetchMemoCount()
-    interval = setInterval(fetchMemoCount, 60000) // refresh every 60 seconds
-  }
-
-  return () => clearInterval(interval)
-}, [user?.id])
-
-
-
-  useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        
-        // Fetch counts
         const countsResponse = await Promise.all([
           axios.get('/api/memos/count'),
           axios.get('/api/requisitions/count'),
@@ -93,223 +76,269 @@ useEffect(() => {
           leaves: countsResponse[3].data.count || 0
         });
 
-        // Fetch recent activities with error handling
         try {
           const activitiesResponse = await axios.get('/api/activities/recent');
-          // Ensure the response is an array
-          const activities = Array.isArray(activitiesResponse.data) 
-            ? activitiesResponse.data 
-            : [];
-          setRecentActivities(activities);
+          setRecentActivities(Array.isArray(activitiesResponse.data) ? activitiesResponse.data : []);
         } catch (activitiesError) {
           console.error('Error fetching activities:', activitiesError);
-          setRecentActivities([]); // Set empty array as fallback
+          setRecentActivities([]);
         }
 
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
         setError('Failed to load dashboard data');
-        // Ensure recentActivities is still an array even on error
-        setRecentActivities([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDashboardData();
-  }, [user?.id]);
-
-  // Extract first name from user.name (assuming it's "First Last" format)
-  const getFirstName = () => {
-    if (user?.name) {
-      return user.name.split(' ')[0]
+    if (user) {
+      fetchTaskCount();
+      fetchRequisitionCount();
+      fetchMemoCount();
+      fetchDashboardData();
+      
+      // Set up interval for memo count refresh
+      const interval = setInterval(fetchMemoCount, 60000);
+      return () => clearInterval(interval);
     }
-    return 'User' // fallback if name is not available
-  }
+  }, [user, BASE_URL]);
+
+  const getFirstName = () => user?.name?.split(' ')[0] || 'User';
 
   if (loading) {
-    return <div className="flex justify-center items-center h-64">Loading dashboard...</div>;
-  }
-
-  if (error) {
-    return <div className="text-red-500 p-4">{error}</div>;
-  }
-
-  return (
-    <div className="space-y-6">
-      <h1 className="text-2xl text-primary mt-6 font-bold">Welcome, {getFirstName()}.</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Memos</p>
-              <p className="text-2xl font-semibold">  {memoCount}</p>
-            </div>
-            <div className="p-3 rounded-full bg-blue-50 text-primary">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-gray-100 rounded-lg"></div>
+            ))}
           </div>
-          <div className="mt-4">
-            <Link to="/dashboard/memos" className="text-sm text-primary hover:underline">View all memos</Link>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Requisitions</p>
-              <p className="text-2xl font-semibold">{requisitionCount}</p>
-            </div>
-            <div className="p-3 rounded-full bg-green-50 text-green-600">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link to="requisitions" className="text-sm text-primary hover:underline">View all requisitions</Link>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Tasks</p>
-              <p className="text-2xl font-semibold">{taskCount}</p>
-            </div>
-            <div className="p-3 rounded-full bg-yellow-50 text-yellow-600">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link to="/dashboard/tasks" className="text-sm text-primary hover:underline">View all tasks</Link>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Leave Requests</p>
-              <p className="text-2xl font-semibold">{stats.leaves}</p>
-            </div>
-            <div className="p-3 rounded-full bg-purple-50 text-purple-600">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-          </div>
-          <div className="mt-4">
-            <Link to="/dashboard/leaves" className="text-sm text-primary hover:underline">View all leaves</Link>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 h-64 bg-gray-100 rounded-lg"></div>
+            <div className="h-64 bg-gray-100 rounded-lg"></div>
           </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Recent Activities</h2>
-            {/* <Link to="/activities" className="text-sm text-primary hover:underline">View all</Link> */}
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
           </div>
-          <div className="space-y-4">
+        </div>
+      </div>
+    );
+  }
+
+  const StatCard = ({ icon: Icon, title, value, color, link }) => (
+    <Link to={link} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{title}</p>
+          <p className="text-3xl font-light mt-1">{value}</p>
+        </div>
+        <div className={`p-3 rounded-full ${color === 'blue' ? 'bg-blue-50 text-blue-600' : 
+          color === 'green' ? 'bg-green-50 text-green-600' :
+          color === 'yellow' ? 'bg-yellow-50 text-yellow-600' :
+          color === 'purple' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-600'}`}>
+          <Icon className="h-6 w-6" />
+        </div>
+      </div>
+      <div className="mt-6">
+        <span className="text-sm font-medium text-primary hover:text-primary-dark flex items-center transition-colors">
+          View all
+          <ArrowRight className="ml-1 h-4 w-4" />
+        </span>
+      </div>
+    </Link>
+  );
+
+  const ActivityItem = ({ activity }) => {
+    const getIcon = () => {
+      switch(activity.type) {
+        case 'Memo': return <FileText className="h-5 w-5 text-blue-600" />;
+        case 'Requisition': return <ShoppingCart className="h-5 w-5 text-green-600" />;
+        case 'Task': return <CheckSquare className="h-5 w-5 text-yellow-600" />;
+        case 'Leave': return <Calendar className="h-5 w-5 text-purple-600" />;
+        default: return <Activity className="h-5 w-5 text-gray-600" />;
+      }
+    };
+
+    return (
+      <div className="flex items-start p-4 rounded-lg hover:bg-gray-50 transition-colors">
+        <div className="flex-shrink-0 mt-1">
+          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+            {getIcon()}
+          </div>
+        </div>
+        <div className="ml-4 flex-1 min-w-0">
+          <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
+          <div className="flex items-center mt-1 text-xs text-gray-500">
+            <span className="capitalize">{activity.type.toLowerCase()}</span>
+            <span className="mx-2">•</span>
+            <Clock className="mr-1 h-3 w-3" />
+            <span>{activity.time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const QuickAction = ({ icon: Icon, title, description, link, color }) => (
+    <Link
+      to={link}
+      className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
+    >
+      <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform ${
+        color === 'blue' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' :
+        color === 'green' ? 'bg-green-50 text-green-600 group-hover:bg-green-100' :
+        color === 'purple' ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-100' : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
+      }`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <div className="ml-4">
+        <p className="text-sm font-medium text-gray-900">{title}</p>
+        <p className="text-xs text-gray-500 mt-1">{description}</p>
+      </div>
+    </Link>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-light text-gray-800">Welcome back,</h1>
+          <h2 className="text-3xl font-semibold text-primary">{getFirstName()}</h2>
+        </div>
+   
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard 
+          icon={FileText} 
+          title="Memos" 
+          value={memoCount} 
+          color="blue" 
+          link="/dashboard/memos" 
+        />
+        <StatCard 
+          icon={ShoppingCart} 
+          title="Requisitions" 
+          value={requisitionCount} 
+          color="green" 
+          link="/dashboard/requisitions" 
+        />
+        <StatCard 
+          icon={CheckSquare} 
+          title="Tasks" 
+          value={taskCount} 
+          color="yellow" 
+          link="/dashboard/tasks" 
+        />
+        <StatCard 
+          icon={Calendar} 
+          title="Leaves" 
+          value={stats.leaves} 
+          color="purple" 
+          link="/dashboard/leaves" 
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Activities */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-light text-gray-800">Recent Activities</h2>
+              <div className="flex space-x-1">
+                <button 
+                  onClick={() => setActiveTab('all')}
+                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'all' ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  All
+                </button>
+                <button 
+                  onClick={() => setActiveTab('pending')}
+                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  Pending
+                </button>
+                <button 
+                  onClick={() => setActiveTab('completed')}
+                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'completed' ? 'bg-green-100 text-green-800' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  Completed
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
             {recentActivities.length > 0 ? (
-              recentActivities.map(activity => (
-                <div key={activity.id} className="flex items-start pb-4 border-b border-gray-100 last:border-0 last:pb-0">
-                  <div className="flex-shrink-0 mt-1">
-                    {activity.type === 'Memo' && (
-                      <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                    )}
-                    {activity.type === 'Requisition' && (
-                      <div className="h-8 w-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                      </div>
-                    )}
-                    {activity.type === 'Task' && (
-                      <div className="h-8 w-8 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                        </svg>
-                      </div>
-                    )}
-                    {activity.type === 'Leave' && (
-                      <div className="h-8 w-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  <div className="ml-3 flex-1">
-                    <p className="text-sm font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-sm text-gray-500">{activity.type} • {activity.time}</p>
-                  </div>
-                </div>
-              ))
+              recentActivities
+                .filter(activity => {
+                  if (activeTab === 'all') return true;
+                  if (activeTab === 'pending') return activity.status === 'pending';
+                  if (activeTab === 'completed') return activity.status === 'completed';
+                  return true;
+                })
+                .map(activity => (
+                  <ActivityItem key={activity.id} activity={activity} />
+                ))
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <p>No recent activities found</p>
+              <div className="text-center py-12">
+                <Clock className="mx-auto h-12 w-12 text-gray-300" />
+                <h3 className="mt-2 text-sm font-medium text-gray-500">No activities found</h3>
+                <p className="mt-1 text-xs text-gray-400">Your activities will appear here</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-          <div className="space-y-3">
-            <Link
-              to="/dashboard/memos/new"
-              className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
-            >
-              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Create New Memo</p>
-              </div>
-            </Link>
-            <Link
-              to="requisitions/new"
-              className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
-            >
-              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Create New Requisition</p>
-              </div>
-            </Link>
-            <Link
-              to="/dashboard/leaves/new"
-              className="flex items-center p-3 border border-gray-200 rounded-md hover:bg-gray-50"
-            >
-              <div className="flex-shrink-0 h-8 w-8 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">Request Leave</p>
-              </div>
-            </Link>
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <h2 className="text-xl font-light text-gray-800 mb-6">Quick Actions</h2>
+          <div className="space-y-4">
+            <QuickAction
+              icon={Plus}
+              title="Create New Memo"
+              description="Send a memo to your team"
+              link="/dashboard/memos/new"
+              color="blue"
+            />
+            <QuickAction
+              icon={Plus}
+              title="Create Requisition"
+              description="Request new items or services"
+              link="/dashboard/requisitions/new"
+              color="green"
+            />
+            <QuickAction
+              icon={Plus}
+              title="Request Leave"
+              description="Submit a leave application"
+              link="/dashboard/leaves/new"
+              color="purple"
+            />
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;
