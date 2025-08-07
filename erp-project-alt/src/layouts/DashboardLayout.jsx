@@ -3,12 +3,12 @@ import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import logo from '../assets/pgl_logo.png'
 import { 
-  FiHome, FiFileText, FiShoppingCart, FiCalendar, 
-  FiFolder, FiUsers, FiCheckSquare, FiDollarSign,
-  FiMenu, FiX, FiChevronLeft, FiChevronRight,
-  FiSearch, FiBell, FiChevronDown, FiLogOut,
-  FiUser, FiClock
-} from 'react-icons/fi'
+  Home, FileText, ShoppingCart, Calendar, 
+  Folder, Users, CheckSquare, DollarSign,
+  Menu, X, ChevronLeft, ChevronRight,
+  Search, Bell, ChevronDown, LogOut,
+  User, Clock
+} from 'lucide-react'
 
 const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
@@ -110,9 +110,9 @@ const DashboardLayout = () => {
             className="text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
           >
             {sidebarOpen ? (
-              <FiChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-6 w-6" />
             ) : (
-              <FiChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-6 w-6" />
             )}
           </button>
         </div>
@@ -125,7 +125,7 @@ const DashboardLayout = () => {
                 onClick={closeSidebar}
                 className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <FiHome className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                <Home className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
                   <span className="ml-3">Dashboard</span>
                 )}
@@ -137,7 +137,7 @@ const DashboardLayout = () => {
                 onClick={closeSidebar}
                 className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <FiFileText className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                <FileText className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
                   <span className="ml-3">Memos</span>
                 )}
@@ -149,7 +149,7 @@ const DashboardLayout = () => {
                 onClick={closeSidebar}
                 className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <FiShoppingCart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                <ShoppingCart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
                   <span className="ml-3">Requisitions</span>
                 )}
@@ -162,7 +162,7 @@ const DashboardLayout = () => {
                   onClick={closeSidebar}
                   className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <FiCheckSquare className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  <CheckSquare className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                   {(sidebarOpen || window.innerWidth < 1024) && (
                     <span className="ml-3">Tasks</span>
                   )}
@@ -176,7 +176,7 @@ const DashboardLayout = () => {
                   onClick={closeSidebar}
                   className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <FiUsers className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  <Users className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                   {(sidebarOpen || window.innerWidth < 1024) && (
                     <span className="ml-3">Users</span>
                   )}
@@ -189,7 +189,7 @@ const DashboardLayout = () => {
                 onClick={closeSidebar}
                 className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <FiCalendar className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                <Calendar className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
                   <span className="ml-3">Leaves</span>
                 )}
@@ -201,7 +201,7 @@ const DashboardLayout = () => {
                 onClick={closeSidebar}
                 className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
               >
-                <FiFolder className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                <Folder className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
                   <span className="ml-3">Files</span>
                 )}
@@ -214,7 +214,7 @@ const DashboardLayout = () => {
                   onClick={closeSidebar}
                   className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
                 >
-                  <FiDollarSign className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  <DollarSign className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                   {(sidebarOpen || window.innerWidth < 1024) && (
                     <span className="ml-3">Payroll</span>
                   )}
@@ -242,14 +242,14 @@ const DashboardLayout = () => {
               onClick={toggleSidebar}
               className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
             >
-              <FiMenu className="h-5 w-5" />
+              <Menu className="h-5 w-5" />
             </button>
 
             {/* Search bar */}
             <div className="flex items-center flex-1 max-w-md mx-4">
               <div className="relative w-full">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="h-5 w-5 text-gray-400" />
+                  <Search className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
@@ -264,7 +264,7 @@ const DashboardLayout = () => {
             {/* Right side items */}
             <div className="flex items-center space-x-4">
               <button className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors relative">
-                <FiBell className="h-5 w-5" />
+                <Bell className="h-5 w-5" />
                 <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
               </button>
               
@@ -285,7 +285,7 @@ const DashboardLayout = () => {
                       {user?.role || 'Role'}
                     </p>
                   </div>
-                  <FiChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? 'transform rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? 'transform rotate-180' : ''}`} />
                 </button>
                 
                 {/* Dropdown menu */}
@@ -301,14 +301,14 @@ const DashboardLayout = () => {
                         onClick={() => setProfileDropdownOpen(false)}
                         className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                       >
-                        <FiUser className="h-4 w-4 mr-3" />
+                        <User className="h-4 w-4 mr-3" />
                         Your Profile
                       </Link>
                       <button 
                         onClick={handleLogout} 
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                       >
-                        <FiLogOut className="h-4 w-4 mr-3" />
+                        <LogOut className="h-4 w-4 mr-3" />
                         Sign out
                       </button>
                     </div>

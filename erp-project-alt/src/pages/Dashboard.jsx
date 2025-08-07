@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import axios from 'axios';
 import {
-  FiFileText, FiShoppingCart, FiCheckSquare, FiCalendar,
-  FiPlus, FiClock, FiUser, FiAlertTriangle,
-  FiHome, FiBell, FiActivity, FiArrowRight
-} from 'react-icons/fi';
+  FileText, ShoppingCart, CheckSquare, Calendar,
+  Plus, Clock, User, AlertTriangle,
+  Home, Bell, Activity, ArrowRight
+} from 'lucide-react';
 
 const Dashboard = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -131,7 +131,7 @@ const Dashboard = () => {
         <div className="bg-red-50 border-l-4 border-red-500 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <FiAlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertTriangle className="h-5 w-5 text-red-500" />
             </div>
             <div className="ml-3">
               <p className="text-sm text-red-700">{error}</p>
@@ -149,14 +149,17 @@ const Dashboard = () => {
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{title}</p>
           <p className="text-3xl font-light mt-1">{value}</p>
         </div>
-        <div className={`p-3 rounded-full ${color}-50 text-${color}-600`}>
+        <div className={`p-3 rounded-full ${color === 'blue' ? 'bg-blue-50 text-blue-600' : 
+          color === 'green' ? 'bg-green-50 text-green-600' :
+          color === 'yellow' ? 'bg-yellow-50 text-yellow-600' :
+          color === 'purple' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-600'}`}>
           <Icon className="h-6 w-6" />
         </div>
       </div>
       <div className="mt-6">
         <span className="text-sm font-medium text-primary hover:text-primary-dark flex items-center transition-colors">
           View all
-          <FiArrowRight className="ml-1 h-4 w-4" />
+          <ArrowRight className="ml-1 h-4 w-4" />
         </span>
       </div>
     </Link>
@@ -165,11 +168,11 @@ const Dashboard = () => {
   const ActivityItem = ({ activity }) => {
     const getIcon = () => {
       switch(activity.type) {
-        case 'Memo': return <FiFileText className="h-5 w-5 text-blue-600" />;
-        case 'Requisition': return <FiShoppingCart className="h-5 w-5 text-green-600" />;
-        case 'Task': return <FiCheckSquare className="h-5 w-5 text-yellow-600" />;
-        case 'Leave': return <FiCalendar className="h-5 w-5 text-purple-600" />;
-        default: return <FiActivity className="h-5 w-5 text-gray-600" />;
+        case 'Memo': return <FileText className="h-5 w-5 text-blue-600" />;
+        case 'Requisition': return <ShoppingCart className="h-5 w-5 text-green-600" />;
+        case 'Task': return <CheckSquare className="h-5 w-5 text-yellow-600" />;
+        case 'Leave': return <Calendar className="h-5 w-5 text-purple-600" />;
+        default: return <Activity className="h-5 w-5 text-gray-600" />;
       }
     };
 
@@ -185,7 +188,7 @@ const Dashboard = () => {
           <div className="flex items-center mt-1 text-xs text-gray-500">
             <span className="capitalize">{activity.type.toLowerCase()}</span>
             <span className="mx-2">•</span>
-            <FiClock className="mr-1 h-3 w-3" />
+            <Clock className="mr-1 h-3 w-3" />
             <span>{activity.time}</span>
           </div>
         </div>
@@ -198,7 +201,11 @@ const Dashboard = () => {
       to={link}
       className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
     >
-      <div className={`flex-shrink-0 h-10 w-10 rounded-full ${color}-50 flex items-center justify-center text-${color}-600 group-hover:bg-${color}-100 transition-colors`}>
+      <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform ${
+        color === 'blue' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' :
+        color === 'green' ? 'bg-green-50 text-green-600 group-hover:bg-green-100' :
+        color === 'purple' ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-100' : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
+      }`}>
         <Icon className="h-5 w-5" />
       </div>
       <div className="ml-4">
@@ -222,28 +229,28 @@ const Dashboard = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          icon={FiFileText} 
+          icon={FileText} 
           title="Memos" 
           value={memoCount} 
           color="blue" 
           link="/dashboard/memos" 
         />
         <StatCard 
-          icon={FiShoppingCart} 
+          icon={ShoppingCart} 
           title="Requisitions" 
           value={requisitionCount} 
           color="green" 
           link="/dashboard/requisitions" 
         />
         <StatCard 
-          icon={FiCheckSquare} 
+          icon={CheckSquare} 
           title="Tasks" 
           value={taskCount} 
           color="yellow" 
           link="/dashboard/tasks" 
         />
         <StatCard 
-          icon={FiCalendar} 
+          icon={Calendar} 
           title="Leaves" 
           value={stats.leaves} 
           color="purple" 
@@ -294,7 +301,7 @@ const Dashboard = () => {
                 ))
             ) : (
               <div className="text-center py-12">
-                <FiClock className="mx-auto h-12 w-12 text-gray-300" />
+                <Clock className="mx-auto h-12 w-12 text-gray-300" />
                 <h3 className="mt-2 text-sm font-medium text-gray-500">No activities found</h3>
                 <p className="mt-1 text-xs text-gray-400">Your activities will appear here</p>
               </div>
@@ -307,21 +314,21 @@ const Dashboard = () => {
           <h2 className="text-xl font-light text-gray-800 mb-6">Quick Actions</h2>
           <div className="space-y-4">
             <QuickAction
-              icon={FiPlus}
+              icon={Plus}
               title="Create New Memo"
               description="Send a memo to your team"
               link="/dashboard/memos/new"
               color="blue"
             />
             <QuickAction
-              icon={FiPlus}
+              icon={Plus}
               title="Create Requisition"
               description="Request new items or services"
               link="/dashboard/requisitions/new"
               color="green"
             />
             <QuickAction
-              icon={FiPlus}
+              icon={Plus}
               title="Request Leave"
               description="Submit a leave application"
               link="/dashboard/leaves/new"
