@@ -1,677 +1,437 @@
 const express = require('express');
 const router = express.Router();
-const multer = require('multer');
-const path = require('path');
 const db = require('../db');
-const fs = require('fs');
 
-
-// Multer setup: store files in 'uploads' folder, keep original filename
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    // Add timestamp to avoid name clashes
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage: storage });
-
-
-
-router.post('/requisitions', upload.single('attachment'), async (req, res) => {
+// Create new requisition
+router.post('/requisitions', async (req, res) => {
   try {
     const {
       title,
       description,
-      items,
-      quantity,
-      unit_price,
-      created_by
+      priority = 'medium',
+      created_by,
+      items = [],
+      total_amount
     } = req.body;
 
-    // Validate required fields
-    if (!title || !items || !quantity || !unit_price || !created_by) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Validate items
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'At least one item is required' });
     }
 
-    // Parse the items JSON string
-    let parsedItems;
-    try {
-      parsedItems = JSON.parse(items);
-    } catch (err) {
-      return res.status(400).json({ error: 'Invalid items format' });
+    // Get sender info
+    const [[user]] = await db.query(
+      'SELECT role, department FROM users WHERE id = ?',
+      [created_by]
+    );
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid user ID' });
     }
 
-    // Format items as a detailed string
-    const itemsString = parsedItems.map(item => {
-      return `${item.name} (Qty: ${item.quantity}, Price: ${item.unitPrice})`;
-    }).join('; ');
+    const sender_role = user.role;
+    const sender_department = user.department;
 
-    // Attachment details
-    const attachmentPath = req.file ? req.file.path : null;
-    const attachmentType = req.file ? path.extname(req.file.originalname).substring(1) : null;
+    // Insert requisition
+    const [result] = await db.execute(
+      `INSERT INTO requisitions 
+        (title, description, priority, created_by, sender_role, sender_department, total_amount, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        title,
+        description,
+        priority,
+        created_by,
+        sender_role,
+        sender_department,
+        total_amount,
+        'submitted'
+      ]
+    );
 
-    // Insert into DB
-    const sql = `
-      INSERT INTO requisitions 
-        (title, description, items, quantity, unit_price, attachment, attachment_type, created_by) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    const requisitionId = result.insertId;
 
-    const [result] = await db.query(sql, [
-      title,
-      description,
-      itemsString, // Save the human-readable version
-      quantity,
-      unit_price,
-      attachmentPath,
-      attachmentType,
-      created_by
-    ]);
+    // Insert items
+    for (const item of items) {
+      await db.execute(
+        `INSERT INTO requisition_items 
+          (requisition_id, name, quantity, unit_price, total_price) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          requisitionId,
+          item.name,
+          item.quantity,
+          item.unit_price,
+          item.quantity * item.unit_price
+        ]
+      );
+    }
 
-    return res.status(201).json({
-      message: 'Requisition created successfully',
-      requisitionId: result.insertId
+    res.status(201).json({ 
+      message: 'Requisition created successfully', 
+      requisition_id: requisitionId 
     });
 
   } catch (err) {
-    console.error('Error inserting requisition:', err);
-    return res.status(500).json({ error: 'Failed to create requisition', details: err.message });
+    console.error('❌ Error creating requisition:', err.message);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
-// router.post('/requisitions/:id/approve', async (req, res) => {
-//   try {
-//     const requisitionId = req.params.id;
-//     const { user_id } = req.body;
+// Get all requisitions for a user based on role
+router.get('/requisitions/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  let { role, status } = req.query;
 
-//     if (!user_id) {
-//       return res.status(400).json({ message: 'User ID is required for approval.' });
-//     }
+  const approvalRoles = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
 
-//     // Define role-to-approval field mapping
-//     const roleApprovalMap = {
-//       manager:   { field: 'approval_manager',   dependsOn: null,                  departmentMatch: true },
-//       executive: { field: 'approval_executive', dependsOn: 'approval_manager',   departmentMatch: true },
-//       finance:   { field: 'approval_finance',   dependsOn: 'approval_executive' },
-//       gmd:       { field: 'approval_gmd',       dependsOn: 'approval_finance' },
-//       chairman:  { field: 'approval_chairman',  dependsOn: 'approval_gmd' }
-//     };
-
-//     // Get user role and department
-//     const [userResults] = await db.query('SELECT role, department FROM users WHERE id = ?', [user_id]);
-//     if (userResults.length === 0) {
-//       return res.status(404).json({ message: 'User not found' });
-//     }
-
-//     const { role, department: userDept } = userResults[0];
-
-//     // Ensure user has a valid approval role
-//     if (!roleApprovalMap[role]) {
-//       return res.status(403).json({ message: 'User role is not authorized to approve' });
-//     }
-
-//     // Get requisition and approval fields
-//     const [requisitionResults] = await db.query(
-//       'SELECT created_by, approval_manager, approval_executive, approval_finance, approval_gmd, approval_chairman FROM requisitions WHERE id = ?',
-//       [requisitionId]
-//     );
-
-//     if (requisitionResults.length === 0) {
-//       return res.status(404).json({ message: 'Requisition not found' });
-//     }
-
-//     const requisition = requisitionResults[0];
-
-//     // Get sender department
-//     const [senderResults] = await db.query('SELECT department FROM users WHERE id = ?', [requisition.created_by]);
-//     if (senderResults.length === 0) {
-//       return res.status(404).json({ message: 'Sender user not found' });
-//     }
-
-//     const senderDept = senderResults[0].department;
-
-//     // Special case: GMD approval only once
-//     if (role === 'gmd') {
-//       if (requisition.approval_gmd === 'approved') {
-//         return res.status(400).json({ message: 'Already approved by GMD' });
-//       }
-
-//       if (requisition.approval_finance !== 'approved') {
-//         return res.status(403).json({ message: 'Cannot approve yet. Waiting for finance approval.' });
-//       }
-
-//       await db.query('UPDATE requisitions SET approval_gmd = "approved" WHERE id = ?', [requisitionId]);
-//       return res.status(200).json({ message: 'Approved by GMD', field: 'approval_gmd' });
-//     }
-
-//     // Standard flow
-//     const { field, dependsOn, departmentMatch } = roleApprovalMap[role];
-
-//     if (requisition[field] === 'approved') {
-//       return res.status(400).json({ message: `Already approved by ${role}` });
-//     }
-
-//     if (dependsOn && requisition[dependsOn] !== 'approved') {
-//       return res.status(403).json({ message: `Cannot approve yet. Waiting for ${dependsOn.replace('approval_', '')} approval.` });
-//     }
-
-//     if (departmentMatch && userDept !== senderDept) {
-//       return res.status(403).json({ message: `Approval denied. ${role} must be from the same department as the requisition sender.` });
-//     }
-
-//     await db.query(`UPDATE requisitions SET ${field} = 'approved' WHERE id = ?`, [requisitionId]);
-//     return res.status(200).json({ message: `Approved by ${role}`, field });
-
-//   } catch (err) {
-//     console.error('Error in approval process:', err);
-//     return res.status(500).json({ message: 'Error updating approval status' });
-//   }
-// });
-
-
-
-// router.get('/requisitions/user/:userId', async (req, res) => {
-//   try {
-//     const { userId } = req.params;
-
-//     // 1. Get user info
-//     const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-
-//     if (userRows.length === 0) {
-//       return res.status(404).json({ success: false, message: 'User not found' });
-//     }
-
-//     const user = userRows[0];
-//     const role = user.role.toLowerCase(); // Normalize
-//     const department = user.department;   // Assuming user table has this field
-
-//     let query = '';
-//     let queryParams = [];
-
-//     switch (role) {
-//       case 'manager':
-//         query = `
-//           SELECT r.* FROM requisitions r
-//           JOIN users u ON r.created_by = u.id
-//           WHERE r.approval_manager = 'pending' AND u.department = ?
-//         `;
-//         queryParams = [department];
-//         break;
-
-//       case 'executive':
-//         query = `
-//           SELECT r.* FROM requisitions r
-//           JOIN users u ON r.created_by = u.id
-//           WHERE r.approval_executive = 'pending' AND u.department = ?
-//         `;
-//         queryParams = [department];
-//         break;
-
-//       case 'finance':
-//         query = `SELECT * FROM requisitions WHERE approval_finance = 'pending'`;
-//         break;
-
-//       case 'gmd':
-//         query = `SELECT * FROM requisitions WHERE approval_gmd = 'pending'`;
-//         break;
-
-//       case 'chairman':
-//         query = `SELECT * FROM requisitions WHERE approval_chairman = 'pending'`;
-//         break;
-
-//       default:
-//         query = `SELECT * FROM requisitions WHERE created_by = ?`;
-//         queryParams = [userId];
-//         break;
-//     }
-
-//     const [requisitions] = await db.query(query, queryParams);
-
-//     res.json({ success: true, data: requisitions });
-//   } catch (err) {
-//     console.error('Error fetching requisitions:', err);
-//     res.status(500).json({ success: false, message: 'Internal server error' });
-//   }
-// });
-
-//this is for the count loginc
-
-
-
-router.post('/requisitions/:id/approve', async (req, res) => {
   try {
-    const requisitionId = req.params.id;
-    const { user_id } = req.body;
+    // Get user's department and actual role from DB
+    const [userRows] = await db.query(
+      `SELECT department, role FROM users WHERE id = ?`, 
+      [userId]
+    );
 
-    if (!user_id) {
-      return res.status(400).json({ message: 'User ID is required for approval.' });
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const roleApprovalMap = {
-      manager:   { field: 'approval_manager',   dependsOn: null,                  departmentMatch: true },
-      executive: { field: 'approval_executive', dependsOn: 'approval_manager',   departmentMatch: true },
-      finance:   { field: 'approval_finance',   dependsOn: null },
-      gmd:       { field: 'approval_gmd',       dependsOn: 'approval_finance' },
-      chairman:  { field: 'approval_chairman',  dependsOn: 'approval_gmd' }
+    const { department, role: actualRole } = userRows[0];
+    const userRole = actualRole.toLowerCase();
+
+    // Normalize role from query
+    let normalizedRole = role?.toLowerCase();
+
+    // OVERRIDE role if dept ≠ ICT and actual role is finance
+    if (department.toLowerCase() !== 'ict' && userRole === 'finance') {
+      normalizedRole = 'finance';
+    }
+
+    // Base query parts
+    const baseSelect = `
+      SELECT 
+        r.*, 
+        u.role AS sender_role, 
+        u.department AS sender_department,
+        r.approved_by_manager AS manager_approved,
+        r.approved_by_executive AS executive_approved,
+        r.approved_by_finance AS finance_approved,
+        r.approved_by_gmd AS gmd_approved,
+        r.approved_by_chairman AS chairman_approved
+      FROM requisitions r
+      JOIN users u ON r.created_by = u.id
+    `;
+
+    let query = '';
+    let values = [];
+
+    // If no role specified or role is not an approval role, just get user's own requisitions
+    if (!normalizedRole || !approvalRoles.includes(normalizedRole)) {
+      let statusCondition = '';
+      if (status === 'approved') {
+        statusCondition = 'AND (r.approved_by_manager = 1 OR r.approved_by_executive = 1 OR r.approved_by_finance = 1 OR r.approved_by_gmd = 1 OR r.approved_by_chairman = 1)';
+      } else if (status === 'pending') {
+        statusCondition = 'AND (r.approved_by_manager IS NULL OR r.approved_by_executive IS NULL OR r.approved_by_finance IS NULL OR r.approved_by_gmd IS NULL OR r.approved_by_chairman IS NULL)';
+      }
+
+      query = `
+        ${baseSelect}
+        WHERE r.created_by = ?
+        ${statusCondition}
+        ORDER BY r.created_at DESC
+      `;
+      values = [userId];
+    } else {
+      // For approvers, get requisitions they need to approve + requisitions they've approved + their own requisitions
+      const approvalField = `approved_by_${normalizedRole}`;
+      const noDeptRoles = ['finance', 'gmd', 'chairman'];
+
+      // Status conditions
+      let pendingCondition = '';
+      let approvedCondition = '';
+      
+      if (status === 'pending') {
+        pendingCondition = `AND ${approvalField} IS NULL`;
+      } else if (status === 'approved') {
+        approvedCondition = `AND ${approvalField} = 1`;
+      }
+
+      if (noDeptRoles.includes(normalizedRole)) {
+        // For roles without department restrictions (finance, gmd, chairman)
+        query = `
+          ${baseSelect}
+          WHERE (
+            r.created_by = ?
+            OR (
+              ${approvalField} IS NULL
+              ${pendingCondition}
+              ${approvedCondition}
+              ${normalizedRole === 'chairman' ? 'AND approved_by_gmd = 1' : ''}
+            )
+            OR ${approvalField} = 1  /* Requisitions this role has already approved */
+          )
+          ORDER BY r.created_at DESC
+        `;
+        values = [userId];
+      } else {
+        // For department-restricted roles (manager, executive)
+        query = `
+          ${baseSelect}
+          WHERE (
+            r.created_by = ?
+            OR (
+              ${approvalField} IS NULL
+              AND u.department = ?
+              ${pendingCondition}
+              ${approvedCondition}
+            )
+            OR ${approvalField} = 1  /* Requisitions this role has already approved */
+          )
+          ORDER BY r.created_at DESC
+        `;
+        values = [userId, department];
+      }
+    }
+
+    const [rows] = await db.query(query, values);
+
+    // Get items for each requisition
+    for (const row of rows) {
+      const [items] = await db.query(
+        'SELECT name, quantity, unit_price, total_price FROM requisition_items WHERE requisition_id = ?',
+        [row.id]
+      );
+      row.items = items || [];
+      
+      // Add overall approval status
+      row.approval_status = 'pending';
+      if (row.approved_by_chairman) {
+        row.approval_status = 'fully_approved';
+      } else if (row.approved_by_gmd) {
+        row.approval_status = 'pending_chairman';
+      } else if (row.approved_by_finance) {
+        row.approval_status = 'pending_gmd';
+      } else if (row.approved_by_executive) {
+        row.approval_status = 'pending_finance';
+      } else if (row.approved_by_manager) {
+        row.approval_status = 'pending_executive';
+      }
+    }
+
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('❌ Error fetching requisitions for user and role:', error);
+    res.status(500).json({ message: 'Server error while fetching user requisitions' });
+  }
+});
+
+// Approve requisition
+router.post('/requisitions/:id/approve', async (req, res) => {
+  const requisitionId = req.params.id;
+  const { user_id, role, department } = req.body;
+
+  try {
+    // 1. Fetch requisition with creator details
+    const [requisitions] = await db.query(`
+      SELECT r.*, u.department as sender_department, u.role as sender_role
+      FROM requisitions r
+      JOIN users u ON r.created_by = u.id
+      WHERE r.id = ?
+    `, [requisitionId]);
+
+    if (requisitions.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Requisition not found',
+        details: `No requisition found with ID: ${requisitionId}`
+      });
+    }
+
+    const requisition = requisitions[0];
+    const isICTDepartment = requisition.sender_department?.toLowerCase() === 'ict';
+    const isFinanceDepartment = requisition.sender_department?.toLowerCase() === 'finance';
+
+    // 2. Define approval rules
+    const approvalRules = {
+      manager: {
+        field: 'approved_by_manager',
+        dependsOn: null,
+        allowed: !isFinanceDepartment,
+        message: isFinanceDepartment 
+          ? 'Finance requisitions skip manager approval' 
+          : 'Manager approval required'
+      },
+      executive: {
+        field: 'approved_by_executive',
+        dependsOn: 'approved_by_manager',
+        allowed: !isFinanceDepartment,
+        message: isFinanceDepartment
+          ? 'Finance requisitions skip executive approval'
+          : 'Executive approval requires manager approval first'
+      },
+      finance: {
+        field: 'approved_by_finance',
+        dependsOn: isICTDepartment ? 'approved_by_manager' : 
+                  isFinanceDepartment ? null : 'approved_by_executive',
+        allowed: true,
+        message: 'Finance approval processed'
+      },
+      gmd: {
+        field: 'approved_by_gmd',
+        dependsOn: isFinanceDepartment ? 'approved_by_finance' : 'approved_by_executive',
+        allowed: true,
+        message: 'GMD approval required'
+      },
+      chairman: {
+        field: 'approved_by_chairman',
+        dependsOn: 'approved_by_gmd',
+        allowed: true,
+        message: 'Chairman approval requires GMD approval first'
+      }
     };
 
-    const [userResults] = await db.query('SELECT role, department FROM users WHERE id = ?', [user_id]);
-    if (userResults.length === 0) return res.status(404).json({ message: 'User not found' });
-
-    const { role, department: userDept } = userResults[0];
-    if (!roleApprovalMap[role]) {
-      return res.status(403).json({ message: 'User role is not authorized to approve' });
+    // 3. Validate approval attempt
+    if (!approvalRules[role]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid approval role',
+        details: `Role ${role} cannot approve requisitions`
+      });
     }
 
-    const [requisitionResults] = await db.query(
-      `SELECT created_by, approval_manager, approval_executive, approval_finance, approval_gmd, approval_chairman 
-       FROM requisitions WHERE id = ?`, [requisitionId]);
+    const { field, dependsOn, allowed, message } = approvalRules[role];
 
-    if (requisitionResults.length === 0) return res.status(404).json({ message: 'Requisition not found' });
-    const requisition = requisitionResults[0];
-
-    const [senderResults] = await db.query('SELECT department FROM users WHERE id = ?', [requisition.created_by]);
-    if (senderResults.length === 0) return res.status(404).json({ message: 'Sender user not found' });
-
-    const senderDept = senderResults[0].department;
-    const isICT = senderDept.toLowerCase() === 'ict';
-
-    const { field, dependsOn, departmentMatch } = roleApprovalMap[role];
-
-    if (requisition[field] === 'approved') {
-      return res.status(400).json({ message: `Already approved by ${role}` });
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: 'Approval not permitted',
+        details: message
+      });
     }
 
-    // Approval Logic: Dynamic Based on Sender Department
-    if (isICT) {
-      // ICT flow (full approval chain)
-      if (dependsOn && requisition[dependsOn] !== 'approved') {
-        return res.status(403).json({
-          message: `Cannot approve yet. Waiting for ${dependsOn.replace('approval_', '')} approval.`,
-        });
-      }
-
-      if (departmentMatch && userDept !== senderDept) {
-        return res.status(403).json({
-          message: `Approval denied. ${role} must be from the same department as the requisition sender.`,
-        });
-      }
-    } else {
-      // Non-ICT: Only allow Finance → GMD → Chairman
-      const allowedNonICTRoles = ['finance', 'gmd', 'chairman'];
-      if (!allowedNonICTRoles.includes(role)) {
-        return res.status(403).json({ message: 'Only Finance, GMD, or Chairman can approve non-ICT requisitions.' });
-      }
-
-      if (role === 'gmd' && requisition.approval_finance !== 'approved') {
-        return res.status(403).json({ message: 'GMD must wait for Finance approval.' });
-      }
-
-      if (role === 'chairman' && requisition.approval_gmd !== 'approved') {
-        return res.status(403).json({ message: 'Chairman must wait for GMD approval.' });
-      }
+    // 4. Check dependency
+    if (dependsOn && requisition[dependsOn] !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: 'Dependency not satisfied',
+        details: `Requires ${dependsOn.replace('approved_by_', '')} approval first`
+      });
     }
 
-    await db.query(`UPDATE requisitions SET ${field} = 'approved' WHERE id = ?`, [requisitionId]);
-    return res.status(200).json({ message: `Approved by ${role}`, field });
+    // 5. Update approval status
+    await db.query(`
+      UPDATE requisitions 
+      SET ${field} = 1,
+          status = CASE
+            WHEN ? = 'chairman' THEN 'approved'
+            WHEN ? = 'gmd' THEN 'pending_chairman'
+            WHEN ? = 'finance' AND sender_department = 'finance' THEN 'pending_gmd'
+            WHEN ? = 'executive' THEN 'pending_finance'
+            WHEN ? = 'manager' THEN 'pending_executive'
+            ELSE 'in_review'
+          END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [role, role, role, role, role, requisitionId]);
+
+    // 6. Determine next approver
+    const nextApprover = getNextApprover(role, isFinanceDepartment);
+
+    return res.status(200).json({
+      success: true,
+      message: `${role} approval successful`,
+      updatedField: field,
+      requisitionStatus: getUpdatedStatus(role, isFinanceDepartment),
+      nextApprover,
+      approvalFlow: getApprovalFlow(isFinanceDepartment)
+    });
 
   } catch (err) {
-    console.error('Error in approval process:', err);
-    return res.status(500).json({ message: 'Error updating approval status' });
+    console.error('Approval error:', err);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error',
+      error: err.message
+    });
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-router.get('/requisitions/user/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-
-    if (userRows.length === 0) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    const user = userRows[0];
-    const role = user.role.toLowerCase();
-    const department = user.department;
-
-    let query = '';
-    let queryParams = [];
-
-    switch (role) {
-      case 'manager':
-        query = `
-          SELECT r.* FROM requisitions r
-          JOIN users u ON r.created_by = u.id
-          WHERE r.approval_manager = 'pending' AND u.department = ?
-        `;
-        queryParams = [department];
-        break;
-
-      case 'executive':
-        query = `
-          SELECT r.* FROM requisitions r
-          JOIN users u ON r.created_by = u.id
-          WHERE r.approval_executive = 'pending' AND u.department = ?
-        `;
-        queryParams = [department];
-        break;
-
-      case 'finance':
-        query = `
-          SELECT * FROM requisitions 
-          WHERE approval_finance = 'pending'
-        `;
-        break;
-
-      case 'gmd':
-        query = `SELECT * FROM requisitions WHERE approval_gmd = 'pending'`;
-        break;
-
-      case 'chairman':
-        query = `SELECT * FROM requisitions WHERE approval_chairman = 'pending'`;
-        break;
-
-      default:
-        query = `SELECT * FROM requisitions WHERE created_by = ?`;
-        queryParams = [userId];
-        break;
-    }
-
-    const [requisitions] = await db.query(query, queryParams);
-    console.log("Requisitions returned:", requisitions.map(r => ({
-      id: r.id,
-      department: r.sender_department,
-      approval: r.approval_finance
-    })));
-    res.json({ success: true, data: requisitions });
-
-  } catch (err) {
-    console.error('Error fetching requisitions:', err);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
-
-
-
-
-
-router.get('/requisitions/count/user/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    // Get user info
-    const [userRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-    if (userRows.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const user = userRows[0];
-    const role = user.role.toLowerCase();
-    const department = user.department;
-
-    let query = '';
-    let params = [];
-
-    if (role === 'manager') {
-      query = `
-        SELECT COUNT(*) AS count
-        FROM requisitions r
-        JOIN users u ON r.created_by = u.id
-        WHERE u.department = ? 
-        AND r.approval_manager = 'pending'
-        AND r.status = 'pending'
-      `;
-      params = [department];
-    } 
-    else if (role === 'executive') {
-      query = `
-        SELECT COUNT(*) AS count
-        FROM requisitions r
-        JOIN users u ON r.created_by = u.id
-        WHERE u.department = ? 
-        AND r.approval_executive = 'pending'
-        AND r.status = 'pending'
-      `;
-      params = [department];
-    }
-    else if (['finance', 'gmd', 'chairman'].includes(role)) {
-      const approvalField = `approval_${role}`;
-      query = `
-        SELECT COUNT(*) AS count
-        FROM requisitions
-        WHERE ${approvalField} = 'pending'
-        AND status = 'pending'
-      `;
-    }
-    else {
-      // Regular user (staff/hr)
-      query = `
-        SELECT COUNT(*) AS count 
-        FROM requisitions 
-        WHERE created_by = ?
-        AND status = 'pending'
-      `;
-      params = [userId];
-    }
-
-    const [rows] = await db.query(query, params);
-    const count = rows[0]?.count || 0;
-
-    res.json({ count });
-
-  } catch (err) {
-    console.error('Error fetching requisition count:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
-  }
-});
-
-
-
-
-
-
+// Reject requisition
 router.post('/requisitions/:id/reject', async (req, res) => {
   try {
     const requisitionId = req.params.id;
-    const { user_id } = req.body;
+    const { userId } = req.body;
 
-    if (!user_id) {
-      return res.status(400).json({ message: 'User ID is required for rejection.' });
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required to reject requisition' });
     }
 
-    // Map roles to rejection fields and dependencies (similar to approval)
-    const roleRejectionMap = {
-      gmd: { field: 'rejected_by_gmd', dependsOn: null },
-      finance: { field: 'rejected_by_finance', dependsOn: 'approved_by_gmd' },
-      gmd2: { field: 'rejected_by_gmd2', dependsOn: 'approved_by_finance' },
-      chairman: { field: 'rejected_by_chairman', dependsOn: 'approved_by_gmd2' }
-    };
-
-    // Get user role
-    const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
-
+    const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
     if (userResults.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const role = userResults[0].role;
+    const role = userResults[0].role?.toLowerCase();
 
-    if (!roleRejectionMap[role]) {
-      return res.status(403).json({ message: 'User role is not authorized to reject' });
+    const roleFieldMap = {
+      manager: 'approved_by_manager',
+      executive: 'approved_by_executive',
+      finance: 'approved_by_finance',
+      gmd: 'approved_by_gmd',
+      chairman: 'approved_by_chairman',
+    };
+
+    const field = roleFieldMap[role];
+
+    if (!field) {
+      return res.status(403).json({ message: 'User role not authorized to reject requisitions' });
     }
 
-    const { field, dependsOn } = roleRejectionMap[role];
-
-    // Check if requisition exists and current approval/rejection status
-    let selectFields = `${field}`;
-    if (dependsOn) selectFields += `, ${dependsOn}`;
-    const [reqResults] = await db.query(`SELECT ${selectFields}, status FROM requisitions WHERE id = ?`, [requisitionId]);
-
-    if (reqResults.length === 0) {
-      return res.status(404).json({ message: 'Requisition not found' });
-    }
-
-    const requisition = reqResults[0];
-
-    if (requisition[field] === 1) {
-      return res.status(400).json({ message: `Already rejected by ${role}` });
-    }
-
-    if (requisition.status === 'rejected') {
-      return res.status(400).json({ message: 'This requisition is already rejected.' });
-    }
-
-    if (dependsOn && requisition[dependsOn] !== 1) {
-      return res.status(403).json({
-        message: `Cannot reject yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`
-      });
-    }
-
-    // Update rejection field and status (no reason)
-    const updateSql = `UPDATE requisitions SET ${field} = 1, status = 'rejected' WHERE id = ?`;
-    await db.query(updateSql, [requisitionId]);
-    
-    return res.status(200).json({ message: `Rejected by ${role}`, field });
-  } catch (err) {
-    console.error('Error in rejection process:', err);
-    return res.status(500).json({ message: 'Error updating rejection status' });
-  }
-});
-
-// GET all requisitions
-router.get('/requisitions', async (req, res) => {
-  try {
-    const sql = 'SELECT * FROM requisitions';
-    const [results] = await db.query(sql);
-
-    res.status(200).json(results);
-  } catch (err) {
-    console.error('Error fetching requisitions:', err);
-    return res.status(500).json({ message: 'Failed to fetch requisitions' });
-  }
-});
-
-router.get('/requisitions/:id', async (req, res) => {
-  try {
-    const requisitionId = req.params.id;
-    const sql = 'SELECT * FROM requisitions WHERE id = ?';
-
-    const [results] = await db.query(sql, [requisitionId]);
-
-    if (results.length === 0) {
-      return res.status(404).json({ message: 'Requisition not found' });
-    }
-
-    res.status(200).json(results[0]);
-  } catch (err) {
-    console.error('Error fetching requisition:', err);
-    return res.status(500).json({ message: 'Failed to fetch requisition' });
-  }
-});
-
-router.delete('/requisitions/:id', async (req, res) => {
-  try {
-    const requisitionId = req.params.id;
-    const deleteQuery = 'DELETE FROM requisitions WHERE id = ?';
-
-    const [result] = await db.query(deleteQuery, [requisitionId]);
+    const updateQuery = `
+      UPDATE requisitions 
+      SET ${field} = -1, status = 'rejected', updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `;
+    const [result] = await db.query(updateQuery, [requisitionId]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Requisition not found' });
     }
 
-    res.status(200).json({ message: 'Requisition deleted successfully' });
-  } catch (err) {
-    console.error('Error deleting requisition:', err);
-    return res.status(500).json({ message: 'Error deleting requisition' });
-  }
-});
-// Get requisition count
-router.get('/count', async (req, res) => {
-  try {
-    const [results] = await db.query('SELECT COUNT(*) as count FROM requisitions');
-    res.json({ count: results[0].count });
-  } catch (err) {
-    console.error('Error fetching requisition count:', err);
-    res.status(500).json({ message: 'Database error' });
-  }
-});
-
-
-router.get('/requisitions/download/:id', async (req, res) => {
-  try {
-    const requisitionId = req.params.id;
-
-    const [results] = await db.query('SELECT attachment, title FROM requisitions WHERE id = ?', [requisitionId]);
-
-    if (!results || results.length === 0) {
-      return res.status(404).json({ message: 'Requisition not found' });
-    }
-
-    const requisition = results[0];
-
-    if (!requisition.attachment) {
-      return res.status(404).json({ message: 'No attachment found for this requisition' });
-    }
-
-    const filePath = path.resolve(requisition.attachment);
-    const fileName = requisition.title.replace(/\s+/g, '_') + path.extname(filePath);
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: 'Attachment file missing on server' });
-    }
-
-    res.download(filePath, fileName, (err) => {
-      if (err) {
-        console.error('Error sending file:', err);
-        res.status(500).end('Error downloading file');
-      }
+    return res.status(200).json({
+      success: true,
+      message: `${role} rejected the requisition.`,
+      field,
     });
-
   } catch (err) {
-    console.error('Download error:', err);
-    res.status(500).json({ message: 'Failed to download attachment' });
+    console.error('❌ Error rejecting requisition:', err);
+    return res.status(500).json({ message: 'Error rejecting requisition' });
   }
 });
-module.exports = router; 
 
-/*
-
- UI = user interface is kek
- AD/ OD
- @ d phase on of mgration
- launch data
- strategic uncentive deployment
-  force staff to use
-  enforcement
-  please
-  sumamissen
-  fall in line gm
-  filgm
-  it dept
-  chamoions of change
-  focus on op data
-  let mg n gms insist on.....
-  trained focal people// people of focus
-  its abt time
-  time travel
-  travel on time
-  forget about circular
-  roll out procedure
+// Helper functions
+function getNextApprover(currentRole, isFinanceDepartment) {
+  const flow = isFinanceDepartment
+    ? ['finance', 'gmd', 'chairman']
+    : ['manager', 'executive', 'finance', 'gmd', 'chairman'];
   
-*/
+  const currentIndex = flow.indexOf(currentRole);
+  return currentIndex < flow.length - 1 ? flow[currentIndex + 1] : null;
+}
+
+function getUpdatedStatus(role, isFinanceDepartment) {
+  if (role === 'chairman') return 'approved';
+  if (role === 'gmd') return 'pending_chairman';
+  if (role === 'finance' && isFinanceDepartment) return 'pending_gmd';
+  if (role === 'executive') return 'pending_finance';
+  if (role === 'manager') return 'pending_executive';
+  return 'in_review';
+}
+
+function getApprovalFlow(isFinanceDepartment) {
+  return isFinanceDepartment
+    ? ['finance', 'gmd', 'chairman']
+    : ['manager', 'executive', 'finance', 'gmd', 'chairman'];
+}
+
+module.exports = router;
