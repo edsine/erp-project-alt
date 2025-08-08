@@ -410,7 +410,7 @@ const RequisitionList = () => {
               >
                 Rejected ({statusCounts.rejected})
               </button>
-              <button
+              {/* <button
                 onClick={() => setActiveTab('completed')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
                   activeTab === 'completed'
@@ -419,7 +419,7 @@ const RequisitionList = () => {
                 }`}
               >
                 Completed ({statusCounts.completed})
-              </button>
+              </button> */}
             </div>
           </div>
 
