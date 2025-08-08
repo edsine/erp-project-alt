@@ -67,9 +67,9 @@ router.post('/requisitions', async (req, res) => {
       );
     }
 
-    res.status(201).json({ 
-      message: 'Requisition created successfully', 
-      requisition_id: requisitionId 
+    res.status(201).json({
+      message: 'Requisition created successfully',
+      requisition_id: requisitionId
     });
 
   } catch (err) {
@@ -88,7 +88,7 @@ router.get('/requisitions/user/:userId', async (req, res) => {
   try {
     // Get user's department and actual role from DB
     const [userRows] = await db.query(
-      `SELECT department, role FROM users WHERE id = ?`, 
+      `SELECT department, role FROM users WHERE id = ?`,
       [userId]
     );
 
@@ -149,7 +149,7 @@ router.get('/requisitions/user/:userId', async (req, res) => {
       // Status conditions
       let pendingCondition = '';
       let approvedCondition = '';
-      
+
       if (status === 'pending') {
         pendingCondition = `AND ${approvalField} IS NULL`;
       } else if (status === 'approved') {
@@ -202,7 +202,7 @@ router.get('/requisitions/user/:userId', async (req, res) => {
         [row.id]
       );
       row.items = items || [];
-      
+
       // Add overall approval status
       row.approval_status = 'pending';
       if (row.approved_by_chairman) {
@@ -228,133 +228,85 @@ router.get('/requisitions/user/:userId', async (req, res) => {
 // Approve requisition
 router.post('/requisitions/:id/approve', async (req, res) => {
   const requisitionId = req.params.id;
-  const { user_id, role, department } = req.body;
+  const { user_id, role } = req.body;
 
   try {
     // 1. Fetch requisition with creator details
     const [requisitions] = await db.query(`
-      SELECT r.*, u.department as sender_department, u.role as sender_role
+      SELECT r.*, u.department as sender_department
       FROM requisitions r
       JOIN users u ON r.created_by = u.id
       WHERE r.id = ?
     `, [requisitionId]);
 
     if (requisitions.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Requisition not found',
-        details: `No requisition found with ID: ${requisitionId}`
-      });
+      return res.status(404).json({ success: false, message: 'Requisition not found' });
     }
 
     const requisition = requisitions[0];
-    const isICTDepartment = requisition.sender_department?.toLowerCase() === 'ict';
-    const isFinanceDepartment = requisition.sender_department?.toLowerCase() === 'finance';
+    const dept = requisition.sender_department?.trim().toLowerCase();
 
-    // 2. Define approval rules
-    const approvalRules = {
-      manager: {
-        field: 'approved_by_manager',
-        dependsOn: null,
-        allowed: !isFinanceDepartment,
-        message: isFinanceDepartment 
-          ? 'Finance requisitions skip manager approval' 
-          : 'Manager approval required'
-      },
-      executive: {
-        field: 'approved_by_executive',
-        dependsOn: 'approved_by_manager',
-        allowed: !isFinanceDepartment,
-        message: isFinanceDepartment
-          ? 'Finance requisitions skip executive approval'
-          : 'Executive approval requires manager approval first'
-      },
-      finance: {
-        field: 'approved_by_finance',
-        dependsOn: isICTDepartment ? 'approved_by_manager' : 
-                  isFinanceDepartment ? null : 'approved_by_executive',
-        allowed: true,
-        message: 'Finance approval processed'
-      },
-      gmd: {
-        field: 'approved_by_gmd',
-        dependsOn: isFinanceDepartment ? 'approved_by_finance' : 'approved_by_executive',
-        allowed: true,
-        message: 'GMD approval required'
-      },
-      chairman: {
-        field: 'approved_by_chairman',
-        dependsOn: 'approved_by_gmd',
-        allowed: true,
-        message: 'Chairman approval requires GMD approval first'
-      }
-    };
+    let approvalRules;
 
-    // 3. Validate approval attempt
+    if (dept === 'ict') {
+      // ICT department flow
+      approvalRules = {
+        manager: { field: 'approved_by_manager', dependsOn: null },
+        executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+        finance: { field: 'approved_by_finance', dependsOn: 'approved_by_executive' },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    } else if (dept === 'finance') {
+      // Finance department flow
+      approvalRules = {
+        finance: { field: 'approved_by_finance', dependsOn: null },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    } else {
+      // All other departments
+      approvalRules = {
+        finance: { field: 'approved_by_finance', dependsOn: null },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    }
+
+    // 2. Validate role
     if (!approvalRules[role]) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid approval role',
-        details: `Role ${role} cannot approve requisitions`
-      });
+      return res.status(400).json({ success: false, message: 'Invalid approval role' });
     }
 
-    const { field, dependsOn, allowed, message } = approvalRules[role];
+    const { field, dependsOn } = approvalRules[role];
 
-    if (!allowed) {
-      return res.status(403).json({
-        success: false,
-        message: 'Approval not permitted',
-        details: message
-      });
-    }
-
-    // 4. Check dependency
+    // 3. Check dependency
     if (dependsOn && requisition[dependsOn] !== 1) {
       return res.status(403).json({
         success: false,
-        message: 'Dependency not satisfied',
-        details: `Requires ${dependsOn.replace('approved_by_', '')} approval first`
+        message: `Requires ${dependsOn.replace('approved_by_', '')} approval first`
       });
     }
 
-    // 5. Update approval status
+    // 4. Update DB
     await db.query(`
       UPDATE requisitions 
       SET ${field} = 1,
-          status = CASE
-            WHEN ? = 'chairman' THEN 'approved'
-            WHEN ? = 'gmd' THEN 'pending_chairman'
-            WHEN ? = 'finance' AND sender_department = 'finance' THEN 'pending_gmd'
-            WHEN ? = 'executive' THEN 'pending_finance'
-            WHEN ? = 'manager' THEN 'pending_executive'
-            ELSE 'in_review'
-          END,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `, [role, role, role, role, role, requisitionId]);
+    `, [requisitionId]);
 
-    // 6. Determine next approver
-    const nextApprover = getNextApprover(role, isFinanceDepartment);
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      message: `${role} approval successful`,
-      updatedField: field,
-      requisitionStatus: getUpdatedStatus(role, isFinanceDepartment),
-      nextApprover,
-      approvalFlow: getApprovalFlow(isFinanceDepartment)
+      message: `${role} approval successful`
     });
 
   } catch (err) {
     console.error('Approval error:', err);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error',
-      error: err.message
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
+
 
 // Reject requisition
 router.post('/requisitions/:id/reject', async (req, res) => {
@@ -366,55 +318,93 @@ router.post('/requisitions/:id/reject', async (req, res) => {
       return res.status(400).json({ message: 'User ID is required to reject requisition' });
     }
 
-    const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
+    // Get user role + department
+    const [userResults] = await db.query(
+      'SELECT role, department FROM users WHERE id = ?',
+      [userId]
+    );
     if (userResults.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     const role = userResults[0].role?.toLowerCase();
+    const dept = userResults[0].department?.trim().toLowerCase();
 
-    const roleFieldMap = {
-      manager: 'approved_by_manager',
-      executive: 'approved_by_executive',
-      finance: 'approved_by_finance',
-      gmd: 'approved_by_gmd',
-      chairman: 'approved_by_chairman',
-    };
+    // Define approval flow per department
+    let approvalRules;
+    if (dept === 'ict') {
+      approvalRules = {
+        manager: { field: 'approved_by_manager', dependsOn: null },
+        executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+        finance: { field: 'approved_by_finance', dependsOn: 'approved_by_executive' },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    } else if (dept === 'finance') {
+      approvalRules = {
+        finance: { field: 'approved_by_finance', dependsOn: null },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    } else {
+      // All other departments
+      approvalRules = {
+        finance: { field: 'approved_by_finance', dependsOn: null },
+        gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+      };
+    }
 
-    const field = roleFieldMap[role];
-
-    if (!field) {
+    if (!approvalRules[role]) {
       return res.status(403).json({ message: 'User role not authorized to reject requisitions' });
     }
 
-    const updateQuery = `
-      UPDATE requisitions 
-      SET ${field} = -1, status = 'rejected', updated_at = CURRENT_TIMESTAMP 
-      WHERE id = ?
-    `;
-    const [result] = await db.query(updateQuery, [requisitionId]);
+    const { field, dependsOn } = approvalRules[role];
 
-    if (result.affectedRows === 0) {
+    // Get current requisition to validate order
+    const [reqRows] = await db.query(
+      'SELECT * FROM requisitions WHERE id = ?',
+      [requisitionId]
+    );
+    if (reqRows.length === 0) {
       return res.status(404).json({ message: 'Requisition not found' });
     }
+    const requisition = reqRows[0];
+
+    // Check if the previous step was approved (if any)
+    if (dependsOn && requisition[dependsOn] !== 1) {
+      return res.status(403).json({
+        message: `Cannot reject — waiting for ${dependsOn.replace('approved_by_', '')} action first`
+      });
+    }
+
+    // Perform rejection
+    await db.query(
+      `UPDATE requisitions 
+       SET ${field} = -1, status = 'rejected', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [requisitionId]
+    );
 
     return res.status(200).json({
       success: true,
       message: `${role} rejected the requisition.`,
-      field,
+      field
     });
+
   } catch (err) {
     console.error('❌ Error rejecting requisition:', err);
     return res.status(500).json({ message: 'Error rejecting requisition' });
   }
 });
 
+
 // Helper functions
 function getNextApprover(currentRole, isFinanceDepartment) {
   const flow = isFinanceDepartment
     ? ['finance', 'gmd', 'chairman']
     : ['manager', 'executive', 'finance', 'gmd', 'chairman'];
-  
+
   const currentIndex = flow.indexOf(currentRole);
   return currentIndex < flow.length - 1 ? flow[currentIndex + 1] : null;
 }
