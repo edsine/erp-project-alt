@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [memoCount, setMemoCount] = useState(0);
   const [requisitionCount, setRequisitionCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
+  const [leaveCount, setLeaveCount] = useState(0); // Added missing leaveCount state
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'pending', 'completed'
 
   // Fetch data functions
@@ -39,9 +40,11 @@ const Dashboard = () => {
 
     const fetchRequisitionCount = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/requisitions/count/user/${user.id}`);
+        const res = await fetch(`${BASE_URL}/requisitions/user/${user.id}`);
         const data = await res.json();
-        if (data && typeof data.count === 'number') {
+        if (Array.isArray(data)) {
+          setRequisitionCount(data.length);
+        } else if (data && typeof data.count === 'number') {
           setRequisitionCount(data.count);
         }
       } catch (err) {
@@ -58,35 +61,46 @@ const Dashboard = () => {
         console.error("Error fetching memo count:", err);
       }
     };
+
     const fetchLeaveCount = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/leaves/counts/${user.id}`);
+        const res = await fetch(`${BASE_URL}/leave-requests/count/user/${user.id}`);
         const data = await res.json();
-        setMemoCount(data.count || 0);
+        if (data.success) {
+          setLeaveCount(data.count || 0);
+        } else {
+          console.error("Failed to fetch leave count:", data.error);
+        }
       } catch (err) {
-        console.error("Error fetching memo count:", err);
+        console.error("Error fetching leave count:", err);
       }
     };
 
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const countsResponse = await Promise.all([
-          axios.get('/api/memos/count'),
-          axios.get('/api/requisitions/count'),
-          axios.get('/api/tasks/count'),
-          axios.get('/api/leave/count')
-        ]);
         
-        setStats({
-          memos: countsResponse[0].data.count || 0,
-          requisitions: countsResponse[1].data.count || 0,
-          tasks: countsResponse[2].data.count || 0,
-          leaves: countsResponse[3].data.count || 0
-        });
+        // Only fetch if these endpoints exist, otherwise rely on individual fetch functions above
+        try {
+          const countsResponse = await Promise.all([
+            axios.get(`${BASE_URL}/api/memos/count`),
+            axios.get(`${BASE_URL}/api/requisitions/count`),
+            axios.get(`${BASE_URL}/api/tasks/count`),
+            axios.get(`${BASE_URL}/api/leave/count`)
+          ]);
+          
+          setStats({
+            memos: countsResponse[0].data.count || 0,
+            requisitions: countsResponse[1].data.count || 0,
+            tasks: countsResponse[2].data.count || 0,
+            leaves: countsResponse[3].data.count || 0
+          });
+        } catch (countsError) {
+          console.log('Generic count endpoints not available, using individual endpoints');
+        }
 
         try {
-          const activitiesResponse = await axios.get('/api/activities/recent');
+          const activitiesResponse = await axios.get(`${BASE_URL}/api/activities/recent`);
           setRecentActivities(Array.isArray(activitiesResponse.data) ? activitiesResponse.data : []);
         } catch (activitiesError) {
           console.error('Error fetching activities:', activitiesError);
@@ -105,10 +119,16 @@ const Dashboard = () => {
       fetchTaskCount();
       fetchRequisitionCount();
       fetchMemoCount();
+      fetchLeaveCount(); // Added missing call
       fetchDashboardData();
       
-      // Set up interval for memo count refresh
-      const interval = setInterval(fetchMemoCount, 60000);
+      // Set up interval for refreshing counts
+      const interval = setInterval(() => {
+        fetchMemoCount();
+        fetchRequisitionCount();
+        fetchTaskCount();
+        fetchLeaveCount();
+      }, 60000);
       return () => clearInterval(interval);
     }
   }, [user, BASE_URL]);
@@ -232,7 +252,6 @@ const Dashboard = () => {
           <h1 className="text-2xl font-light text-gray-800">Welcome back,</h1>
           <h2 className="text-3xl font-semibold text-primary">{getFirstName()}</h2>
         </div>
-   
       </div>
 
       {/* Stats Cards */}
@@ -261,7 +280,7 @@ const Dashboard = () => {
         <StatCard 
           icon={Calendar} 
           title="Leaves" 
-          value={stats.leaves} 
+          value={leaveCount} // Fixed: was using stats.leaves instead of leaveCount
           color="purple" 
           link="/dashboard/leaves" 
         />

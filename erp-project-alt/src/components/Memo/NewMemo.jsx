@@ -215,7 +215,7 @@ const handleSubmit = async (e) => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Normal Memo 
+            Approval Memo 
           </button>
           <button
             type="button"
