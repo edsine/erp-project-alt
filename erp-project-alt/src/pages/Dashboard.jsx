@@ -29,7 +29,7 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchTaskCount = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/api/tasks/counts/user/${user.id}`);
+        const res = await fetch(`${BASE_URL}/tasks/counts/user/${user.id}`);
         const data = await res.json();
         if (data.success) setTaskCount(data.count);
       } catch (error) {
@@ -52,6 +52,15 @@ const Dashboard = () => {
     const fetchMemoCount = async () => {
       try {
         const res = await fetch(`${BASE_URL}/memos/counts/${user.id}`);
+        const data = await res.json();
+        setMemoCount(data.count || 0);
+      } catch (err) {
+        console.error("Error fetching memo count:", err);
+      }
+    };
+    const fetchLeaveCount = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/leaves/counts/${user.id}`);
         const data = await res.json();
         setMemoCount(data.count || 0);
       } catch (err) {

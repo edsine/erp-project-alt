@@ -21,10 +21,10 @@ const Login = () => {
       if (result.success) {
         navigate('/dashboard')
       } else {
-        setError(result.error || 'Login failed')
+        setError(result.error || 'Check your email and password')
       }
     } catch (err) {
-      setError('An error occurred during login')
+      setError('check your email and password')
     } finally {
       setLoading(false)
     }

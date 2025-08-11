@@ -48,61 +48,6 @@ const upload = multer({
   fileFilter: fileFilter
 })
 
-// Create new memo
-// Create new memo
-// router.post('/memos', async (req, res) => {
-//   try {
-//     const {
-//       title,
-//       content,
-//       priority = 'medium',
-//       memo_type = 'normal',
-//       requires_approval = 1,
-//       created_by,
-//       report_data = {}
-//     } = req.body;
-
-//     const {
-//       reportType = null,
-//       reportDate = null,
-//       attachments = null,
-//       acknowledgments = []
-//     } = memo_type === 'report' ? report_data : {};
-
-//     // ✅ Sanitize: only keep string role names (e.g., "manager")
-//     const cleanAcknowledgments = Array.isArray(acknowledgments)
-//       ? acknowledgments.filter(a => typeof a === 'string')
-//       : [];
-
-//     const acknowledgmentString = cleanAcknowledgments.length > 0
-//       ? JSON.stringify(cleanAcknowledgments)
-//       : null;
-
-//     const [result] = await db.execute(
-//       `INSERT INTO memos 
-//         (title, content, priority, memo_type, requires_approval, created_by, report_type, report_date, attachments, acknowledgments, status) 
-//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//       [
-//         title,
-//         content,
-//         priority,
-//         memo_type,
-//         requires_approval ? 1 : 0,
-//         created_by,
-//         reportType,
-//         reportDate,
-//         attachments,
-//         acknowledgmentString,
-//         'submitted'
-//       ]
-//     );
-
-//     res.status(201).json({ message: 'Memo created successfully', memo_id: result.insertId, memo_type });
-//   } catch (err) {
-//     console.error('❌ Error creating memo:', err.message);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// });
 
 
 router.post('/memos', upload.array('files'), async (req, res) => {
@@ -115,24 +60,14 @@ router.post('/memos', upload.array('files'), async (req, res) => {
       requires_approval = 1,
       created_by,
       report_data = {}
-    } = req.body;
+    } = req.body
 
-    let reportType = null;
-    let reportDate = null;
-    let attachments = null;
-    let acknowledgments = [];
-    let recipients = [];
-
-    if (memo_type === 'report') {
-      const parsedReportData = JSON.parse(report_data);
-      reportType = parsedReportData.reportType || null;
-      reportDate = parsedReportData.reportDate || null;
-      attachments = parsedReportData.attachments || null;
-      acknowledgments = Array.isArray(parsedReportData.acknowledgments) ? 
-        parsedReportData.acknowledgments.filter(a => typeof a === 'string') : [];
-      recipients = Array.isArray(parsedReportData.recipients) ? 
-        parsedReportData.recipients.filter(r => typeof r === 'number') : [];
-    }
+    const {
+      reportType = null,
+      reportDate = null,
+      attachments = null,
+      acknowledgments = []
+    } = memo_type === 'report' ? JSON.parse(report_data) : {}
 
     // Process uploaded files
     const fileAttachments = req.files?.map(file => ({
@@ -141,13 +76,14 @@ router.post('/memos', upload.array('files'), async (req, res) => {
       path: file.path,
       size: file.size,
       mimetype: file.mimetype
-    })) || [];
+    })) || []
 
+    // Rest of your original memo creation logic
     const [result] = await db.execute(
       `INSERT INTO memos 
         (title, content, priority, memo_type, requires_approval, created_by,
-         report_type, report_date, attachments, acknowledgments, recipients, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         report_type, report_date, attachments, acknowledgments, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         content,
@@ -159,33 +95,31 @@ router.post('/memos', upload.array('files'), async (req, res) => {
         reportDate,
         JSON.stringify(fileAttachments),
         JSON.stringify(acknowledgments),
-        JSON.stringify(recipients),
         'submitted'
       ]
-    );
+    )
 
     res.status(201).json({ 
       message: 'Memo created successfully', 
       memo_id: result.insertId, 
       memo_type
-    });
+    })
 
   } catch (err) {
-    console.error('Error creating memo:', err.message);
+    console.error('Error creating memo:', err.message)
     
     // Clean up uploaded files on error
     if (req.files?.length) {
       req.files.forEach(file => {
-        fs.unlink(file.path, () => {});
-      });
+        fs.unlink(file.path, () => {})
+      })
     }
     
     res.status(500).json({ 
       message: err.message || 'Internal server error' 
-    });
+    })
   }
-});
-
+})
 
 
 // Serve uploaded files
@@ -467,14 +401,13 @@ router.get('/memos/user/:userId', async (req, res) => {
         statusCondition = 'AND m.requires_approval = 1 AND (m.approved_by_manager IS NULL OR m.approved_by_executive IS NULL OR m.approved_by_finance IS NULL OR m.approved_by_gmd IS NULL OR m.approved_by_chairman IS NULL)';
       }
 
-      // Also include memos where user is in recipients list
       query = `
         ${baseSelect}
-        WHERE m.created_by = ? OR JSON_CONTAINS(m.recipients, CAST(? AS JSON))
+        WHERE m.created_by = ?
         ${statusCondition}
         ORDER BY m.created_at DESC
       `;
-      values = [userId, JSON.stringify([userId])];
+      values = [userId];
     } else {
       // For approvers, get memos they need to approve + memos they've approved + their own memos
       const approvalField = `approved_by_${normalizedRole}`;
@@ -496,7 +429,6 @@ router.get('/memos/user/:userId', async (req, res) => {
           ${baseSelect}
           WHERE (
             m.created_by = ?
-            OR JSON_CONTAINS(m.recipients, CAST(? AS JSON))
             OR (
               m.memo_type = 'normal' 
               AND m.requires_approval = 1
@@ -514,14 +446,13 @@ router.get('/memos/user/:userId', async (req, res) => {
           )
           ORDER BY m.created_at DESC
         `;
-        values = [userId, JSON.stringify([userId])];
+        values = [userId];
       } else {
         // For department-restricted roles (manager, executive)
         query = `
           ${baseSelect}
           WHERE (
             m.created_by = ?
-            OR JSON_CONTAINS(m.recipients, CAST(? AS JSON))
             OR (
               m.memo_type = 'normal'
               AND m.requires_approval = 1
@@ -540,24 +471,22 @@ router.get('/memos/user/:userId', async (req, res) => {
           )
           ORDER BY m.created_at DESC
         `;
-        values = [userId, JSON.stringify([userId]), department, department];
+        values = [userId, department, department];
       }
     }
 
     const [rows] = await db.query(query, values);
 
-    // Parse JSON fields
+    // Parse JSON acknowledgments and add approval status summary
     rows.forEach(memo => {
-      ['acknowledgments', 'recipients', 'attachments'].forEach(field => {
-        if (memo[field]) {
-          try {
-            memo[field] = JSON.parse(memo[field]);
-          } catch (e) {
-            console.warn(`⚠️ Failed to parse ${field} for memo ID ${memo.id}`);
-            memo[field] = [];
-          }
+      if (memo.acknowledgments) {
+        try {
+          memo.acknowledgments = JSON.parse(memo.acknowledgments);
+        } catch (e) {
+          console.warn(`⚠️ Failed to parse acknowledgments for memo ID ${memo.id}`);
+          memo.acknowledgments = [];
         }
-      });
+      }
       
       // Add overall approval status
       memo.approval_status = 'pending';
@@ -667,7 +596,7 @@ router.post('/memos/:id/acknowledge', async (req, res) => {
   try {
     // Get memo and sender info
     const [memoRows] = await db.execute(`
-      SELECT acknowledgments, recipients, created_by, u.role AS sender_role, u.department AS sender_dept
+      SELECT acknowledgments, created_by, u.role AS sender_role, u.department AS sender_dept
       FROM memos
       JOIN users u ON memos.created_by = u.id
       WHERE memos.id = ?
@@ -679,21 +608,13 @@ router.post('/memos/:id/acknowledge', async (req, res) => {
 
     const memo = memoRows[0];
     let acknowledgments = [];
-    let recipients = [];
 
     if (memo.acknowledgments) {
       try {
         acknowledgments = JSON.parse(memo.acknowledgments);
       } catch (e) {
         console.error('❌ Failed to parse acknowledgments:', e.message);
-      }
-    }
-
-    if (memo.recipients) {
-      try {
-        recipients = JSON.parse(memo.recipients);
-      } catch (e) {
-        console.error('❌ Failed to parse recipients:', e.message);
+        // fallback to empty
       }
     }
 
@@ -702,15 +623,10 @@ router.post('/memos/:id/acknowledge', async (req, res) => {
       return res.status(400).json({ message: 'You cannot acknowledge your own memo' });
     }
 
-    // Check if user is in the recipients list or acknowledgments list
-    const isRecipient = recipients.includes(parseInt(user_id));
-    const isAcknowledgmentRequest = acknowledgments.some(ack => 
-      typeof ack === 'string' || // role-based
-      (typeof ack === 'object' && ack.id === parseInt(user_id)) // user-based
-    );
-
-    if (!isRecipient && !isAcknowledgmentRequest) {
-      return res.status(403).json({ message: 'You are not a recipient of this memo' });
+    // Prevent duplicates
+    const alreadyAcknowledged = acknowledgments.some(user => user.id === user_id);
+    if (alreadyAcknowledged) {
+      return res.status(400).json({ message: 'You have already acknowledged this memo' });
     }
 
     // Get acknowledger info
@@ -731,18 +647,13 @@ router.post('/memos/:id/acknowledge', async (req, res) => {
       name: user.name,
       role: user.role,
       dept: user.department,
-      acknowledged_at: new Date().toISOString()
+      acknowledging_sender: {
+        id: memo.created_by,
+        role: memo.sender_role,
+        dept: memo.sender_dept
+      }
     };
 
-    // Check if already acknowledged
-    const alreadyAcknowledged = acknowledgments.some(ack => 
-      typeof ack === 'object' && ack.id === parseInt(user_id)
-    );
-    if (alreadyAcknowledged) {
-      return res.status(400).json({ message: 'You have already acknowledged this memo' });
-    }
-
-    // Add new acknowledgment
     acknowledgments.push(newAck);
 
     // Update DB
@@ -781,174 +692,6 @@ router.get('/memos/:id', async (req, res) => {
   }
 });
 
-
-
-// POST /memos/:id/approve - approve memo based on user role
-// router.post('/memos/:id/approve', async (req, res) => {
-//   const memoId = req.params.id;
-//   const { user_id, role } = req.body;
-
-//   const roleApprovalMap = {
-//     manager: { field: 'approved_by_manager', dependsOn: null },
-//     executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
-//     finance: { field: 'approved_by_finance', dependsOn: 'approved_by_manager' },
-//     gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_manager' },
-//     chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' },
-//   };
-
-//   if (!roleApprovalMap[role]) {
-//     return res.status(400).json({ success: false, message: 'Invalid role' });
-//   }
-
-//   const { field, dependsOn } = roleApprovalMap[role];
-
-//   try {
-//     // 1. Fetch the memo
-//     const [memos] = await db.query('SELECT * FROM memos WHERE id = ?', [memoId]);
-
-//     if (memos.length === 0) {
-//       return res.status(404).json({ success: false, message: 'Memo not found' });
-//     }
-
-//     const memo = memos[0];
-
-//     // 2. Check if approval dependency is satisfied
-//     if (dependsOn && memo[dependsOn] !== 1) {
-//       return res.status(403).json({
-//         success: false,
-//         message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`,
-//       });
-//     }
-
-//     // 3. Update approval field
-//     const updateQuery = `
-//       UPDATE memos 
-//       SET ${field} = 1, updated_at = CURRENT_TIMESTAMP 
-//       WHERE id = ?
-//     `;
-//     await db.query(updateQuery, [memoId]);
-
-//     return res.status(200).json({
-//       success: true,
-//       message: `${role} approved the memo.`,
-//       updatedFields: {
-//         [field]: 1,
-//       },
-//     });
-//   } catch (err) {
-//     console.error('Error approving memo:', err);
-//     return res.status(500).json({ success: false, message: 'Internal server error' });
-//   }
-// });
-
-
-// router.post('/memos/:id/approve', async (req, res) => {
-//   const memoId = req.params.id;
-//   const { user_id, role } = req.body;
-
-//   try {
-//     // 1. Fetch memo with creator's department and role
-//     const [memos] = await db.query(`
-//       SELECT m.*, u.department, u.role as creator_role 
-//       FROM memos m
-//       JOIN users u ON m.created_by = u.id
-//       WHERE m.id = ?
-//     `, [memoId]);
-
-//     if (memos.length === 0) {
-//       return res.status(404).json({ success: false, message: 'Memo not found' });
-//     }
-
-//     const memo = memos[0];
-// const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
-// const isFinanceApprover = role?.toLowerCase() === 'finance';
-
-
-
-//     // 2. Define approval rules with Finance exception
-//   const approvalRules = {
-//   manager: { 
-//     field: 'approved_by_manager', 
-//     dependsOn: null,
-//     skip: isFinanceCreator
-//   },
-//   executive: { 
-//     field: 'approved_by_executive', 
-//     dependsOn: 'approved_by_manager',
-//     skip: isFinanceCreator
-//   },
-//   finance: { 
-//     field: 'approved_by_finance', 
-//     dependsOn: isFinanceCreator ? null : 'approved_by_manager'
-//   },
-//   gmd: { 
-//     field: 'approved_by_gmd', 
-//     dependsOn: isFinanceCreator ? 'approved_by_finance' : 'approved_by_manager'
-//   },
-//   chairman: { 
-//     field: 'approved_by_chairman', 
-//     dependsOn: 'approved_by_gmd' 
-//   }
-// };
-
-
-//     if (!approvalRules[role]) {
-//       return res.status(400).json({ success: false, message: 'Invalid role' });
-//     }
-
-//     const { field, dependsOn, skip } = approvalRules[role];
-
-//     // 3. Handle skipped steps
-//     if (skip) {
-//       return res.status(403).json({
-//         success: false,
-//         message: `This memo skips ${role} approval due to Finance creator rules.`
-//       });
-//     }
-
-//     // 4. Check dependency
-//     if (dependsOn && memo[dependsOn] !== 1) {
-//       return res.status(403).json({
-//         success: false,
-//         message: `Requires ${dependsOn.replace('approved_by_', '')} approval first.`
-//       });
-//     }
-
-//     // 5. Update approval
-//     await db.query(`
-//       UPDATE memos 
-//       SET ${field} = 1, 
-//           updated_at = CURRENT_TIMESTAMP,
-//           status = CASE 
-//             WHEN ? = 'chairman' THEN 'approved'
-//             WHEN ? = 'gmd' THEN 'pending_chairman'
-//             ELSE status
-//           END
-//       WHERE id = ?
-//     `, [role, role, memoId]);
-
-//     return res.status(200).json({
-//       success: true,
-//       message: `${role} approved the memo.`,
-//       updatedFields: { [field]: 1 },
-//       nextApprover: getNextApprover(role, isFinanceCreator)
-//     });
-
-//   } catch (err) {
-//     console.error('Error approving memo:', err);
-//     return res.status(500).json({ success: false, message: 'Internal server error' });
-//   }
-// });
-
-// // Helper to determine next approver
-// function getNextApprover(currentRole, isFinanceCreator) {
-//   const flow = isFinanceCreator
-//     ? ['finance', 'gmd', 'chairman']  // Finance creator flow
-//     : ['manager', 'executive', 'finance', 'gmd', 'chairman']; // Normal flow
-  
-//   const currentIndex = flow.indexOf(currentRole);
-//   return currentIndex < flow.length - 1 ? flow[currentIndex + 1] : null;
-// }
 
 
 router.post('/memos/:id/approve', async (req, res) => {
@@ -1195,64 +938,7 @@ router.post('/memos/:id/reject', async (req, res) => {
   }
 });
 
-// router.post('/memos/:id/reject', async (req, res) => {
-//   try {
-//     const memoId = req.params.id;
-//     const { userId } = req.body;
 
-//     if (!userId) {
-//       return res.status(400).json({ message: 'User ID is required to reject memo' });
-//     }
-
-//     const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [userId]);
-
-//     if (userResults.length === 0) {
-//       return res.status(404).json({ message: 'User not found' });
-//     }
-
-//     const role = userResults[0].role;
-
-//     const roleFieldMap = {
-//       manager: 'approved_by_manager',
-//       executive: 'approved_by_executive',
-//       finance: 'approved_by_finance',
-//       gmd: 'approved_by_gmd',
-//       gmd2: 'approved_by_gmd2',
-//       chairman: 'approved_by_chairman',
-//     };
-
-
-//     const field = roleFieldMap[role];
-
-//     if (!field) {
-//       return res.status(403).json({ message: 'User role not authorized to reject memos' });
-//     }
-
-//     const updateQuery = `
-//   UPDATE memos 
-//   SET ${field} = -1, status = 'rejected', updated_at = CURRENT_TIMESTAMP 
-//   WHERE id = ?
-// `;
-
-
-//     const [result] = await db.query(updateQuery, [memoId]);
-
-//     if (result.affectedRows === 0) {
-//       return res.status(404).json({ message: 'Memo not found' });
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: `${role} rejected the memo.`,
-//       field,
-//     });
-//   } catch (err) {
-//     console.error('Error rejecting memo:', err);
-//     return res.status(500).json({ message: 'Error rejecting memo' });
-//   }
-// });
-
-// DELETE /memos/:id - delete memo
 router.delete('/memos/:id', async (req, res) => {
   try {
     const memoId = req.params.id;

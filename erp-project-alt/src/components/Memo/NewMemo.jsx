@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../../context/AuthContext'
@@ -54,7 +54,6 @@ const getFileIcon = (file) => {
     </svg>
   );
 };
-
 const NewMemo = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   
@@ -69,37 +68,17 @@ const NewMemo = () => {
     reportType: '',
     reportDate: '',
     attachments: '',
-    acknowledgments: [],
-    recipients: []
+    acknowledgments: []
   })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [users, setUsers] = useState([]) // Add users state
-  const [selectedUsers, setSelectedUsers] = useState([])
-  const [showUserDropdown, setShowUserDropdown] = useState(false) 
 
-   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get(`${BASE_URL}/users`, {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        });
-        setUsers(response.data);
-      } catch (err) {
-        console.error('Failed to fetch users:', err);
-      }
-    };
-
-    fetchUsers();
-  }, [BASE_URL, user.token]); 
 
   
   const handleMemoTypeChange = (type) => {
     setMemoType(type)
-    // Reset form data when switching types - FIXED: Include recipients in reset
+    // Reset form data when switching types
     setFormData({
       title: '',
       content: '',
@@ -107,8 +86,7 @@ const NewMemo = () => {
       reportType: '',
       reportDate: '',
       attachments: '',
-      acknowledgments: [],
-      recipients: [] // FIXED: Added this line
+      acknowledgments: []
     })
     setSelectedFiles([])
     setError('')
@@ -121,16 +99,6 @@ const NewMemo = () => {
       [name]: value
     }))
   }
-
-  // FIXED: Added missing handleUserSelect function
-  const handleUserSelect = (userId) => {
-    setFormData(prev => ({
-      ...prev,
-      recipients: prev.recipients.includes(userId)
-        ? prev.recipients.filter(id => id !== userId)
-        : [...prev.recipients, userId]
-    }));
-  };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files)
@@ -180,56 +148,55 @@ const NewMemo = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
+const handleSubmit = async (e) => {
+  e.preventDefault()
+  setLoading(true)
+  setError('')
 
-    try {
-      const submitFormData = new FormData()
-      
-      // Add basic memo data
-      submitFormData.append('title', formData.title)
-      submitFormData.append('content', formData.content)
-      submitFormData.append('priority', formData.priority)
-      submitFormData.append('created_by', user.id)
-      submitFormData.append('memo_type', memoType)
-      submitFormData.append('requires_approval', memoType === 'normal')
+  try {
+    const submitFormData = new FormData()
+    
+    // Add basic memo data (unchanged from original)
+    submitFormData.append('title', formData.title)
+    submitFormData.append('content', formData.content)
+    submitFormData.append('priority', formData.priority)
+    submitFormData.append('created_by', user.id)
+    submitFormData.append('memo_type', memoType)
+    submitFormData.append('requires_approval', memoType === 'normal')
 
-      // Add report-specific data
-      if (memoType === 'report') {
-        const reportData = {
-          reportType: formData.reportType,
-          reportDate: formData.reportDate,
-          attachments: formData.attachments,
-          acknowledgments: [...formData.acknowledgments, ...selectedUsers] // Combine checkboxes and selected users
-        }
-        submitFormData.append('report_data', JSON.stringify(reportData))
+    // Add report-specific data (unchanged from original)
+    if (memoType === 'report') {
+      const reportData = {
+        reportType: formData.reportType,
+        reportDate: formData.reportDate,
+        attachments: formData.attachments,
+        acknowledgments: formData.acknowledgments
       }
-
-      // Add files
-      selectedFiles.forEach((file) => {
-        submitFormData.append('files', file)
-      })
-
-      const response = await axios.post(`${BASE_URL}/memos`, submitFormData, {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-
-      if (response.status === 201) {
-        navigate('/dashboard/memos')
-      }
-    } catch (err) {
-      console.error('Error creating memo:', err)
-      setError(err.response?.data?.message || 'Failed to create memo')
-    } finally {
-      setLoading(false)
+      submitFormData.append('report_data', JSON.stringify(reportData))
     }
-  }
 
+    // Add files - ONLY CHANGE: using 'files' instead of 'files[]'
+    selectedFiles.forEach((file) => {
+      submitFormData.append('files', file)  // Changed from 'files[]' to 'files'
+    })
+
+    const response = await axios.post(`${BASE_URL}/memos`, submitFormData, {
+      headers: {
+        Authorization: `Bearer ${user.token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+
+    if (response.status === 201) {
+      navigate('/dashboard/memos')
+    }
+  } catch (err) {
+    console.error('Error creating memo:', err)
+    setError(err.response?.data?.message || 'Failed to create memo')
+  } finally {
+    setLoading(false)
+  }
+}
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl mx-auto">
@@ -248,7 +215,7 @@ const NewMemo = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Approval Memo 
+            Normal Memo 
           </button>
           <button
             type="button"
@@ -329,89 +296,90 @@ const NewMemo = () => {
         </div>
 
         {/* File Upload Section */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Attachments (Optional)
-          </label>
-          
-          {/* Drag and Drop Zone */}
-          <div 
-            className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md transition-colors hover:border-primary/50"
-            onDragOver={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.add('border-primary', 'bg-blue-50');
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
-              handleFileChange({ target: { files: e.dataTransfer.files } });
-            }}
-          >
-            <div className="space-y-1 text-center">
-              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div className="flex flex-col items-center text-sm text-gray-600">
-                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
-                  <span>Upload files</span>
-                  <input
-                    id="file-upload"
-                    name="file-upload"
-                    type="file"
-                    multiple
-                    className="sr-only"
-                    onChange={handleFileChange}
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
-                  />
-                </label>
-                <p className="mt-1">or drag and drop</p>
-              </div>
-              <p className="text-xs text-gray-500">
-                PDF, Word, Excel, Text, Images up to 500MB each
-              </p>
-            </div>
-          </div>
+{/* File Upload Section */}
+<div className="mb-6">
+  <label className="block text-sm font-medium text-gray-700 mb-2">
+    Attachments (Optional)
+  </label>
+  
+  {/* Drag and Drop Zone */}
+  <div 
+    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md transition-colors hover:border-primary/50"
+    onDragOver={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.add('border-primary', 'bg-blue-50');
+    }}
+    onDragLeave={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
+    }}
+    onDrop={(e) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
+      handleFileChange({ target: { files: e.dataTransfer.files } });
+    }}
+  >
+    <div className="space-y-1 text-center">
+      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <div className="flex flex-col items-center text-sm text-gray-600">
+        <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+          <span>Upload files</span>
+          <input
+            id="file-upload"
+            name="file-upload"
+            type="file"
+            multiple
+            className="sr-only"
+            onChange={handleFileChange}
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
+          />
+        </label>
+        <p className="mt-1">or drag and drop</p>
+      </div>
+      <p className="text-xs text-gray-500">
+        PDF, Word, Excel, Text, Images up to 500MB each
+      </p>
+    </div>
+  </div>
 
-          {/* Selected Files Display */}
-          {selectedFiles.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Files ({selectedFiles.length})</h4>
-              <div className="space-y-2">
-                {selectedFiles.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center space-x-3 min-w-0">
-                      <div className="flex-shrink-0">
-                        {getFileIcon(file)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                        <div className="flex items-center text-xs text-gray-500">
-                          <span>{formatFileSize(file.size)}</span>
-                          <span className="mx-2">•</span>
-                          <span>{file.type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
-                      title="Remove file"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+  {/* Selected Files Display */}
+  {selectedFiles.length > 0 && (
+    <div className="mt-4">
+      <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Files ({selectedFiles.length})</h4>
+      <div className="space-y-2">
+        {selectedFiles.map((file, index) => (
+          <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+            <div className="flex items-center space-x-3 min-w-0">
+              <div className="flex-shrink-0">
+                {getFileIcon(file)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                <div className="flex items-center text-xs text-gray-500">
+                  <span>{formatFileSize(file.size)}</span>
+                  <span className="mx-2">•</span>
+                  <span>{file.type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                </div>
               </div>
             </div>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => removeFile(index)}
+              className="text-red-500 hover:text-red-700 transition-colors"
+              title="Remove file"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
 
         {/* Report-specific Fields */}
         {memoType === 'report' && (
@@ -459,92 +427,76 @@ const NewMemo = () => {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Send Report To
+                Request Acknowledgment From
               </label>
-              
-              {/* Selected Recipients Display */}
-              {(formData.recipients || []).length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {(formData.recipients || []).map(userId => {
-                    const user = users.find(u => u.id === userId);
-                    return (
-                      <span 
-                        key={userId}
-                        className="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium"
-                      >
-                        {user?.name || `User ${userId}`}
-                        <button
-                          type="button"
-                          onClick={() => handleUserSelect(userId)}
-                          className="ml-1 text-blue-500 hover:text-blue-700"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    );
-                  })}
+              <div className="space-y-2">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="acknowledge_manager"
+                    name="acknowledgments"
+                    value="manager"
+                    checked={formData.acknowledgments.includes('manager')}
+                    onChange={(e) => {
+                      const { checked, value } = e.target;
+                      setFormData(prev => ({
+                        ...prev,
+                        acknowledgments: checked
+                          ? [...prev.acknowledgments, value]
+                          : prev.acknowledgments.filter(v => v !== value)
+                      }));
+                    }}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="acknowledge_manager" className="ml-2 block text-sm text-gray-700">
+                    Line Manager
+                  </label>
                 </div>
-              )}
-
-              {/* Dropdown Button */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowUserDropdown(!showUserDropdown)}
-                  className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <span>
-                    {(formData.recipients || []).length > 0 
-                      ? `${(formData.recipients || []).length} user(s) selected`
-                      : 'Select users to send report to'
-                    }
-                  </span>
-                  <svg className={`h-5 w-5 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                {showUserDropdown && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    <div className="py-1">
-                      {users.length > 0 ? (
-                        users.map(user => (
-                          <label
-                            key={user.id}
-                            className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={(formData.recipients || []).includes(user.id)}
-                              onChange={() => handleUserSelect(user.id)}
-                              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                            />
-                            <div className="ml-3 flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {user.name}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {user.email} • {user.role}
-                              </p>
-                            </div>
-                          </label>
-                        ))
-                      ) : (
-                        <div className="px-3 py-2 text-sm text-gray-500">
-                          No users available
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="acknowledge_executive"
+                    name="acknowledgments"
+                    value="executive"
+                    checked={formData.acknowledgments.includes('executive')}
+                    onChange={(e) => {
+                      const { checked, value } = e.target;
+                      setFormData(prev => ({
+                        ...prev,
+                        acknowledgments: checked
+                          ? [...prev.acknowledgments, value]
+                          : prev.acknowledgments.filter(v => v !== value)
+                      }));
+                    }}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="acknowledge_executive" className="ml-2 block text-sm text-gray-700">
+                    GMD
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="acknowledge_finance"
+                    name="acknowledgments"
+                    value="finance"
+                    checked={formData.acknowledgments.includes('finance')}
+                    onChange={(e) => {
+                      const { checked, value } = e.target;
+                      setFormData(prev => ({
+                        ...prev,
+                        acknowledgments: checked
+                          ? [...prev.acknowledgments, value]
+                          : prev.acknowledgments.filter(v => v !== value)
+                      }));
+                    }}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="acknowledge_finance" className="ml-2 block text-sm text-gray-700">
+                    Chairman
+                  </label>
+                </div>
               </div>
-              
-              {(formData.recipients || []).length > 0 && (
-                <p className="mt-1 text-xs text-gray-500">
-                  {(formData.recipients || []).length} recipient(s) selected
-                </p>
-              )}
             </div>
           </div>
         )}
