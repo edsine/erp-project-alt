@@ -147,14 +147,16 @@ const MemoList = () => {
   });
 
   // Helper function to check if memo is approved
-  const isMemoApproved = (memo) => {
-    return memo.status.toLowerCase() === 'approved' ||
-           memo.approved_by_chairman === 1 ||
-           memo.approved_by_gmd === 1 ||
-           memo.approved_by_finance === 1 ||
-           memo.approved_by_executive === 1 ||
-           memo.approved_by_manager === 1;
-  };
+const isMemoApproved = (memo) => {
+  const roleField = `approved_by_${user.role}`;
+  const isFinalApproval = memo.approved_by_chairman === 1; // or your final stage condition
+
+  // Approved tab shows if:
+  // - This user's role has approved
+  // - Or final approval has been given
+  return memo[roleField] === 1 || isFinalApproval;
+};
+
 
   // Helper function to check if memo is rejected
   const isMemoRejected = (memo) => {
@@ -174,14 +176,12 @@ const MemoList = () => {
   // Filter memos by status based on active tab
   const getFilteredMemosByStatus = () => {
     switch (activeTab) {
-      case 'pending':
-        return searchFilteredMemos.filter(memo => 
-          (memo.status.toLowerCase() === 'pending' || 
-           memo.status.toLowerCase() === 'submitted') &&
-          !isMemoApproved(memo) &&
-          !isMemoRejected(memo) &&
-          !isMemoCompleted(memo)
-        );
+     case 'pending':
+  return searchFilteredMemos.filter(memo => {
+    const roleField = `approved_by_${user.role}`;
+    const rejectField = `rejected_by_${user.role}`;
+    return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
+  });
       case 'approved':
         return searchFilteredMemos.filter(memo => 
           isMemoApproved(memo) && !isMemoCompleted(memo)
@@ -235,7 +235,7 @@ const MemoList = () => {
   const statusCounts = getStatusCounts();
 
   const handleMemoClick = (memo) => {
-    // Toggle memo: if clicking the same memo, close it; otherwise, open the new one
+
     if (selectedMemo && selectedMemo.id === memo.id) {
       setSelectedMemo(null);
     } else {
@@ -266,8 +266,7 @@ const MemoList = () => {
         const updatedMemo = {
           ...memo,
           ...response.data.updatedFields,
-          status: 'approved submitted',
-          // Explicitly set the approval field for current user's role
+          status: response.data.updatedFields.status || memo.status,
           [`approved_by_${user.role}`]: 1,
           [`rejected_by_${user.role}`]: 0
         };
@@ -281,7 +280,10 @@ const MemoList = () => {
       }
     } catch (error) {
       console.error('Approval failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+      const errorMessage = error.response?.data?.details 
+        ? `${error.response.data.message}: ${error.response.data.details}`
+        : error.response?.data?.message || 'Approval failed';
+      alert(`❌ Error: ${errorMessage}`);
     }
   };
 
