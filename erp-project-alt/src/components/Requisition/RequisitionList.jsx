@@ -84,14 +84,46 @@ const RequisitionList = () => {
   });
 
   // Helper function to check if requisition is approved
-  const isRequisitionApproved = (req) => {
-    return req.status.toLowerCase() === 'approved' ||
-           req.approved_by_manager === 1 ||
-           req.approved_by_executive === 1 ||
-           req.approved_by_finance === 1 ||
-           req.approved_by_gmd === 1 ||
-           req.approved_by_chairman === 1;
-  };
+const isRequisitionApproved = (req, role, userId) => {
+  role = role?.toLowerCase();
+
+  // 1️⃣ Approver roles → return true if they personally approved
+  if (role === 'finance') return req.approved_by_finance === 1;
+  if (role === 'gmd') return req.approved_by_gmd === 1;
+  if (role === 'chairman') return req.approved_by_chairman === 1;
+  if (role === 'manager') return req.approved_by_manager === 1;
+  if (role === 'executive') return req.approved_by_executive === 1;
+
+  // 2️⃣ Sender logic
+  if (req.created_by === userId) {
+    const dept = req.department?.toLowerCase();
+
+    if (dept === 'finance') {
+      // Finance sender → short chain
+      return req.approved_by_finance === 1 &&
+             req.approved_by_gmd === 1 &&
+             req.approved_by_chairman === 1;
+    } else {
+      // Non-finance sender → full chain
+      return req.approved_by_manager === 1 &&
+             req.approved_by_executive === 1 &&
+             req.approved_by_finance === 1 &&
+             req.approved_by_gmd === 1 &&
+             req.approved_by_chairman === 1;
+    }
+  }
+
+  // 3️⃣ Non-approvers who are not the sender → never "approved"
+  return false;
+};
+
+
+const isRequisitionPendingForUser = (req, role, userId) => {
+  return !isRequisitionApproved(req, role, userId) &&
+         !isRequisitionRejected(req) &&
+         !isRequisitionCompleted(req);
+};
+
 
   // Helper function to check if requisition is rejected
   const isRequisitionRejected = (req) => {
@@ -109,59 +141,66 @@ const RequisitionList = () => {
   };
 
   // Filter requisitions by status based on active tab
-  const getFilteredRequisitionsByStatus = () => {
-    switch (activeTab) {
-      case 'pending':
-        return searchFilteredRequisitions.filter(req => 
-          (req.status.toLowerCase() === 'pending' || 
-           req.status.toLowerCase() === 'submitted') &&
-          !isRequisitionApproved(req) &&
-          !isRequisitionRejected(req) &&
-          !isRequisitionCompleted(req)
-        );
-      case 'approved':
-        return searchFilteredRequisitions.filter(req => 
-          isRequisitionApproved(req) && !isRequisitionCompleted(req)
-        );
-      case 'rejected':
-        return searchFilteredRequisitions.filter(req => 
-          isRequisitionRejected(req) && !isRequisitionCompleted(req)
-        );
-      case 'completed':
-        return searchFilteredRequisitions.filter(req => 
-          isRequisitionCompleted(req)
-        );
-      default:
-        return searchFilteredRequisitions;
-    }
-  };
+ const getFilteredRequisitionsByStatus = (status) => {
+  const role = user.role?.toLowerCase();
+  const userId = user.id;
+
+  switch (status) {
+    case 'all':
+      return searchFilteredRequisitions;
+
+    case 'pending':
+      return searchFilteredRequisitions.filter(req => 
+        isRequisitionPendingForUser(req, role, userId)
+      );
+
+    case 'approved':
+      return searchFilteredRequisitions.filter(req => 
+        isRequisitionApproved(req, role, userId) && 
+        !isRequisitionCompleted(req)
+      );
+
+    case 'rejected':
+      return searchFilteredRequisitions.filter(req => 
+        isRequisitionRejected(req)
+      );
+
+    case 'completed':
+      return searchFilteredRequisitions.filter(req => 
+        isRequisitionCompleted(req)
+      );
+
+    default:
+      return searchFilteredRequisitions;
+  }
+};
+
 
   const filteredRequisitions = getFilteredRequisitionsByStatus();
 
   // Get counts for each status
   const getStatusCounts = () => {
-    const pending = searchFilteredRequisitions.filter(req => 
-      (req.status.toLowerCase() === 'pending' || 
-       req.status.toLowerCase() === 'submitted') &&
-      !isRequisitionApproved(req) &&
-      !isRequisitionRejected(req) &&
+  const role = user.role?.toLowerCase();
+  const userId = user.id;
+
+  return {
+    all: searchFilteredRequisitions.length,
+    pending: searchFilteredRequisitions.filter(req =>
+      isRequisitionPendingForUser(req, role, userId)
+    ).length,
+    approved: searchFilteredRequisitions.filter(req =>
+      isRequisitionApproved(req, role, userId) && 
       !isRequisitionCompleted(req)
-    ).length;
-    
-    const approved = searchFilteredRequisitions.filter(req => 
-      isRequisitionApproved(req) && !isRequisitionCompleted(req)
-    ).length;
-    
-    const rejected = searchFilteredRequisitions.filter(req => 
-      isRequisitionRejected(req) && !isRequisitionCompleted(req)
-    ).length;
-
-    const completed = searchFilteredRequisitions.filter(req => 
+    ).length,
+    rejected: searchFilteredRequisitions.filter(req =>
+      isRequisitionRejected(req)
+    ).length,
+    completed: searchFilteredRequisitions.filter(req =>
       isRequisitionCompleted(req)
-    ).length;
-
-    return { pending, approved, rejected, completed };
+    ).length,
   };
+};
+
 
   const statusCounts = getStatusCounts();
 
