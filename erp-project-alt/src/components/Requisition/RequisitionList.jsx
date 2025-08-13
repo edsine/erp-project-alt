@@ -84,44 +84,62 @@ const RequisitionList = () => {
   });
 
   // Helper function to check if requisition is approved
+// Updated approval check
 const isRequisitionApproved = (req, role, userId) => {
   role = role?.toLowerCase();
 
-  // 1️⃣ Approver roles → return true if they personally approved
+  // For approvers - show requisitions they've personally approved
   if (role === 'finance') return req.approved_by_finance === 1;
   if (role === 'gmd') return req.approved_by_gmd === 1;
   if (role === 'chairman') return req.approved_by_chairman === 1;
   if (role === 'manager') return req.approved_by_manager === 1;
   if (role === 'executive') return req.approved_by_executive === 1;
 
-  // 2️⃣ Sender logic
+  // For senders - show only fully approved requisitions
   if (req.created_by === userId) {
-    const dept = req.department?.toLowerCase();
-
-    if (dept === 'finance') {
-      // Finance sender → short chain
-      return req.approved_by_finance === 1 &&
-             req.approved_by_gmd === 1 &&
-             req.approved_by_chairman === 1;
-    } else {
-      // Non-finance sender → full chain
-      return req.approved_by_manager === 1 &&
-             req.approved_by_executive === 1 &&
-             req.approved_by_finance === 1 &&
-             req.approved_by_gmd === 1 &&
-             req.approved_by_chairman === 1;
-    }
+    return req.approved_by_chairman === 1;
   }
 
-  // 3️⃣ Non-approvers who are not the sender → never "approved"
   return false;
 };
 
-
+// Updated pending check
 const isRequisitionPendingForUser = (req, role, userId) => {
-  return !isRequisitionApproved(req, role, userId) &&
-         !isRequisitionRejected(req) &&
-         !isRequisitionCompleted(req);
+  role = role?.toLowerCase();
+  const senderDept = req.sender_department?.toLowerCase();
+
+  // If rejected or completed → not pending
+  if (isRequisitionRejected(req) || isRequisitionCompleted(req)) {
+    return false;
+  }
+
+  // If user is the sender → show if not fully approved
+  if (req.created_by === userId) {
+    return req.approved_by_chairman !== 1;
+  }
+
+  // Special case for ICT department - normal approval chain
+  if (senderDept === 'ict') {
+    if (role === 'manager') return !req.approved_by_manager && !req.rejected_by_manager;
+    if (role === 'executive') return req.approved_by_manager && !req.approved_by_executive && !req.rejected_by_executive;
+    if (role === 'finance') return req.approved_by_executive && !req.approved_by_finance && !req.rejected_by_finance;
+    if (role === 'gmd') return req.approved_by_finance && !req.approved_by_gmd && !req.rejected_by_gmd;
+    if (role === 'chairman') return req.approved_by_gmd && !req.approved_by_chairman && !req.rejected_by_chairman;
+  }
+  // Special case for Finance department - skip to Finance
+  else if (senderDept === 'finance') {
+    if (role === 'finance') return !req.approved_by_finance && !req.rejected_by_finance;
+    if (role === 'gmd') return req.approved_by_finance && !req.approved_by_gmd && !req.rejected_by_gmd;
+    if (role === 'chairman') return req.approved_by_gmd && !req.approved_by_chairman && !req.rejected_by_chairman;
+  }
+  // All other departments - skip Manager/Executive, go straight to Finance
+  else {
+    if (role === 'finance') return !req.approved_by_finance && !req.rejected_by_finance;
+    if (role === 'gmd') return req.approved_by_finance && !req.approved_by_gmd && !req.rejected_by_gmd;
+    if (role === 'chairman') return req.approved_by_gmd && !req.approved_by_chairman && !req.rejected_by_chairman;
+  }
+
+  return false;
 };
 
 
@@ -176,7 +194,7 @@ const isRequisitionPendingForUser = (req, role, userId) => {
 };
 
 
-  const filteredRequisitions = getFilteredRequisitionsByStatus();
+  const filteredRequisitions = getFilteredRequisitionsByStatus(activeTab);
 
   // Get counts for each status
   const getStatusCounts = () => {
