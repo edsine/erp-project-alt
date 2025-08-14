@@ -3,6 +3,65 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
+// File icon helper function (same as in memo component)
+const getFileIcon = (file) => {
+  const fileType = file.mimetype?.split('/')[0] || '';
+  const extension = file.originalname?.split('.').pop()?.toLowerCase() || '';
+
+  const iconClass = "h-8 w-8 text-gray-400";
+
+  // PDF
+  if (file.mimetype === 'application/pdf' || extension === 'pdf') {
+    return (
+      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+
+  // Word
+  if (file.mimetype.includes('word') || ['doc', 'docx'].includes(extension)) {
+    return (
+      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+
+  // Excel
+  if (file.mimetype.includes('excel') || ['xls', 'xlsx'].includes(extension)) {
+    return (
+      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+      </svg>
+    );
+  }
+
+  // Image
+  if (fileType === 'image') {
+    return (
+      <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+
+  // Default file icon
+  return (
+    <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]);
+};
+
 const RequisitionList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -142,7 +201,6 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   return false;
 };
 
-
   // Helper function to check if requisition is rejected
   const isRequisitionRejected = (req) => {
     return req.status.toLowerCase() === 'rejected' ||
@@ -193,7 +251,6 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   }
 };
 
-
   const filteredRequisitions = getFilteredRequisitionsByStatus(activeTab);
 
   // Get counts for each status
@@ -218,7 +275,6 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     ).length,
   };
 };
-
 
   const statusCounts = getStatusCounts();
 
@@ -407,9 +463,10 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   if (loading) return <p className="text-center py-4">Loading requisitions...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
+
+
   return (
     <div className="flex flex-col md:flex-row gap-6">
-      {/* Requisition List Panel */}
       <div className={`${selectedRequisition ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
         <div className="bg-white rounded-lg shadow-md p-4">
             <div className="flex justify-between items-center mb-4">
@@ -527,8 +584,7 @@ const isRequisitionPendingForUser = (req, role, userId) => {
           </div>
         </div>
       </div>
-
-           {selectedRequisition && (
+      {selectedRequisition && (
         <div className="md:w-2/3">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex justify-between items-start mb-4">
@@ -617,6 +673,39 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     </table>
   </div>
 </div>
+            {selectedRequisition.attachments && (
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
+                <div className="space-y-2">
+                  {JSON.parse(selectedRequisition.attachments).map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        {getFileIcon(file)}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.originalname}</p>
+                          <div className="flex items-center text-xs text-gray-500">
+                            <span>{formatFileSize(file.size)}</span>
+                            <span className="mx-2">•</span>
+                            <span>{file.mimetype.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <a 
+                        href={`${BASE_URL}/uploads/requisitions/${file.filename}`}
+                        download={file.originalname}
+                        className="text-primary hover:text-primary-dark transition-colors"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Approval status indicators */}
 <div className="grid grid-cols-5 gap-2 mb-6">
@@ -671,11 +760,9 @@ const isRequisitionPendingForUser = (req, role, userId) => {
         </button>
       </div>
     </div>
-  )}
-          </div>
+  )}          </div>
         </div>
       )}
-
     </div>
   );
 };
