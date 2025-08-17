@@ -149,12 +149,7 @@ const MemoList = () => {
   // Helper function to check if memo is approved
 const isMemoApproved = (memo) => {
   const roleField = `approved_by_${user.role}`;
-  const isFinalApproval = memo.approved_by_chairman === 1; // or your final stage condition
-
-  // Approved tab shows if:
-  // - This user's role has approved
-  // - Or final approval has been given
-  return memo[roleField] === 1 || isFinalApproval;
+  return memo[roleField] === 1;
 };
 
 
@@ -174,36 +169,29 @@ const isMemoApproved = (memo) => {
   };
 
   // Filter memos by status based on active tab
-  const getFilteredMemosByStatus = () => {
-    switch (activeTab) {
-     case 'pending':
-  return searchFilteredMemos.filter(memo => {
-    const roleField = `approved_by_${user.role}`;
-    const rejectField = `rejected_by_${user.role}`;
-    return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
-  });
-      case 'approved':
-        return searchFilteredMemos.filter(memo => 
-          isMemoApproved(memo) && !isMemoCompleted(memo)
-        );
-      case 'rejected':
-        return searchFilteredMemos.filter(memo => 
-          isMemoRejected(memo) && !isMemoCompleted(memo)
-        );
-      case 'completed':
-        return searchFilteredMemos.filter(memo => 
-          isMemoCompleted(memo)
-        );
-      default:
-        return searchFilteredMemos.filter(memo => 
-          (memo.status.toLowerCase() === 'pending' || 
-           memo.status.toLowerCase() === 'submitted') &&
-          !isMemoApproved(memo) &&
-          !isMemoRejected(memo) &&
-          !isMemoCompleted(memo)
-        );
-    }
-  };
+const getFilteredMemosByStatus = () => {
+  switch (activeTab) {
+    case 'pending':
+      return searchFilteredMemos.filter(memo => 
+        memo.status.toLowerCase() === 'pending' || 
+        memo.status.toLowerCase() === 'submitted'
+      );
+    case 'approved':
+      return searchFilteredMemos.filter(memo => 
+        isMemoApproved(memo)
+      );
+    case 'rejected':
+      return searchFilteredMemos.filter(memo => 
+        memo.status.toLowerCase() === 'rejected'
+      );
+    case 'completed':
+      return searchFilteredMemos.filter(memo => 
+        memo.status.toLowerCase() === 'completed'
+      );
+    default:
+      return searchFilteredMemos;
+  }
+};
 
   const filteredMemos = getFilteredMemosByStatus();
 
