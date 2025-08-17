@@ -3,7 +3,23 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
-// File icon helper function (same as in memo component)
+const getMimeTypeFromFilename = (filename) => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'txt': 'text/plain',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+};
+// File icon helper function 
 const getFileIcon = (file) => {
   const fileType = file.mimetype?.split('/')[0] || '';
   const extension = file.originalname?.split('.').pop()?.toLowerCase() || '';
@@ -673,39 +689,58 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     </table>
   </div>
 </div>
-            {selectedRequisition.attachments && (
-              <div className="mt-6 border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
-                <div className="space-y-2">
-                  {JSON.parse(selectedRequisition.attachments).map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center space-x-3 min-w-0">
-                        {getFileIcon(file)}
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{file.originalname}</p>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <span>{formatFileSize(file.size)}</span>
-                            <span className="mx-2">•</span>
-                            <span>{file.mimetype.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <a 
-                        href={`${BASE_URL}/uploads/requisitions/${file.filename}`}
-                        download={file.originalname}
-                        className="text-primary hover:text-primary-dark transition-colors"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </a>
-                    </div>
-                  ))}
+{selectedRequisition.attachments && (
+  <div className="mt-6 border-t pt-4">
+    <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
+    <div className="space-y-2">
+      {(() => {
+        try {
+          const attachments = JSON.parse(selectedRequisition.attachments);
+          if (!Array.isArray(attachments) || attachments.length === 0) {
+            return (
+              <p className="text-sm text-gray-500">No attachments found</p>
+            );
+          }
+          
+          return attachments.map((file, index) => (
+            <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+              <div className="flex items-center space-x-3 min-w-0">
+                {getFileIcon({
+                  mimetype: file.mimetype,
+                  originalname: file.filename
+                })}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {file.filename}
+                  </p>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <span>{file.mimetype?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                  </div>
                 </div>
               </div>
-            )}
+              <a 
+                href={`${BASE_URL}/uploads/${file.filename}`}
+                download={file.filename}
+                className="text-primary hover:text-primary-dark transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </a>
+            </div>
+          ));
+        } catch (error) {
+          console.error('Error parsing attachments:', error);
+          return (
+            <p className="text-sm text-red-500">Error loading attachments</p>
+          );
+        }
+      })()}
+    </div>
+  </div>
+)}
 
             {/* Approval status indicators */}
 <div className="grid grid-cols-5 gap-2 mb-6">

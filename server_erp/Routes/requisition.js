@@ -1,10 +1,54 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const multer = require('multer');
+const path = require('path');
 
-// Create new requisition
-router.post('/requisitions', async (req, res) => {
+// Storage config
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '../uploads'));
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+// Updated file filter to accept multiple file types (matching your frontend)
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'image/jpeg',
+    'image/png',
+    'image/gif'
+  ];
+  
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Unsupported file type!'), false);
+  }
+};
+
+// Updated multer instance to accept multiple files
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 500 * 1024 * 1024 } // 500MB to match frontend
+});
+
+// Updated route to handle multiple files
+router.post('/requisitions', upload.array('files', 10), async (req, res) => {
   try {
+    console.log('📝 Request body:', req.body);
+    console.log('📎 Files received:', req.files);
+
     const {
       title,
       description,
@@ -14,8 +58,28 @@ router.post('/requisitions', async (req, res) => {
       total_amount
     } = req.body;
 
+    // Validate required fields
+    if (!title || !created_by) {
+      return res.status(400).json({ 
+        message: 'Title and created_by are required fields' 
+      });
+    }
+
+    // Files are now optional since your frontend marks them as optional
+    // But if you want to require at least one file, uncomment below:
+    // if (!req.files || req.files.length === 0) {
+    //   return res.status(400).json({ message: 'At least one file is required' });
+    // }
+
     // Validate items
-    if (!Array.isArray(items) || items.length === 0) {
+    let parsedItems;
+    try {
+      parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
+    } catch (e) {
+      return res.status(400).json({ message: 'Invalid items format' });
+    }
+
+    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
     }
 
@@ -32,11 +96,15 @@ router.post('/requisitions', async (req, res) => {
     const sender_role = user.role;
     const sender_department = user.department;
 
-    // Insert requisition
+    // Prepare file paths (if files were uploaded)
+    const filePaths = req.files ? req.files.map(file => file.filename) : [];
+    const filePathsJson = JSON.stringify(filePaths);
+
+    // Insert requisition with file paths
     const [result] = await db.execute(
       `INSERT INTO requisitions 
-        (title, description, priority, created_by, sender_role, sender_department, total_amount, status) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        (title, description, priority, created_by, sender_role, sender_department, total_amount, status, file_path) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         description,
@@ -45,14 +113,15 @@ router.post('/requisitions', async (req, res) => {
         sender_role,
         sender_department,
         total_amount,
-        'submitted'
+        'submitted',
+        filePathsJson // Store as JSON string of file paths
       ]
     );
 
     const requisitionId = result.insertId;
 
     // Insert items
-    for (const item of items) {
+    for (const item of parsedItems) {
       await db.execute(
         `INSERT INTO requisition_items 
           (requisition_id, name, quantity, unit_price, total_price) 
@@ -69,13 +138,32 @@ router.post('/requisitions', async (req, res) => {
 
     res.status(201).json({
       message: 'Requisition created successfully',
-      requisition_id: requisitionId
+      requisition_id: requisitionId,
+      files_uploaded: filePaths.length,
+      files: filePaths
     });
 
   } catch (err) {
     console.error('❌ Error creating requisition:', err.message);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: err.message 
+    });
   }
+});
+
+router.get('/uploads/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filePath = path.join(__dirname, '../uploads', filename);
+  
+  // Check if file exists
+  const fs = require('fs');
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: 'File not found' });
+  }
+  
+  // Send the file
+  res.sendFile(filePath);
 });
 
 // Get all requisitions for a user based on role
@@ -195,13 +283,37 @@ router.get('/requisitions/user/:userId', async (req, res) => {
 
     const [rows] = await db.query(query, values);
 
-    // Get items for each requisition
+    // Get items for each requisition and process attachments
     for (const row of rows) {
       const [items] = await db.query(
         'SELECT name, quantity, unit_price, total_price FROM requisition_items WHERE requisition_id = ?',
         [row.id]
       );
       row.items = items || [];
+
+      // Process file_path - Convert to attachments format for frontend
+      if (row.file_path) {
+        try {
+          const filePaths = JSON.parse(row.file_path);
+          if (Array.isArray(filePaths) && filePaths.length > 0) {
+            // Convert file paths to attachment objects for frontend compatibility
+            row.attachments = JSON.stringify(filePaths.map(filename => ({
+              filename: filename,
+              originalname: filename,
+              mimetype: getMimeTypeFromFilename(filename),
+              size: 0, // Size not stored, so we'll show 0
+              url: `/uploads/${filename}` // Download URL path
+            })));
+          } else {
+            row.attachments = null;
+          }
+        } catch (e) {
+          console.error('Error parsing file_path for requisition', row.id, e);
+          row.attachments = null;
+        }
+      } else {
+        row.attachments = null;
+      }
 
       // Add overall approval status
       row.approval_status = 'pending';
@@ -224,6 +336,24 @@ router.get('/requisitions/user/:userId', async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching user requisitions' });
   }
 });
+
+// Helper function to get MIME type from filename
+function getMimeTypeFromFilename(filename) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  const mimeTypes = {
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'txt': 'text/plain',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
 
 // Approve requisition
 router.post('/requisitions/:id/approve', async (req, res) => {

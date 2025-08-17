@@ -246,90 +246,86 @@ const isMemoApproved = (memo) => {
     }
   };
 
-  const handleApprove = async (memo) => {
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/approve`,
-        {
-          user_id: user.id,
-          role: user.role,
+const handleApprove = async (memo) => {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/approve`,
+      {
+        user_id: user.id,
+        role: user.role,
+      },
+      {
+        headers: {
+          Authorization: user?.token ? `Bearer ${user.token}` : '',
         },
-        {
-          headers: {
-            Authorization: user?.token ? `Bearer ${user.token}` : '',
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert(`✅ Success: ${response.data.message}`);
-        const updatedMemo = {
-          ...memo,
-          ...response.data.updatedFields,
-          status: response.data.updatedFields.status || memo.status,
-          [`approved_by_${user.role}`]: 1,
-          [`rejected_by_${user.role}`]: 0
-        };
-        
-        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-        setSelectedMemo(updatedMemo);
-
-        if (response.data.nextApprover) {
-          alert(`Next approver: ${response.data.nextApprover}`);
-        }
       }
-    } catch (error) {
-      console.error('Approval failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.details 
-        ? `${error.response.data.message}: ${error.response.data.details}`
-        : error.response?.data?.message || 'Approval failed';
-      alert(`❌ Error: ${errorMessage}`);
+    );
+
+    if (response.status === 200) {
+      alert(`✅ Success: ${response.data.message}`);
+      const updatedMemo = {
+        ...memo,
+        ...response.data.updatedFields,
+        status: response.data.updatedFields.status || memo.status,
+        [`approved_by_${user.role}`]: 1,
+        [`rejected_by_${user.role}`]: 0,
+        actionTaken: true // mark that this user already acted
+      };
+      
+      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+      setSelectedMemo(null); // 👈 auto-close after approve
+
+      if (response.data.nextApprover) {
+        alert(`Next approver: ${response.data.nextApprover}`);
+      }
     }
-  };
+  } catch (error) {
+    console.error('Approval failed:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.details 
+      ? `${error.response.data.message}: ${error.response.data.details}`
+      : error.response?.data?.message || 'Approval failed';
+    alert(`❌ Error: ${errorMessage}`);
+  }
+};
 
-  const handleReject = async (memo) => {
-    if (!memo) return;
+const handleReject = async (memo) => {
+  if (!memo) return;
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/reject`,
-        { userId: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/reject`,
+      { userId: user.id },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
 
-      if (response.data?.success) {
-        const { field } = response.data;
+    if (response.data?.success) {
+      const { field } = response.data;
 
-        const updatedMemos = memos.map(m =>
-          m.id === memo.id
-            ? {
-              ...m,
-              status: 'rejected',
-              [field]: -1,
-            }
-            : m
-        );
-
-        setMemos(updatedMemos);
-
-        if (selectedMemo?.id === memo.id) {
-          setSelectedMemo(prev => ({
-            ...prev,
+      const updatedMemos = memos.map(m =>
+        m.id === memo.id
+          ? {
+            ...m,
             status: 'rejected',
             [field]: -1,
-          }));
-        }
+            actionTaken: true // mark action taken
+          }
+          : m
+      );
 
-        setError(null);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject memo');
+      setMemos(updatedMemos);
+      setSelectedMemo(null); // 👈 auto-close after reject
+
+      setError(null);
     }
-  };
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to reject memo');
+  }
+};
+
 
   const getStatusBadge = (status) => {
     const statusLower = status.toLowerCase();
@@ -754,22 +750,25 @@ const isMemoApproved = (memo) => {
                 user?.role === 'chairman') && (
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => handleReject(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                    >
-                      {loading ? 'Processing...' : 'Reject'}
-                    </button>
-                    <button
-                      onClick={() => handleApprove(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
-                    >
-                      {loading ? 'Processing...' : 'Approve'}
-                    </button>
+<button
+  onClick={() => handleReject(selectedMemo)}
+  disabled={loading || selectedMemo?.actionTaken} // 👈 added condition
+  className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${
+    loading || selectedMemo?.actionTaken ? 'opacity-50 cursor-not-allowed' : ''
+  }`}
+>
+  {loading ? 'Processing...' : 'Reject'}
+</button>
+<button
+  onClick={() => handleApprove(selectedMemo)}
+  disabled={loading || selectedMemo?.actionTaken} // 👈 added condition
+  className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${
+    loading || selectedMemo?.actionTaken ? 'opacity-50 cursor-not-allowed' : ''
+  }`}
+>
+  {loading ? 'Processing...' : 'Approve'}
+</button>
+
                   </div>
                 </div>
               )}
