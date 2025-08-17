@@ -22,7 +22,8 @@ const getMimeTypeFromFilename = (filename) => {
 // File icon helper function 
 const getFileIcon = (file) => {
   const fileType = file.mimetype?.split('/')[0] || '';
-  const extension = file.originalname?.split('.').pop()?.toLowerCase() || '';
+  const originalName = file.originalname || file.filename || '';
+  const extension = originalName.split('.').pop()?.toLowerCase() || '';
 
   const iconClass = "h-8 w-8 text-gray-400";
 
@@ -36,7 +37,7 @@ const getFileIcon = (file) => {
   }
 
   // Word
-  if (file.mimetype.includes('word') || ['doc', 'docx'].includes(extension)) {
+  if (file.mimetype?.includes('word') || ['doc', 'docx'].includes(extension)) {
     return (
       <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
         <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
@@ -45,7 +46,7 @@ const getFileIcon = (file) => {
   }
 
   // Excel
-  if (file.mimetype.includes('excel') || ['xls', 'xlsx'].includes(extension)) {
+  if (file.mimetype?.includes('excel') || ['xls', 'xlsx'].includes(extension)) {
     return (
       <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
         <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
@@ -707,20 +708,26 @@ const isRequisitionPendingForUser = (req, role, userId) => {
               <div className="flex items-center space-x-3 min-w-0">
                 {getFileIcon({
                   mimetype: file.mimetype,
-                  originalname: file.filename
+                  originalname: file.originalname || file.filename
                 })}
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {file.filename}
+                    {file.originalname || file.filename}
                   </p>
                   <div className="flex items-center text-xs text-gray-500">
                     <span>{file.mimetype?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                    {file.size > 0 && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <span>{formatFileSize(file.size)}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <a 
                 href={`${BASE_URL}/uploads/${file.filename}`}
-                download={file.filename}
+                download={file.originalname || file.filename}
                 className="text-primary hover:text-primary-dark transition-colors"
                 target="_blank"
                 rel="noopener noreferrer"

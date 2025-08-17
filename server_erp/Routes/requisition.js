@@ -44,10 +44,12 @@ const upload = multer({
 });
 
 // Updated route to handle multiple files
+// Updated POST route with separate files table
 router.post('/requisitions', upload.array('files', 10), async (req, res) => {
+  const connection = await db.getConnection();
+  
   try {
-    console.log('📝 Request body:', req.body);
-    console.log('📎 Files received:', req.files);
+    await connection.beginTransaction();
 
     const {
       title,
@@ -58,53 +60,50 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
       total_amount
     } = req.body;
 
+    console.log('📝 Request body:', req.body);
+    console.log('📎 Files received:', req.files);
+
     // Validate required fields
     if (!title || !created_by) {
+      await connection.rollback();
       return res.status(400).json({ 
         message: 'Title and created_by are required fields' 
       });
     }
-
-    // Files are now optional since your frontend marks them as optional
-    // But if you want to require at least one file, uncomment below:
-    // if (!req.files || req.files.length === 0) {
-    //   return res.status(400).json({ message: 'At least one file is required' });
-    // }
 
     // Validate items
     let parsedItems;
     try {
       parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
     } catch (e) {
+      await connection.rollback();
       return res.status(400).json({ message: 'Invalid items format' });
     }
 
     if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+      await connection.rollback();
       return res.status(400).json({ message: 'At least one item is required' });
     }
 
     // Get sender info
-    const [[user]] = await db.query(
+    const [[user]] = await connection.query(
       'SELECT role, department FROM users WHERE id = ?',
       [created_by]
     );
 
     if (!user) {
+      await connection.rollback();
       return res.status(400).json({ message: 'Invalid user ID' });
     }
 
     const sender_role = user.role;
     const sender_department = user.department;
 
-    // Prepare file paths (if files were uploaded)
-    const filePaths = req.files ? req.files.map(file => file.filename) : [];
-    const filePathsJson = JSON.stringify(filePaths);
-
-    // Insert requisition with file paths
-    const [result] = await db.execute(
+    // Insert requisition (without file_path since we're using separate table)
+    const [result] = await connection.execute(
       `INSERT INTO requisitions 
-        (title, description, priority, created_by, sender_role, sender_department, total_amount, status, file_path) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (title, description, priority, created_by, sender_role, sender_department, total_amount, status) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         description,
@@ -113,8 +112,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
         sender_role,
         sender_department,
         total_amount,
-        'submitted',
-        filePathsJson // Store as JSON string of file paths
+        'submitted'
       ]
     );
 
@@ -122,7 +120,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
 
     // Insert items
     for (const item of parsedItems) {
-      await db.execute(
+      await connection.execute(
         `INSERT INTO requisition_items 
           (requisition_id, name, quantity, unit_price, total_price) 
          VALUES (?, ?, ?, ?, ?)`,
@@ -136,21 +134,200 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
       );
     }
 
+    // Insert files (if any)
+    const uploadedFiles = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        await connection.execute(
+          `INSERT INTO requisition_files 
+            (requisition_id, filename, original_name, file_type, file_size) 
+           VALUES (?, ?, ?, ?, ?)`,
+          [
+            requisitionId,
+            file.filename,
+            file.originalname,
+            file.mimetype,
+            file.size
+          ]
+        );
+        
+        uploadedFiles.push({
+          filename: file.filename,
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size
+        });
+      }
+    }
+
+    await connection.commit();
+
     res.status(201).json({
       message: 'Requisition created successfully',
       requisition_id: requisitionId,
-      files_uploaded: filePaths.length,
-      files: filePaths
+      files_uploaded: uploadedFiles.length,
+      files: uploadedFiles
     });
 
   } catch (err) {
+    await connection.rollback();
     console.error('❌ Error creating requisition:', err.message);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: err.message 
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+// Updated GET routes with separate files table
+router.get('/requisitions/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.query;
+
+    console.log(`📋 Fetching requisitions for user ${userId} with role ${role}`);
+
+    let query;
+    let params;
+
+    // Different queries based on user role
+    if (role.toLowerCase() === 'employee' || role.toLowerCase() === 'staff') {
+      query = `
+        SELECT 
+          r.*,
+          u.name as creator_name,
+          u.department as creator_department
+        FROM requisitions r
+        LEFT JOIN users u ON r.created_by = u.id
+        WHERE r.created_by = ?
+        ORDER BY r.created_at DESC
+      `;
+      params = [userId];
+    } else {
+      query = `
+        SELECT 
+          r.*,
+          u.name as creator_name,
+          u.department as creator_department
+        FROM requisitions r
+        LEFT JOIN users u ON r.created_by = u.id
+        ORDER BY r.created_at DESC
+      `;
+      params = [];
+    }
+
+    const [requisitions] = await db.execute(query, params);
+
+    // Process each requisition to include items and files
+    const processedRequisitions = await Promise.all(
+      requisitions.map(async (requisition) => {
+        // Get items for this requisition
+        const [items] = await db.execute(
+          'SELECT * FROM requisition_items WHERE requisition_id = ?',
+          [requisition.id]
+        );
+
+        // Get files for this requisition
+        const [files] = await db.execute(
+          'SELECT * FROM requisition_files WHERE requisition_id = ?',
+          [requisition.id]
+        );
+
+        // Format files for frontend
+        const attachments = files.map(file => ({
+          filename: file.filename,
+          originalname: file.original_name,
+          mimetype: file.file_type,
+          size: file.file_size,
+          path: `/uploads/${file.filename}`
+        }));
+
+        return {
+          ...requisition,
+          items: items || [],
+          attachments: JSON.stringify(attachments)
+        };
+      })
+    );
+
+    res.json(processedRequisitions);
+
+  } catch (err) {
+    console.error('❌ Error fetching requisitions:', err.message);
     res.status(500).json({ 
       message: 'Internal server error',
       error: err.message 
     });
   }
 });
+
+// Updated GET single requisition route
+router.get('/requisitions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`📋 Fetching requisition ${id}`);
+
+    // Get requisition details
+    const [requisitions] = await db.execute(
+      `SELECT 
+        r.*,
+        u.name as creator_name,
+        u.department as creator_department,
+        u.email as creator_email
+      FROM requisitions r
+      LEFT JOIN users u ON r.created_by = u.id
+      WHERE r.id = ?`,
+      [id]
+    );
+
+    if (requisitions.length === 0) {
+      return res.status(404).json({ message: 'Requisition not found' });
+    }
+
+    const requisition = requisitions[0];
+
+    // Get items for this requisition
+    const [items] = await db.execute(
+      'SELECT * FROM requisition_items WHERE requisition_id = ?',
+      [id]
+    );
+
+    // Get files for this requisition
+    const [files] = await db.execute(
+      'SELECT * FROM requisition_files WHERE requisition_id = ?',
+      [id]
+    );
+
+    // Format files for frontend
+    const attachments = files.map(file => ({
+      filename: file.filename,
+      originalname: file.original_name,
+      mimetype: file.file_type,
+      size: file.file_size,
+      path: `/uploads/${file.filename}`
+    }));
+
+    const response = {
+      ...requisition,
+      items: items || [],
+      attachments: JSON.stringify(attachments)
+    };
+
+    res.json(response);
+
+  } catch (err) {
+    console.error('❌ Error fetching requisition:', err.message);
+    res.status(500).json({ 
+      message: 'Internal server error',
+      error: err.message 
+    });
+  }
+});
+
+module.exports = router;
 
 router.get('/uploads/:filename', (req, res) => {
   const filename = req.params.filename;
@@ -291,19 +468,26 @@ router.get('/requisitions/user/:userId', async (req, res) => {
       );
       row.items = items || [];
 
-      // Process file_path - Convert to attachments format for frontend
+      // Process file_path - Handle both old and new formats
       if (row.file_path) {
         try {
-          const filePaths = JSON.parse(row.file_path);
-          if (Array.isArray(filePaths) && filePaths.length > 0) {
-            // Convert file paths to attachment objects for frontend compatibility
-            row.attachments = JSON.stringify(filePaths.map(filename => ({
-              filename: filename,
-              originalname: filename,
-              mimetype: getMimeTypeFromFilename(filename),
-              size: 0, // Size not stored, so we'll show 0
-              url: `/uploads/${filename}` // Download URL path
-            })));
+          const fileData = JSON.parse(row.file_path);
+          
+          if (Array.isArray(fileData) && fileData.length > 0) {
+            // Check if it's the new format (objects with originalname) or old format (just filenames)
+            if (typeof fileData[0] === 'string') {
+              // Old format: just filenames
+              row.attachments = JSON.stringify(fileData.map(filename => ({
+                filename: filename,
+                originalname: filename, // Use filename as originalname for old data
+                mimetype: getMimeTypeFromFilename(filename),
+                size: 0,
+                url: `/uploads/${filename}`
+              })));
+            } else {
+              // New format: already contains file objects
+              row.attachments = JSON.stringify(fileData);
+            }
           } else {
             row.attachments = null;
           }
