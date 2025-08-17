@@ -323,7 +323,6 @@ const isRequisitionPendingForUser = (req, role, userId) => {
         const updatedRequisition = {
           ...req,
           ...response.data.updatedFields,
-          status: 'approved',
           [`approved_by_${user.role}`]: 1,
           [`rejected_by_${user.role}`]: 0
         };
@@ -779,30 +778,57 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   })}
 </div>
 
-            {/* Approval buttons for authorized roles */}
-{(selectedRequisition.status === 'pending' || selectedRequisition.status === 'submitted') &&
-  (user?.role === 'manager' ||
-   user?.role === 'executive' ||
-   user?.role === 'finance' ||
-   user?.role === 'gmd' ||
-   user?.role === 'chairman') && (
+{/* Approval buttons for authorized roles */}
+{(() => {
+  const userRole = user?.role?.toLowerCase();
+  const hasUserApproved = selectedRequisition[`approved_by_${userRole}`] === 1;
+  const hasUserRejected = selectedRequisition[`rejected_by_${userRole}`] === 1;
+  const hasUserActed = hasUserApproved || hasUserRejected;
+  
+  // Check if requisition is fully approved (Finance, GMD, and Chairman have all approved)
+  const isFullyApproved = selectedRequisition.approved_by_finance === 1 && 
+                         selectedRequisition.approved_by_gmd === 1 && 
+                         selectedRequisition.approved_by_chairman === 1;
+  
+  // Check if user is authorized and hasn't acted yet
+  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
+  const statusAllowsAction = selectedRequisition.status === 'pending' || selectedRequisition.status === 'submitted';
+  const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
+  
+  if (!isAuthorized || !canAct) {
+    return null;
+  }
+  
+  return (
     <div className="mt-6 space-y-4">
       <div className="flex justify-end space-x-3">
         <button
           onClick={() => handleReject(selectedRequisition)}
-          className="px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50"
+          disabled={hasUserActed}
+          className={`px-4 py-2 border rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+              : 'border-red-500 text-red-500 hover:bg-red-50'
+          }`}
         >
           Reject
         </button>
         <button
           onClick={() => handleApprove(selectedRequisition)}
-          className="px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark"
+          disabled={hasUserActed}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-primary text-white hover:bg-primary-dark'
+          }`}
         >
           Approve
         </button>
       </div>
     </div>
-  )}          </div>
+  );
+})()} 
+       </div>
         </div>
       )}
     </div>

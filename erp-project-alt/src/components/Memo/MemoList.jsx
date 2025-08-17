@@ -257,7 +257,6 @@ const handleApprove = async (memo) => {
         status: response.data.updatedFields.status || memo.status,
         [`approved_by_${user.role}`]: 1,
         [`rejected_by_${user.role}`]: 0,
-        actionTaken: true // mark that this user already acted
       };
       
       setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
@@ -299,7 +298,6 @@ const handleReject = async (memo) => {
             ...m,
             status: 'rejected',
             [field]: -1,
-            actionTaken: true // mark action taken
           }
           : m
       );
@@ -730,36 +728,55 @@ const handleReject = async (memo) => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {(selectedMemo.status === 'pending' || 'submitted') &&
-              (user?.role === 'manager' ||
-                user?.role === 'executive' ||
-                user?.role === 'finance' ||
-                user?.role === 'gmd' ||
-                user?.role === 'chairman') && (
-                <div className="mt-6 space-y-4">
-                  <div className="flex justify-end space-x-3">
-<button
-  onClick={() => handleReject(selectedMemo)}
-  disabled={loading || selectedMemo?.actionTaken} // 👈 added condition
-  className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${
-    loading || selectedMemo?.actionTaken ? 'opacity-50 cursor-not-allowed' : ''
-  }`}
->
-  {loading ? 'Processing...' : 'Reject'}
-</button>
-<button
-  onClick={() => handleApprove(selectedMemo)}
-  disabled={loading || selectedMemo?.actionTaken} // 👈 added condition
-  className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${
-    loading || selectedMemo?.actionTaken ? 'opacity-50 cursor-not-allowed' : ''
-  }`}
->
-  {loading ? 'Processing...' : 'Approve'}
-</button>
-
-                  </div>
-                </div>
-              )}
+{(() => {
+  const userRole = user?.role?.toLowerCase();
+  const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
+  const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
+  const hasUserActed = hasUserApproved || hasUserRejected;
+  
+  // Check if memo is fully approved (all required roles have approved)
+  const isFullyApproved = selectedMemo.approved_by_finance === 1 && 
+                         selectedMemo.approved_by_gmd === 1 && 
+                         selectedMemo.approved_by_chairman === 1;
+  
+  // Check if user is authorized and hasn't acted yet
+  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
+  const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
+  const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
+  
+  if (!isAuthorized || !canAct) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => handleReject(selectedMemo)}
+          disabled={hasUserActed}
+          className={`px-4 py-2 border rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+              : 'border-red-500 text-red-500 hover:bg-red-50'
+          }`}
+        >
+          Reject
+        </button>
+        <button
+          onClick={() => handleApprove(selectedMemo)}
+          disabled={hasUserActed}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-primary text-white hover:bg-primary-dark'
+          }`}
+        >
+          Approve
+        </button>
+      </div>
+    </div>
+  );
+})()}
           </div>
         </div>
       )}
