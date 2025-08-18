@@ -6,9 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 const getFileIcon = (file) => {
   const fileType = file.mimetype.split('/')[0];
   const extension = file.originalname.split('.').pop().toLowerCase();
-  
+
   const iconClass = "h-8 w-8 text-gray-400";
-  
+
   // PDF
   if (file.mimetype === 'application/pdf' || extension === 'pdf') {
     return (
@@ -17,7 +17,7 @@ const getFileIcon = (file) => {
       </svg>
     );
   }
-  
+
   // Word
   if (file.mimetype.includes('word') || ['doc', 'docx'].includes(extension)) {
     return (
@@ -26,7 +26,7 @@ const getFileIcon = (file) => {
       </svg>
     );
   }
-  
+
   // Excel
   if (file.mimetype.includes('excel') || ['xls', 'xlsx'].includes(extension)) {
     return (
@@ -35,7 +35,7 @@ const getFileIcon = (file) => {
       </svg>
     );
   }
-  
+
   // Image
   if (fileType === 'image') {
     return (
@@ -44,7 +44,7 @@ const getFileIcon = (file) => {
       </svg>
     );
   }
-  
+
   // Default file icon
   return (
     <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,6 +120,7 @@ const MemoList = () => {
           ...memo,
           sender: users[memo.created_by]?.name || `User ${memo.created_by}`,
           senderDetails: users[memo.created_by],
+           isSender: memo.created_by === user.id,
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
@@ -147,20 +148,32 @@ const MemoList = () => {
   });
 
   // Helper function to check if memo is approved
-const isMemoApproved = (memo) => {
-  const roleField = `approved_by_${user.role}`;
-  return memo[roleField] === 1;
-};
+  const isMemoApproved = (memo) => {
+    if (memo.created_by === user.id) {
+      return memo.approved_by_manager === 1 ||
+        memo.approved_by_executive === 1 ||
+        memo.approved_by_finance === 1 ||
+        memo.approved_by_gmd === 1 ||
+        memo.approved_by_chairman === 1;
+    }
+    const roleField = `approved_by_${user.role}`;
+    const isFinalApproval = memo.approved_by_chairman === 1; // or your final stage condition
+
+    // Approved tab shows if:
+    // - This user's role has approved
+    // - Or final approval has been given
+    return memo[roleField] === 1 || isFinalApproval;
+  };
 
 
   // Helper function to check if memo is rejected
   const isMemoRejected = (memo) => {
     return memo.status.toLowerCase() === 'rejected' ||
-           memo.rejected_by_chairman === 1 ||
-           memo.rejected_by_gmd === 1 ||
-           memo.rejected_by_finance === 1 ||
-           memo.rejected_by_executive === 1 ||
-           memo.rejected_by_manager === 1;
+      memo.rejected_by_chairman === 1 ||
+      memo.rejected_by_gmd === 1 ||
+      memo.rejected_by_finance === 1 ||
+      memo.rejected_by_executive === 1 ||
+      memo.rejected_by_manager === 1;
   };
 
   // Helper function to check if memo is completed
@@ -169,51 +182,63 @@ const isMemoApproved = (memo) => {
   };
 
   // Filter memos by status based on active tab
-const getFilteredMemosByStatus = () => {
-  switch (activeTab) {
-    case 'pending':
-      return searchFilteredMemos.filter(memo => 
-        memo.status.toLowerCase() === 'pending' || 
-        memo.status.toLowerCase() === 'submitted'
-      );
-    case 'approved':
-      return searchFilteredMemos.filter(memo => 
-        isMemoApproved(memo)
-      );
-    case 'rejected':
-      return searchFilteredMemos.filter(memo => 
-        memo.status.toLowerCase() === 'rejected'
-      );
-    case 'completed':
-      return searchFilteredMemos.filter(memo => 
-        memo.status.toLowerCase() === 'completed'
-      );
-    default:
-      return searchFilteredMemos;
-  }
-};
+  const getFilteredMemosByStatus = () => {
+    switch (activeTab) {
+      case 'pending':
+        return searchFilteredMemos.filter(memo => {
+           if (memo.created_by === user.id) {
+      return !isMemoApproved(memo) && 
+             !isMemoRejected(memo) && 
+             !isMemoCompleted(memo);
+    }
+          const roleField = `approved_by_${user.role}`;
+          const rejectField = `rejected_by_${user.role}`;
+          return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
+        });
+      case 'approved':
+        return searchFilteredMemos.filter(memo =>
+          isMemoApproved(memo) && !isMemoCompleted(memo)
+        );
+      case 'rejected':
+        return searchFilteredMemos.filter(memo =>
+          isMemoRejected(memo) && !isMemoCompleted(memo)
+        );
+      case 'completed':
+        return searchFilteredMemos.filter(memo =>
+          isMemoCompleted(memo)
+        );
+      default:
+        return searchFilteredMemos.filter(memo =>
+          (memo.status.toLowerCase() === 'pending' ||
+            memo.status.toLowerCase() === 'submitted') &&
+          !isMemoApproved(memo) &&
+          !isMemoRejected(memo) &&
+          !isMemoCompleted(memo)
+        );
+    }
+  };
 
   const filteredMemos = getFilteredMemosByStatus();
 
   // Get counts for each status
   const getStatusCounts = () => {
-    const pending = searchFilteredMemos.filter(memo => 
-      (memo.status.toLowerCase() === 'pending' || 
-       memo.status.toLowerCase() === 'submitted') &&
+    const pending = searchFilteredMemos.filter(memo =>
+      (memo.status.toLowerCase() === 'pending' ||
+        memo.status.toLowerCase() === 'submitted') &&
       !isMemoApproved(memo) &&
       !isMemoRejected(memo) &&
       !isMemoCompleted(memo)
     ).length;
-    
-    const approved = searchFilteredMemos.filter(memo => 
+
+    const approved = searchFilteredMemos.filter(memo =>
       isMemoApproved(memo) && !isMemoCompleted(memo)
     ).length;
-    
-    const rejected = searchFilteredMemos.filter(memo => 
+
+    const rejected = searchFilteredMemos.filter(memo =>
       isMemoRejected(memo) && !isMemoCompleted(memo)
     ).length;
 
-    const completed = searchFilteredMemos.filter(memo => 
+    const completed = searchFilteredMemos.filter(memo =>
       isMemoCompleted(memo)
     ).length;
 
@@ -234,84 +259,90 @@ const getFilteredMemosByStatus = () => {
     }
   };
 
-const handleApprove = async (memo) => {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/approve`,
-      {
-        user_id: user.id,
-        role: user.role,
-      },
-      {
-        headers: {
-          Authorization: user?.token ? `Bearer ${user.token}` : '',
+  const handleApprove = async (memo) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/approve`,
+        {
+          user_id: user.id,
+          role: user.role,
         },
-      }
-    );
-
-    if (response.status === 200) {
-      alert(`✅ Success: ${response.data.message}`);
-      const updatedMemo = {
-        ...memo,
-        ...response.data.updatedFields,
-        status: response.data.updatedFields.status || memo.status,
-        [`approved_by_${user.role}`]: 1,
-        [`rejected_by_${user.role}`]: 0,
-      };
-      
-      setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-      setSelectedMemo(null); // 👈 auto-close after approve
-
-      if (response.data.nextApprover) {
-        alert(`Next approver: ${response.data.nextApprover}`);
-      }
-    }
-  } catch (error) {
-    console.error('Approval failed:', error.response?.data || error.message);
-    const errorMessage = error.response?.data?.details 
-      ? `${error.response.data.message}: ${error.response.data.details}`
-      : error.response?.data?.message || 'Approval failed';
-    alert(`❌ Error: ${errorMessage}`);
-  }
-};
-
-const handleReject = async (memo) => {
-  if (!memo) return;
-
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/reject`,
-      { userId: user.id },
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      }
-    );
-
-    if (response.data?.success) {
-      const { field } = response.data;
-
-      const updatedMemos = memos.map(m =>
-        m.id === memo.id
-          ? {
-            ...m,
-            status: 'rejected',
-            [field]: -1,
-          }
-          : m
+        {
+          headers: {
+            Authorization: user?.token ? `Bearer ${user.token}` : '',
+          },
+        }
       );
 
-      setMemos(updatedMemos);
-      setSelectedMemo(null); // 👈 auto-close after reject
+      if (response.status === 200) {
+        alert(`✅ Success: ${response.data.message}`);
+        const updatedMemo = {
+          ...memo,
+          ...response.data.updatedFields,
+          status: response.data.updatedFields.status || memo.status,
+          [`approved_by_${user.role}`]: 1,
+          [`rejected_by_${user.role}`]: 0
+        };
 
-      setError(null);
+        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+        setSelectedMemo(updatedMemo);
+
+        if (response.data.nextApprover) {
+          alert(`Next approver: ${response.data.nextApprover}`);
+        }
+      }
+    } catch (error) {
+      console.error('Approval failed:', error.response?.data || error.message);
+      const errorMessage = error.response?.data?.details
+        ? `${error.response.data.message}: ${error.response.data.details}`
+        : error.response?.data?.message || 'Approval failed';
+      alert(`❌ Error: ${errorMessage}`);
     }
-  } catch (err) {
-    setError(err.response?.data?.message || 'Failed to reject memo');
-  }
-};
+  };
 
+  const handleReject = async (memo) => {
+    if (!memo) return;
+
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/reject`,
+        { userId: user.id },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        const { field } = response.data;
+
+        const updatedMemos = memos.map(m =>
+          m.id === memo.id
+            ? {
+              ...m,
+              status: 'rejected',
+              [field]: -1,
+            }
+            : m
+        );
+
+        setMemos(updatedMemos);
+
+        if (selectedMemo?.id === memo.id) {
+          setSelectedMemo(prev => ({
+            ...prev,
+            status: 'rejected',
+            [field]: -1,
+          }));
+        }
+
+        setError(null);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to reject memo');
+    }
+  };
 
   const getStatusBadge = (status) => {
     const statusLower = status.toLowerCase();
@@ -489,31 +520,28 @@ const handleReject = async (memo) => {
             <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab('pending')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'pending'
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'pending'
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Pending ({statusCounts.pending})
               </button>
               <button
                 onClick={() => setActiveTab('approved')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'approved'
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'approved'
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Approved ({statusCounts.approved})
               </button>
               <button
                 onClick={() => setActiveTab('rejected')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'rejected'
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
                     ? 'bg-white text-gray-900 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
-                }`}
+                  }`}
               >
                 Rejected ({statusCounts.rejected})
               </button>
@@ -615,39 +643,39 @@ const handleReject = async (memo) => {
               <pre className="whitespace-pre-wrap font-sans">{selectedMemo.content}</pre>
             </div>
 
-      {selectedMemo.attachments && (
-        <div className="mt-6 border-t pt-4">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
-          <div className="space-y-2">
-            {JSON.parse(selectedMemo.attachments).map((file, index) => (
-              <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                <div className="flex items-center space-x-3 min-w-0">
-                  {getFileIcon(file)}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{file.originalname}</p>
-                    <div className="flex items-center text-xs text-gray-500">
-                      <span>{formatFileSize(file.size)}</span>
-                      <span className="mx-2">•</span>
-                      <span>{file.mimetype.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+            {selectedMemo.attachments && (
+              <div className="mt-6 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
+                <div className="space-y-2">
+                  {JSON.parse(selectedMemo.attachments).map((file, index) => (
+                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        {getFileIcon(file)}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{file.originalname}</p>
+                          <div className="flex items-center text-xs text-gray-500">
+                            <span>{formatFileSize(file.size)}</span>
+                            <span className="mx-2">•</span>
+                            <span>{file.mimetype.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <a
+                        href={`${BASE_URL}/uploads/memos/${file.filename}`}
+                        download={file.originalname}
+                        className="text-primary hover:text-primary-dark transition-colors"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </a>
                     </div>
-                  </div>
+                  ))}
                 </div>
-                <a 
-                  href={`${BASE_URL}/uploads/memos/${file.filename}`}
-                  download={file.originalname}
-                  className="text-primary hover:text-primary-dark transition-colors"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </a>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            )}
 
 
 
@@ -668,8 +696,8 @@ const handleReject = async (memo) => {
                   <div
                     key={role}
                     className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
-                        rejected ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100'
+                      rejected ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100'
                       }`}
                   >
                     <div className="font-medium">{label}</div>
@@ -728,59 +756,37 @@ const handleReject = async (memo) => {
             )}
 
             {/* Approval buttons for authorized roles */}
-{(() => {
-  const userRole = user?.role?.toLowerCase();
-  const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
-  const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
-  const hasUserActed = hasUserApproved || hasUserRejected;
-  
-  // Check if memo is fully approved (all required roles have approved)
-  const isFullyApproved = selectedMemo.approved_by_finance === 1 && 
-                         selectedMemo.approved_by_gmd === 1 && 
-                         selectedMemo.approved_by_chairman === 1;
-  
-  // Check if user is authorized and hasn't acted yet
-  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
-  const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
-  const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
-  
-  if (!isAuthorized || !canAct) {
-    return null;
-  }
-  
-  return (
-    <div className="mt-6 space-y-4">
-      <div className="flex justify-end space-x-3">
-        <button
-          onClick={() => handleReject(selectedMemo)}
-          disabled={hasUserActed}
-          className={`px-4 py-2 border rounded-md text-sm font-medium ${
-            hasUserActed 
-              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-              : 'border-red-500 text-red-500 hover:bg-red-50'
-          }`}
-        >
-          Reject
-        </button>
-        <button
-          onClick={() => handleApprove(selectedMemo)}
-          disabled={hasUserActed}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            hasUserActed 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-              : 'bg-primary text-white hover:bg-primary-dark'
-          }`}
-        >
-          Approve
-        </button>
-      </div>
-    </div>
-  );
-})()}
+            {(selectedMemo.status === 'pending' || 'submitted') &&
+              (user?.role === 'manager' ||
+                user?.role === 'executive' ||
+                user?.role === 'finance' ||
+                user?.role === 'gmd' ||
+                user?.role === 'chairman') && (
+                <div className="mt-6 space-y-4">
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => handleReject(selectedMemo)}
+                      disabled={loading}
+                      className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {loading ? 'Processing...' : 'Reject'}
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedMemo)}
+                      disabled={loading}
+                      className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                    >
+                      {loading ? 'Processing...' : 'Approve'}
+                    </button>
+                  </div>
+                </div>
+              )}
           </div>
         </div>
       )}
-        </div>
+    </div>
   );
 };
 
