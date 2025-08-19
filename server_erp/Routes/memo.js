@@ -962,10 +962,12 @@ router.post('/memos/:id/approve', async (req, res) => {
       },
       finance: {
         field: 'approved_by_finance',
-        dependsOn: null,
-        allowed: memo.requires_approval,
-        error: 'Finance approval not permitted'
-          
+        dependsOn: isICTDepartment ? 'approved_by_executive' : null,
+        allowed: memo.requires_approval && 
+          (isICTDepartment ? memo.approved_by_executive === 1 : true),
+        error: isICTDepartment 
+          ? 'Requires executive approval first for ICT memos'
+          : 'Finance approval not permitted'
       },
       gmd: {
         field: 'approved_by_gmd',
