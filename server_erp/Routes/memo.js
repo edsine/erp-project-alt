@@ -966,7 +966,7 @@ router.post('/memos/:id/approve', async (req, res) => {
         allowed: memo.requires_approval && 
           (isICTDepartment ? memo.approved_by_executive === 1 : true),
         error: isICTDepartment 
-          ? 'Requires executive approval first for ICT memos'
+          ? 'Requires executive approval first from cto'
           : 'Finance approval not permitted'
       },
       gmd: {

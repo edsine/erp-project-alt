@@ -60,6 +60,7 @@ const formatFileSize = (bytes) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
 const MemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
@@ -75,8 +76,6 @@ const MemoList = () => {
 
   // Fetch all users when component mounts
   useEffect(() => {
-
-
     const fetchUsers = async () => {
       try {
         const response = await axios.get(
@@ -120,7 +119,7 @@ const MemoList = () => {
           ...memo,
           sender: users[memo.created_by]?.name || `User ${memo.created_by}`,
           senderDetails: users[memo.created_by],
-           isSender: memo.created_by === user.id,
+          isSender: memo.created_by === user.id,
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
@@ -165,7 +164,6 @@ const MemoList = () => {
     return memo[roleField] === 1 || isFinalApproval;
   };
 
-
   // Helper function to check if memo is rejected
   const isMemoRejected = (memo) => {
     return memo.status.toLowerCase() === 'rejected' ||
@@ -186,11 +184,11 @@ const MemoList = () => {
     switch (activeTab) {
       case 'pending':
         return searchFilteredMemos.filter(memo => {
-           if (memo.created_by === user.id) {
-      return !isMemoApproved(memo) && 
-             !isMemoRejected(memo) && 
-             !isMemoCompleted(memo);
-    }
+          if (memo.created_by === user.id) {
+            return !isMemoApproved(memo) && 
+                   !isMemoRejected(memo) && 
+                   !isMemoCompleted(memo);
+          }
           const roleField = `approved_by_${user.role}`;
           const rejectField = `rejected_by_${user.role}`;
           return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
@@ -248,7 +246,6 @@ const MemoList = () => {
   const statusCounts = getStatusCounts();
 
   const handleMemoClick = (memo) => {
-
     if (selectedMemo && selectedMemo.id === memo.id) {
       setSelectedMemo(null);
     } else {
@@ -285,7 +282,7 @@ const MemoList = () => {
         };
 
         setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
-        setSelectedMemo(updatedMemo);
+        setSelectedMemo(null); // Close the memo view
 
         if (response.data.nextApprover) {
           alert(`Next approver: ${response.data.nextApprover}`);
@@ -328,15 +325,7 @@ const MemoList = () => {
         );
 
         setMemos(updatedMemos);
-
-        if (selectedMemo?.id === memo.id) {
-          setSelectedMemo(prev => ({
-            ...prev,
-            status: 'rejected',
-            [field]: -1,
-          }));
-        }
-
+        setSelectedMemo(null); // Close the memo view
         setError(null);
       }
     } catch (err) {
@@ -486,8 +475,6 @@ const MemoList = () => {
     };
   };
 
-
-
   return (
     <div className="flex flex-col md:flex-row gap-6">
       {/* Memo List Panel */}
@@ -545,16 +532,6 @@ const MemoList = () => {
               >
                 Rejected ({statusCounts.rejected})
               </button>
-              {/* <button
-                onClick={() => setActiveTab('completed')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'completed'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Completed ({statusCounts.completed})
-              </button> */}
             </div>
           </div>
 
@@ -589,7 +566,8 @@ const MemoList = () => {
                   <p className="text-sm text-gray-500">
                     From: {memo.sender} {memo.senderDetails?.department && `(${memo.senderDetails.department})`}
                   </p>
-                  <p className="text-xs text-gray-400">{memo.date}</p>                </div>
+                  <p className="text-xs text-gray-400">{memo.date}</p>
+                </div>
               ))
             ) : (
               <p className="text-center text-gray-500 py-4">
@@ -677,11 +655,8 @@ const MemoList = () => {
               </div>
             )}
 
-
-
-
             {/* Approval status indicators */}
-            <div className="grid grid-cols-4 gap-2 mb-6">
+            <div className="grid grid-cols-5 gap-2 mb-6">
               {[
                 { role: 'manager', label: 'Manager' },
                 { role: 'executive', label: 'Executive' },
@@ -695,10 +670,11 @@ const MemoList = () => {
                 return (
                   <div
                     key={role}
-                    className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
+                    className={`p-2 rounded text-center text-xs ${
+                      approved ? 'bg-green-100 text-green-800' :
                       rejected ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100'
-                      }`}
+                      'bg-gray-100'
+                    }`}
                   >
                     <div className="font-medium">{label}</div>
                     <div>
@@ -756,33 +732,53 @@ const MemoList = () => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {(selectedMemo.status === 'pending' || 'submitted') &&
-              (user?.role === 'manager' ||
-                user?.role === 'executive' ||
-                user?.role === 'finance' ||
-                user?.role === 'gmd' ||
-                user?.role === 'chairman') && (
+            {(() => {
+              const userRole = user?.role?.toLowerCase();
+              const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
+              const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
+              const hasUserActed = hasUserApproved || hasUserRejected;
+              
+              // Check if memo is fully approved (Chairman has approved)
+              const isFullyApproved = selectedMemo.approved_by_chairman === 1;
+              
+              // Check if user is authorized and hasn't acted yet
+              const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
+              const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
+              const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
+              
+              if (!isAuthorized || !canAct) {
+                return null;
+              }
+              
+              return (
                 <div className="mt-6 space-y-4">
                   <div className="flex justify-end space-x-3">
                     <button
                       onClick={() => handleReject(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 border border-red-500 text-red-500 rounded-md text-sm font-medium hover:bg-red-50 ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                      disabled={hasUserActed}
+                      className={`px-4 py-2 border rounded-md text-sm font-medium ${
+                        hasUserActed 
+                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+                          : 'border-red-500 text-red-500 hover:bg-red-50'
+                      }`}
                     >
-                      {loading ? 'Processing...' : 'Reject'}
+                      Reject
                     </button>
                     <button
                       onClick={() => handleApprove(selectedMemo)}
-                      disabled={loading}
-                      className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                      disabled={hasUserActed}
+                      className={`px-4 py-2 rounded-md text-sm font-medium ${
+                        hasUserActed 
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                          : 'bg-primary text-white hover:bg-primary-dark'
+                      }`}
                     >
-                      {loading ? 'Processing...' : 'Approve'}
+                      Approve
                     </button>
                   </div>
                 </div>
-              )}
+              );
+            })()}
           </div>
         </div>
       )}
