@@ -3,6 +3,139 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
+// Add CommentSection component for memos
+const CommentSection = ({ memoId, user }) => {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+  useEffect(() => {
+    fetchComments();
+  }, [memoId]);
+
+  const fetchComments = async () => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/memos/${memoId}/comments`,
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      setComments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch comments:', error);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memoId}/comments`,
+        {
+          comment: newComment,
+          user_id: user.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response.status === 201) {
+        setNewComment('');
+        setShowCommentInput(false);
+        fetchComments(); // Refresh comments
+      }
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+      alert('Failed to add comment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
+  return (
+    <div className="mt-6 border-t pt-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Comments ({comments.length})</h3>
+        <button
+          type="button"
+          onClick={() => setShowCommentInput(!showCommentInput)}
+          className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
+        >
+          {showCommentInput ? 'Cancel' : 'Add Comment'}
+        </button>
+      </div>
+      
+      {/* Comment input - shown only when button is clicked */}
+      {showCommentInput && (
+        <div className="mb-4 bg-gray-50 p-4 rounded-md">
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Type your comment here..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            rows="3"
+          />
+          <div className="flex justify-end mt-2 space-x-2">
+            <button
+              onClick={() => setShowCommentInput(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddComment}
+              disabled={loading || !newComment.trim()}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Adding...' : 'Post Comment'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Comments list */}
+      <div className="space-y-4">
+        {comments.length > 0 ? (
+          comments.map((comment) => (
+            <div key={comment.id} className="bg-gray-50 p-4 rounded-md">
+              <div className="flex justify-between items-start">
+                <div className="font-medium text-sm text-gray-900">{comment.user_name}</div>
+                <div className="text-xs text-gray-500">
+                  {formatDate(comment.created_at)}
+                </div>
+              </div>
+              <p className="text-sm mt-2 text-gray-700">{comment.comment}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-center text-gray-500 py-4">No comments yet. Be the first to add one!</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Add finance tabs constants
+const FINANCE_TABS = {
+  TO_BE_ACTED: 'to_be_acted',
+  ACTED_UPON: 'acted_upon'
+};
+
 const getFileIcon = (file) => {
   const fileType = file.mimetype.split('/')[0];
   const extension = file.originalname.split('.').pop().toLowerCase();
@@ -73,6 +206,16 @@ const MemoList = () => {
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
   const [activeTab, setActiveTab] = useState('pending'); // Changed default to 'pending'
+  const [financeActionedMemos, setFinanceActionedMemos] = useState([]);
+
+  // Add useEffect to track finance actions
+  useEffect(() => {
+    // Load finance actioned memos from localStorage or initialize
+    const savedActions = localStorage.getItem(`financeMemoActions_${user.id}`);
+    if (savedActions) {
+      setFinanceActionedMemos(JSON.parse(savedActions));
+    }
+  }, [user.id]);
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -156,7 +299,12 @@ const MemoList = () => {
         memo.approved_by_chairman === 1;
     }
     const roleField = `approved_by_${user.role}`;
-    const isFinalApproval = memo.approved_by_chairman === 1; // or your final stage condition
+    const isFinalApproval = memo.approved_by_chairman === 1;
+
+    // For senders - show only fully approved AND paid memos
+    if (memo.created_by === user.id) {
+      return memo.approved_by_chairman === 1 && financeActionedMemos.includes(memo.id);
+    }
 
     // Approved tab shows if:
     // - This user's role has approved
@@ -179,8 +327,35 @@ const MemoList = () => {
     return memo.status.toLowerCase() === 'completed';
   };
 
+  // Add this function to filter memos for finance tabs
+  const getFinanceFilteredMemos = (tab) => {
+    if (user.role?.toLowerCase() !== 'finance') return [];
+    
+    const chairmanApprovedMemos = searchFilteredMemos.filter(
+      memo => memo.approved_by_chairman === 1
+    );
+    
+    if (tab === FINANCE_TABS.TO_BE_ACTED) {
+      return chairmanApprovedMemos.filter(
+        memo => !financeActionedMemos.includes(memo.id)
+      );
+    } else if (tab === FINANCE_TABS.ACTED_UPON) {
+      return chairmanApprovedMemos.filter(
+        memo => financeActionedMemos.includes(memo.id)
+      );
+    }
+    
+    return [];
+  };
+
   // Filter memos by status based on active tab
   const getFilteredMemosByStatus = () => {
+    // Handle finance-specific tabs
+    if (user.role?.toLowerCase() === 'finance' && 
+        (activeTab === FINANCE_TABS.TO_BE_ACTED || activeTab === FINANCE_TABS.ACTED_UPON)) {
+      return getFinanceFilteredMemos(activeTab);
+    }
+
     switch (activeTab) {
       case 'pending':
         return searchFilteredMemos.filter(memo => {
@@ -240,7 +415,24 @@ const MemoList = () => {
       isMemoCompleted(memo)
     ).length;
 
-    return { pending, approved, rejected, completed };
+    // Add finance-specific counts if user is finance
+    const counts = { pending, approved, rejected, completed };
+    
+    if (user.role?.toLowerCase() === 'finance') {
+      const chairmanApproved = searchFilteredMemos.filter(
+        memo => memo.approved_by_chairman === 1
+      );
+      
+      counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
+        memo => !financeActionedMemos.includes(memo.id)
+      ).length;
+      
+      counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
+        memo => financeActionedMemos.includes(memo.id)
+      ).length;
+    }
+    
+    return counts;
   };
 
   const statusCounts = getStatusCounts();
@@ -253,6 +445,36 @@ const MemoList = () => {
         ...memo,
         acknowledged: isMemoAcknowledgedByUser(memo, user.id)
       });
+    }
+  };
+
+  // Add this function to handle the Pay action for memos
+  const handlePay = async (memo) => {
+    try {
+      // Make API call to mark as paid
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/pay`,
+        { user_id: user.id },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        // Add to acted upon list
+        const updatedActions = [...financeActionedMemos, memo.id];
+        setFinanceActionedMemos(updatedActions);
+        
+        // Save to localStorage
+        localStorage.setItem(`financeMemoActions_${user.id}`, JSON.stringify(updatedActions));
+        
+        alert('Payment processed successfully!');
+      }
+    } catch (error) {
+      console.error('Payment failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
     }
   };
 
@@ -523,6 +745,33 @@ const MemoList = () => {
               >
                 Approved ({statusCounts.approved})
               </button>
+              
+              {/* Finance-specific tabs */}
+              {user.role?.toLowerCase() === 'finance' && (
+                <>
+                  <button
+                    onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                      activeTab === FINANCE_TABS.TO_BE_ACTED
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                      activeTab === FINANCE_TABS.ACTED_UPON
+                        ? 'bg-white text-gray-900 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
+                  </button>
+                </>
+              )}
+              
               <button
                 onClick={() => setActiveTab('rejected')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
@@ -684,6 +933,28 @@ const MemoList = () => {
                 );
               })}
             </div>
+
+            {/* Comment Section */}
+            {selectedMemo && (
+              <CommentSection 
+                memoId={selectedMemo.id} 
+                user={user} 
+              />
+            )}
+
+            {/* Pay button for finance users on to-be-acted items */}
+            {user.role?.toLowerCase() === 'finance' && 
+             activeTab === FINANCE_TABS.TO_BE_ACTED && 
+             !financeActionedMemos.includes(selectedMemo.id) && (
+              <div className="mt-6">
+                <button
+                  onClick={() => handlePay(selectedMemo)}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                >
+                  Pay
+                </button>
+              </div>
+            )}
 
             {/* Acknowledgment checkbox for reports */}
             {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (

@@ -1294,7 +1294,97 @@ router.get('/memos/approval/:userId', async (req, res) => {
 });
 
 
+// GET comments for a memo
+router.get('/memos/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [comments] = await db.execute(`
+      SELECT c.*, u.name as user_name 
+      FROM memo_comments c 
+      JOIN users u ON c.user_id = u.id 
+      WHERE c.memo_id = ? 
+      ORDER BY c.created_at ASC
+    `, [id]);
+    
+    res.json(comments);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ message: 'Error fetching comments' });
+  }
+});
 
+// POST a new comment for a memo
+router.post('/memos/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, user_id } = req.body;
+    
+    if (!comment || !user_id) {
+      return res.status(400).json({ message: 'Comment and user ID are required' });
+    }
+    
+    const [result] = await db.execute(
+      'INSERT INTO memo_comments (memo_id, user_id, comment) VALUES (?, ?, ?)',
+      [id, user_id, comment]
+    );
+    
+    // Get the newly created comment with user name
+    const [newComment] = await db.execute(`
+      SELECT c.*, u.name as user_name 
+      FROM memo_comments c 
+      JOIN users u ON c.user_id = u.id 
+      WHERE c.id = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newComment[0]);
+  } catch (err) {
+    console.error('Error adding comment:', err);
+    res.status(500).json({ message: 'Error adding comment' });
+  }
+});
+
+// Pay endpoint for finance (memos)
+router.post('/memos/:id/pay', async (req, res) => {
+  try {
+    const memoId = req.params.id;
+    const { user_id } = req.body;
+
+    // Verify user is finance
+    const [userRows] = await db.query(
+      'SELECT role FROM users WHERE id = ?',
+      [user_id]
+    );
+    
+    if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
+      return res.status(403).json({ message: 'Only finance users can process payments' });
+    }
+
+    // Verify memo exists and is approved by chairman
+    const [memoRows] = await db.query(
+      'SELECT * FROM memos WHERE id = ? AND approved_by_chairman = 1',
+      [memoId]
+    );
+    
+    if (memoRows.length === 0) {
+      return res.status(404).json({ message: 'Memo not found or not approved by chairman' });
+    }
+
+    // Update status to completed
+    await db.query(
+      'UPDATE memos SET status = "completed" WHERE id = ?',
+      [memoId]
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Payment processed successfully' 
+    });
+  } catch (err) {
+    console.error('Payment processing error:', err);
+    res.status(500).json({ message: 'Error processing payment' });
+  }
+});
 
 
 
