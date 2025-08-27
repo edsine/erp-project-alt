@@ -779,4 +779,54 @@ router.post('/requisitions/:id/pay', async (req, res) => {
   }
 });
 
+// GET comments for a requisition
+router.get('/requisitions/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const [comments] = await db.execute(`
+      SELECT c.*, u.name as user_name 
+      FROM requisition_comments c 
+      JOIN users u ON c.user_id = u.id 
+      WHERE c.requisition_id = ? 
+      ORDER BY c.created_at ASC
+    `, [id]);
+    
+    res.json(comments);
+  } catch (err) {
+    console.error('Error fetching comments:', err);
+    res.status(500).json({ message: 'Error fetching comments' });
+  }
+});
+
+// POST a new comment
+router.post('/requisitions/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comment, user_id } = req.body;
+    
+    if (!comment || !user_id) {
+      return res.status(400).json({ message: 'Comment and user ID are required' });
+    }
+    
+    const [result] = await db.execute(
+      'INSERT INTO requisition_comments (requisition_id, user_id, comment) VALUES (?, ?, ?)',
+      [id, user_id, comment]
+    );
+    
+    // Get the newly created comment with user name
+    const [newComment] = await db.execute(`
+      SELECT c.*, u.name as user_name 
+      FROM requisition_comments c 
+      JOIN users u ON c.user_id = u.id 
+      WHERE c.id = ?
+    `, [result.insertId]);
+    
+    res.status(201).json(newComment[0]);
+  } catch (err) {
+    console.error('Error adding comment:', err);
+    res.status(500).json({ message: 'Error adding comment' });
+  }
+}); 
+
 module.exports = router;

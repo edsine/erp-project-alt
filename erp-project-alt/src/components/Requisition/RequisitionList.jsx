@@ -3,6 +3,135 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
+// Add this component near the top, after the imports
+// Update the CommentSection component with the new design
+const CommentSection = ({ requisitionId, user }) => {
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showCommentInput, setShowCommentInput] = useState(false);
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+  useEffect(() => {
+    fetchComments();
+  }, [requisitionId]);
+
+  const fetchComments = async () => {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/requisitions/${requisitionId}/comments`,
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      setComments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch comments:', error);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim()) return;
+    
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/requisitions/${requisitionId}/comments`,
+        {
+          comment: newComment,
+          user_id: user.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      if (response.status === 201) {
+        setNewComment('');
+        setShowCommentInput(false);
+        fetchComments(); // Refresh comments
+      }
+    } catch (error) {
+      console.error('Failed to add comment:', error);
+      alert('Failed to add comment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  };
+
+  return (
+    <div className="mt-6 border-t pt-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">Comments ({comments.length})</h3>
+        <button
+          type="button"
+          onClick={() => setShowCommentInput(!showCommentInput)}
+          className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
+        >
+          {showCommentInput ? 'Cancel' : 'Add Comment'}
+        </button>
+      </div>
+      
+      {/* Comment input - shown only when button is clicked */}
+      {showCommentInput && (
+        <div className="mb-4 bg-gray-50 p-4 rounded-md">
+          <textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Type your comment here..."
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            rows="3"
+          />
+          <div className="flex justify-end mt-2 space-x-2">
+            <button
+              onClick={() => setShowCommentInput(false)}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddComment}
+              disabled={loading || !newComment.trim()}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Adding...' : 'Post Comment'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Comments list */}
+      <div className="space-y-4">
+        {comments.length > 0 ? (
+          comments.map((comment) => (
+            <div key={comment.id} className="bg-gray-50 p-4 rounded-md">
+              <div className="flex justify-between items-start">
+                <div className="font-medium text-sm text-gray-900">{comment.user_name}</div>
+                <div className="text-xs text-gray-500">
+                  {formatDate(comment.created_at)}
+                </div>
+              </div>
+              <p className="text-sm mt-2 text-gray-700">{comment.comment}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-center text-gray-500 py-4">No comments yet. Be the first to add one!</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Add this function to the existing helper functions
 const getMimeTypeFromFilename = (filename) => {
   const ext = filename.split('.').pop()?.toLowerCase();
   const mimeTypes = {
@@ -18,11 +147,6 @@ const getMimeTypeFromFilename = (filename) => {
     'gif': 'image/gif'
   };
   return mimeTypes[ext] || 'application/octet-stream';
-};
-
-const FINANCE_TABS = {
-  TO_BE_ACTED: 'to_be_acted',
-  ACTED_UPON: 'acted_upon'
 };
 
 // File icon helper function 
@@ -95,16 +219,7 @@ const RequisitionList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
-  const [activeTab, setActiveTab] = useState('pending'); // default tab 
-  const [financeActionedRequisitions, setFinanceActionedRequisitions] = useState([]);
-  
-useEffect(() => {
-  // Load finance actioned requisitions from localStorage or initialize
-  const savedActions = localStorage.getItem(`financeActions_${user.id}`);
-  if (savedActions) {
-    setFinanceActionedRequisitions(JSON.parse(savedActions));
-  }
-}, [user.id]);
+  const [activeTab, setActiveTab] = useState('pending'); // Changed default tab to 'pending'
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -188,7 +303,7 @@ const isRequisitionApproved = (req, role, userId) => {
 
   // For senders - show only fully approved requisitions
   if (req.created_by === userId) {
-    return req.approved_by_chairman === 1 && financeActionedRequisitions.includes(req.id);
+    return req.approved_by_chairman === 1;
   }
 
   return false;
@@ -244,38 +359,12 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   };
 
   // Helper function to check if requisition is completed
-  const getFinanceFilteredRequisitions = (tab) => {
-  if (user.role?.toLowerCase() !== 'finance') return [];
-  
-  const chairmanApprovedReqs = searchFilteredRequisitions.filter(
-    req => req.approved_by_chairman === 1
-  );
-  
-  if (tab === FINANCE_TABS.TO_BE_ACTED) {
-    return chairmanApprovedReqs.filter(
-      req => !financeActionedRequisitions.includes(req.id)
-    );
-  } else if (tab === FINANCE_TABS.ACTED_UPON) {
-    return chairmanApprovedReqs.filter(
-      req => financeActionedRequisitions.includes(req.id)
-    );
-  }
-  
-  return [];
-};
-
   const isRequisitionCompleted = (req) => {
     return req.status.toLowerCase() === 'completed';
   };
 
   // Filter requisitions by status based on active tab
-const getFilteredRequisitionsByStatus = (status) => {
-  // Handle finance-specific tabs
-  if (user.role?.toLowerCase() === 'finance' && 
-      (status === FINANCE_TABS.TO_BE_ACTED || status === FINANCE_TABS.ACTED_UPON)) {
-    return getFinanceFilteredRequisitions(status);
-  }
-  
+ const getFilteredRequisitionsByStatus = (status) => {
   const role = user.role?.toLowerCase();
   const userId = user.id;
 
@@ -312,11 +401,11 @@ const getFilteredRequisitionsByStatus = (status) => {
   const filteredRequisitions = getFilteredRequisitionsByStatus(activeTab);
 
   // Get counts for each status
-const getStatusCounts = () => {
+  const getStatusCounts = () => {
   const role = user.role?.toLowerCase();
   const userId = user.id;
-  
-  const counts = {
+
+  return {
     all: searchFilteredRequisitions.length,
     pending: searchFilteredRequisitions.filter(req =>
       isRequisitionPendingForUser(req, role, userId)
@@ -332,55 +421,9 @@ const getStatusCounts = () => {
       isRequisitionCompleted(req)
     ).length,
   };
-  
-  // Add finance-specific counts if user is finance
-  if (role === 'finance') {
-    const chairmanApproved = searchFilteredRequisitions.filter(
-      req => req.approved_by_chairman === 1
-    );
-    
-    counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
-      req => !financeActionedRequisitions.includes(req.id)
-    ).length;
-    
-    counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
-      req => financeActionedRequisitions.includes(req.id)
-    ).length;
-  }
-  
-  return counts;
 };
 
   const statusCounts = getStatusCounts();
-
-  const handlePay = async (req) => {
-  try {
-    // Make API call to mark as paid
-    const response = await axios.post(
-      `${BASE_URL}/requisitions/${req.id}/pay`,
-      { user_id: user.id },
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      }
-    );
-
-    if (response.status === 200) {
-      // Add to acted upon list
-      const updatedActions = [...financeActionedRequisitions, req.id];
-      setFinanceActionedRequisitions(updatedActions);
-      
-      // Save to localStorage
-      localStorage.setItem(`financeActions_${user.id}`, JSON.stringify(updatedActions));
-      
-      alert('Payment processed successfully!');
-    }
-  } catch (error) {
-    console.error('Payment failed:', error.response?.data || error.message);
-    alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
-  }
-};
 
   const handleRequisitionClick = (req) => {
     if (selectedRequisition && selectedRequisition.id === req.id) {
@@ -566,391 +609,366 @@ const getStatusCounts = () => {
   if (loading) return <p className="text-center py-4">Loading requisitions...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
-
-
-return (
-  <div className="flex flex-col md:flex-row gap-6">
-    <div className={`${selectedRequisition ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
-      <div className="bg-white rounded-lg shadow-md p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">Requisitions</h2>
-          <Link
-            to="/dashboard/requisitions/new"
-            className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
-          >
-            New Requisition
-          </Link>
-        </div>
-
-        {/* Search Input */}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search requisitions..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* Status Tabs */}
-        <div className="mb-4">
-          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('pending')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                activeTab === 'pending'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+  return (
+    <div className="flex flex-col md:flex-row gap-6">
+      <div className={`${selectedRequisition ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
+        <div className="bg-white rounded-lg shadow-md p-4">
+            <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Requisitions</h2>
+            <Link
+              to="/dashboard/requisitions/new"
+              className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
             >
-              Pending ({statusCounts.pending})
-            </button>
-            <button
-              onClick={() => setActiveTab('approved')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                activeTab === 'approved'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Approved ({statusCounts.approved})
-            </button>
-            
-            {/* Finance-specific tabs */}
-            {user.role?.toLowerCase() === 'finance' && (
-              <>
-                <button
-                  onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
-                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === FINANCE_TABS.TO_BE_ACTED
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+              New Requisition
+            </Link>
+          </div>
+
+          {/* Search Input */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search requisitions..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+
+          {/* Status Tabs */}
+          <div className="mb-4">
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setActiveTab('pending')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'pending'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Pending ({statusCounts.pending})
+              </button>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'approved'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Approved ({statusCounts.approved})
+              </button>
+              <button
+                onClick={() => setActiveTab('rejected')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'rejected'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Rejected ({statusCounts.rejected})
+              </button>
+              {/* <button
+                onClick={() => setActiveTab('completed')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'completed'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Completed ({statusCounts.completed})
+              </button> */}
+            </div>
+          </div>
+
+          {/* Requisitions List */}
+          <div className="space-y-2">
+            {filteredRequisitions.length > 0 ? (
+              filteredRequisitions.map(req => (
+                <div
+                  key={req.id}
+                  onClick={() => handleRequisitionClick(req)}
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${
+                    req.status === 'submitted' ? 'border-l-4 border-l-primary' : ''
+                  } ${selectedRequisition?.id === req.id ? 'bg-gray-100' : ''}`}
                 >
-                  To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
-                </button>
-                <button
-                  onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
-                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                    activeTab === FINANCE_TABS.ACTED_UPON
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
-                </button>
-              </>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">{req.title}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(req.status).className}`}
+                        >
+                          {getStatusBadge(req.status).icon}
+                          {getStatusBadge(req.status).text}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(req.priority).className}`}
+                        >
+                          {getPriorityBadge(req.priority).icon}
+                          {getPriorityBadge(req.priority).text}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold">
+                      {req.total_amount ? `₦${req.total_amount.toLocaleString()}` : ''}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    From: {req.requester} {req.requesterDetails?.department && `(${req.requesterDetails.department})`}
+                  </p>
+                  <p className="text-xs text-gray-400">{req.date}</p>
+                </div>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 py-4">
+                {`No ${activeTab} requisitions found`}
+              </p>
             )}
-            
-            <button
-              onClick={() => setActiveTab('rejected')}
-              className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                activeTab === 'rejected'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Rejected ({statusCounts.rejected})
-            </button>
           </div>
         </div>
-
-        {/* Requisitions List */}
-        <div className="space-y-2">
-          {filteredRequisitions.length > 0 ? (
-            filteredRequisitions.map(req => (
-              <div
-                key={req.id}
-                onClick={() => handleRequisitionClick(req)}
-                className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${
-                  req.status === 'submitted' ? 'border-l-4 border-l-primary' : ''
-                } ${selectedRequisition?.id === req.id ? 'bg-gray-100' : ''}`}
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium">{req.title}</h3>
-                    <div className="flex gap-2 mt-1">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(req.status).className}`}
-                      >
-                        {getStatusBadge(req.status).icon}
-                        {getStatusBadge(req.status).text}
-                      </span>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(req.priority).className}`}
-                      >
-                        {getPriorityBadge(req.priority).icon}
-                        {getPriorityBadge(req.priority).text}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-sm font-semibold">
-                    {req.total_amount ? `₦${req.total_amount.toLocaleString()}` : ''}
+      </div>
+      {selectedRequisition && (
+        <div className="md:w-2/3">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-xl font-bold">{selectedRequisition.title}</h2>
+                <p className="text-sm text-gray-500">
+                  From: {selectedRequisition.requester}
+                  {selectedRequisition.requesterDetails?.department && ` (${selectedRequisition.requesterDetails.department})`}
+                </p>
+                <p className="text-xs text-gray-400">Date: {selectedRequisition.date}</p>
+                <div className="mt-2 flex gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedRequisition.status).className}`}>
+                    {getStatusBadge(selectedRequisition.status).icon}
+                    {getStatusBadge(selectedRequisition.status).text}
+                  </span>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(selectedRequisition.priority).className}`}>
+                    {getPriorityBadge(selectedRequisition.priority).icon}
+                    {getPriorityBadge(selectedRequisition.priority).text}
                   </span>
                 </div>
-                <p className="text-sm text-gray-500">
-                  From: {req.requester} {req.requesterDetails?.department && `(${req.requesterDetails.department})`}
-                </p>
-                <p className="text-xs text-gray-400">{req.date}</p>
               </div>
-            ))
-          ) : (
-            <p className="text-center text-gray-500 py-4">
-              {`No ${activeTab} requisitions found`}
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
-    {selectedRequisition && (
-      <div className="md:w-2/3">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-xl font-bold">{selectedRequisition.title}</h2>
-              <p className="text-sm text-gray-500">
-                From: {selectedRequisition.requester}
-                {selectedRequisition.requesterDetails?.department && ` (${selectedRequisition.requesterDetails.department})`}
-              </p>
-              <p className="text-xs text-gray-400">Date: {selectedRequisition.date}</p>
-              <div className="mt-2 flex gap-2">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedRequisition.status).className}`}>
-                  {getStatusBadge(selectedRequisition.status).icon}
-                  {getStatusBadge(selectedRequisition.status).text}
-                </span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityBadge(selectedRequisition.priority).className}`}>
-                  {getPriorityBadge(selectedRequisition.priority).icon}
-                  {getPriorityBadge(selectedRequisition.priority).text}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => setSelectedRequisition(null)}
-              className="md:hidden text-gray-500 hover:text-gray-700"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2">Description</h3>
-            <p className="text-gray-700">{selectedRequisition.description}</p>
-          </div>
-
-          {/* Items Section */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-2">Items</h3>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {selectedRequisition.items && selectedRequisition.items.length > 0 ? (
-                    selectedRequisition.items.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {item.name || 'Unnamed Item'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.quantity}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          ₦{item.unit_price?.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          ₦{(item.quantity * item.unit_price)?.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
-                        No items added to this requisition
-                      </td>
-                    </tr>
-                  )}
-                  {selectedRequisition.items && selectedRequisition.items.length > 0 && (
-                    <tr className="bg-gray-50">
-                      <td colSpan="3" className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                        Total
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        ₦{selectedRequisition.total_amount?.toLocaleString()}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          
-          {selectedRequisition.attachments && (
-            <div className="mt-6 border-t pt-4">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
-              <div className="space-y-2">
-                {(() => {
-                  try {
-                    const attachments = JSON.parse(selectedRequisition.attachments);
-                    if (!Array.isArray(attachments) || attachments.length === 0) {
-                      return (
-                        <p className="text-sm text-gray-500">No attachments found</p>
-                      );
-                    }
-                    
-                    return attachments.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                        <div className="flex items-center space-x-3 min-w-0">
-                          {getFileIcon({
-                            mimetype: file.mimetype,
-                            originalname: file.originalname || file.filename
-                          })}
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {file.originalname || file.filename}
-                            </p>
-                            <div className="flex items-center text-xs text-gray-500">
-                              <span>{file.mimetype?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                              {file.size > 0 && (
-                                <>
-                                  <span className="mx-1">•</span>
-                                  <span>{formatFileSize(file.size)}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        <a 
-                          href={`${BASE_URL}/uploads/${file.filename}`}
-                          download={file.originalname || file.filename}
-                          className="text-primary hover:text-primary-dark transition-colors"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </a>
-                      </div>
-                    ));
-                  } catch (error) {
-                    console.error('Error parsing attachments:', error);
-                    return (
-                      <p className="text-sm text-red-500">Error loading attachments</p>
-                    );
-                  }
-                })()}
-              </div>
-            </div>
-          )}
-
-          {/* Approval status indicators */}
-          <div className="grid grid-cols-5 gap-2 mb-6">
-            {[
-              { role: 'manager', label: 'Manager' },
-              { role: 'executive', label: 'Executive' },
-              { role: 'finance', label: 'Finance' },
-              { role: 'gmd', label: 'GMD' },
-              { role: 'chairman', label: 'Chairman' }
-            ].map(({ role, label }) => {
-              const approved = selectedRequisition[`approved_by_${role}`] === 1;
-              const rejected = selectedRequisition[`rejected_by_${role}`] === 1;
-
-              return (
-                <div
-                  key={role}
-                  className={`p-2 rounded text-center text-xs ${
-                    approved ? 'bg-green-100 text-green-800' :
-                    rejected ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100'
-                  }`}
-                >
-                  <div className="font-medium">{label}</div>
-                  <div>
-                    {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Pay button for finance users on to-be-acted items */}
-          {user.role?.toLowerCase() === 'finance' && 
-           activeTab === FINANCE_TABS.TO_BE_ACTED && 
-           !financeActionedRequisitions.includes(selectedRequisition.id) && (
-            <div className="mt-6">
               <button
-                onClick={() => handlePay(selectedRequisition)}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                onClick={() => setSelectedRequisition(null)}
+                className="md:hidden text-gray-500 hover:text-gray-700"
               >
-                Pay
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
               </button>
             </div>
-          )}
 
-          {/* Approval buttons for authorized roles */}
-          {(() => {
-            const userRole = user?.role?.toLowerCase();
-            const hasUserApproved = selectedRequisition[`approved_by_${userRole}`] === 1;
-            const hasUserRejected = selectedRequisition[`rejected_by_${userRole}`] === 1;
-            const hasUserActed = hasUserApproved || hasUserRejected;
-            
-            // Check if requisition is fully approved (Finance, GMD, and Chairman have all approved)
-            const isFullyApproved = selectedRequisition.approved_by_finance === 1 && 
-                                  selectedRequisition.approved_by_gmd === 1 && 
-                                  selectedRequisition.approved_by_chairman === 1;
-            
-            // Check if user is authorized and hasn't acted yet
-            const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
-            const statusAllowsAction = selectedRequisition.status === 'pending' || selectedRequisition.status === 'submitted';
-            const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
-            
-            if (!isAuthorized || !canAct) {
-              return null;
-            }
-            
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-2">Description</h3>
+              <p className="text-gray-700">{selectedRequisition.description}</p>
+            </div>
+
+{/* Items Section */}
+<div className="mb-6">
+  <h3 className="text-lg font-semibold mb-2">Items</h3>
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {selectedRequisition.items && selectedRequisition.items.length > 0 ? (
+          selectedRequisition.items.map((item, index) => (
+            <tr key={index}>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {item.name || 'Unnamed Item'}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {item.quantity}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ₦{item.unit_price?.toLocaleString()}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ₦{(item.quantity * item.unit_price)?.toLocaleString()}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+              No items added to this requisition
+            </td>
+          </tr>
+        )}
+        {selectedRequisition.items && selectedRequisition.items.length > 0 && (
+          <tr className="bg-gray-50">
+            <td colSpan="3" className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+              Total
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+              ₦{selectedRequisition.total_amount?.toLocaleString()}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
+{selectedRequisition.attachments && (
+  <div className="mt-6 border-t pt-4">
+    <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
+    <div className="space-y-2">
+      {(() => {
+        try {
+          const attachments = JSON.parse(selectedRequisition.attachments);
+          if (!Array.isArray(attachments) || attachments.length === 0) {
             return (
-              <div className="mt-6 space-y-4">
-                <div className="flex justify-end space-x-3">
-                  <button
-                    onClick={() => handleReject(selectedRequisition)}
-                    disabled={hasUserActed}
-                    className={`px-4 py-2 border rounded-md text-sm font-medium ${
-                      hasUserActed 
-                        ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-                        : 'border-red-500 text-red-500 hover:bg-red-50'
-                    }`}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => handleApprove(selectedRequisition)}
-                    disabled={hasUserActed}
-                    className={`px-4 py-2 rounded-md text-sm font-medium ${
-                      hasUserActed 
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                        : 'bg-primary text-white hover:bg-primary-dark'
-                    }`}
-                  >
-                    Approve
-                  </button>
+              <p className="text-sm text-gray-500">No attachments found</p>
+            );
+          }
+          
+          return attachments.map((file, index) => (
+            <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+              <div className="flex items-center space-x-3 min-w-0">
+                {getFileIcon({
+                  mimetype: file.mimetype,
+                  originalname: file.originalname || file.filename
+                })}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {file.originalname || file.filename}
+                  </p>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <span>{file.mimetype?.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                    {file.size > 0 && (
+                      <>
+                        <span className="mx-1">•</span>
+                        <span>{formatFileSize(file.size)}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            );
-          })()} 
+              <a 
+                href={`${BASE_URL}/uploads/${file.filename}`}
+                download={file.originalname || file.filename}
+                className="text-primary hover:text-primary-dark transition-colors"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </a>
+            </div>
+          ));
+        } catch (error) {
+          console.error('Error parsing attachments:', error);
+          return (
+            <p className="text-sm text-red-500">Error loading attachments</p>
+          );
+        }
+      })()}
+    </div>
+  </div>
+)}
+
+            {/* Approval status indicators */}
+<div className="grid grid-cols-5 gap-2 mb-6">
+  {[
+    { role: 'manager', label: 'Manager' },
+    { role: 'executive', label: 'Executive' },
+    { role: 'finance', label: 'Finance' },
+    { role: 'gmd', label: 'GMD' },
+    { role: 'chairman', label: 'Chairman' }
+  ].map(({ role, label }) => {
+    const approved = selectedRequisition[`approved_by_${role}`] === 1;
+    const rejected = selectedRequisition[`rejected_by_${role}`] === 1;
+
+    return (
+      <div
+        key={role}
+        className={`p-2 rounded text-center text-xs ${
+          approved ? 'bg-green-100 text-green-800' :
+          rejected ? 'bg-red-100 text-red-800' :
+          'bg-gray-100'
+        }`}
+      >
+        <div className="font-medium">{label}</div>
+        <div>
+          {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
         </div>
       </div>
-    )}
-  </div>
-);
+    );
+  })}
+</div>
+
+{/* Comment Section */}
+{selectedRequisition && (
+  <CommentSection 
+    requisitionId={selectedRequisition.id} 
+    user={user} 
+  />
+)}
+
+{/* Approval buttons for authorized roles */}
+{(() => {
+  const userRole = user?.role?.toLowerCase();
+  const hasUserApproved = selectedRequisition[`approved_by_${userRole}`] === 1;
+  const hasUserRejected = selectedRequisition[`rejected_by_${userRole}`] === 1;
+  const hasUserActed = hasUserApproved || hasUserRejected;
+  
+  // Check if requisition is fully approved (Finance, GMD, and Chairman have all approved)
+  const isFullyApproved = selectedRequisition.approved_by_finance === 1 && 
+                         selectedRequisition.approved_by_gmd === 1 && 
+                         selectedRequisition.approved_by_chairman === 1;
+  
+  // Check if user is authorized and hasn't acted yet
+  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
+  const statusAllowsAction = selectedRequisition.status === 'pending' || selectedRequisition.status === 'submitted';
+  const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
+  
+  if (!isAuthorized || !canAct) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => handleReject(selectedRequisition)}
+          disabled={hasUserActed}
+          className={`px-4 py-2 border rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+              : 'border-red-500 text-red-500 hover:bg-red-50'
+          }`}
+        >
+          Reject
+        </button>
+        <button
+          onClick={() => handleApprove(selectedRequisition)}
+          disabled={hasUserActed}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            hasUserActed 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-primary text-white hover:bg-primary-dark'
+          }`}
+        >
+          Approve
+        </button>
+      </div>
+    </div>
+  );
+})()} 
+       </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default RequisitionList;
