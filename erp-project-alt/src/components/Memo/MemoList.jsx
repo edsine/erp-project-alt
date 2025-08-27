@@ -70,7 +70,7 @@ const CommentSection = ({ memoId, user }) => {
   return (
     <div className="mt-6 border-t pt-4">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">Comments ({comments.length})</h3>
+        <h3 className="text-lg font-semibold text-gray-500">Comments ({comments.length})</h3>
         <button
           type="button"
           onClick={() => setShowCommentInput(!showCommentInput)}
@@ -114,7 +114,7 @@ const CommentSection = ({ memoId, user }) => {
           comments.map((comment) => (
             <div key={comment.id} className="bg-gray-50 p-4 rounded-md">
               <div className="flex justify-between items-start">
-                <div className="font-medium text-sm text-gray-900">{comment.user_name}</div>
+                <div className="font-medium text-sm text-gray-800">{comment.user_name}</div>
                 <div className="text-xs text-gray-500">
                   {formatDate(comment.created_at)}
                 </div>
@@ -123,7 +123,7 @@ const CommentSection = ({ memoId, user }) => {
             </div>
           ))
         ) : (
-          <p className="text-center text-gray-500 py-4">No comments yet. Be the first to add one!</p>
+          <p className="text-center text-gray-500 py-4"></p>
         )}
       </div>
     </div>
