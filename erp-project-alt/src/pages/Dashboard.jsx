@@ -38,19 +38,28 @@ const Dashboard = () => {
       }
     };
 
-    const fetchRequisitionCount = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/requisitions/user/${user.id}`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setRequisitionCount(data.length);
-        } else if (data && typeof data.count === 'number') {
-          setRequisitionCount(data.count);
-        }
-      } catch (err) {
-        console.error('Failed to fetch requisition count:', err);
-      }
-    };
+const fetchRequisitionCount = async () => {
+  try {
+    // Add the role parameter to match backend expectations
+    const res = await fetch(`${BASE_URL}/requisitions/user/${user.id}?role=${user.role}`);
+    const data = await res.json();
+    
+    console.log('Requisition count response:', data); // Add this for debugging
+    
+    if (Array.isArray(data)) {
+      setRequisitionCount(data.length);
+    } else if (data && typeof data.count === 'number') {
+      setRequisitionCount(data.count);
+    } else {
+      // Handle error case
+      console.error('Unexpected response format:', data);
+      setRequisitionCount(0);
+    }
+  } catch (err) {
+    console.error('Failed to fetch requisition count:', err);
+    setRequisitionCount(0); // Set to 0 on error instead of leaving undefined
+  }
+};
 
     const fetchMemoCount = async () => {
       try {
