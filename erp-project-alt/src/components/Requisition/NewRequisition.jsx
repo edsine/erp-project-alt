@@ -72,17 +72,45 @@ const NewRequisition = () => {
     description: '',
     priority: 'medium',
     items: [{ name: '', quantity: 1, unit_price: 0 }],
-    total_amount: 0
+    total_amount: 0,
+    recipients: []
   })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [userSearchTerm, setUserSearchTerm] = useState('')
+
+  // Mock users data - replace with actual API call
+  const [users] = useState([
+    { id: 1, name: 'John Doe', email: 'john@company.com', role: 'Manager' },
+    { id: 2, name: 'Jane Smith', email: 'jane@company.com', role: 'HR Director' },
+    { id: 3, name: 'Mike Johnson', email: 'mike@company.com', role: 'Finance Manager' },
+    { id: 4, name: 'Sarah Wilson', email: 'sarah@company.com', role: 'Operations Lead' },
+    { id: 5, name: 'David Brown', email: 'david@company.com', role: 'IT Director' },
+  ])
+
+  // Filter users based on search term
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    user.role.toLowerCase().includes(userSearchTerm.toLowerCase())
+  )
 
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleUserSelect = (userId) => {
+    setFormData(prev => ({
+      ...prev,
+      recipients: prev.recipients.includes(userId)
+        ? prev.recipients.filter(id => id !== userId)
+        : [...prev.recipients, userId]
     }))
   }
 
@@ -189,6 +217,7 @@ const NewRequisition = () => {
       submitFormData.append('created_by', user.id)
       submitFormData.append('items', JSON.stringify(formData.items))
       submitFormData.append('total_amount', formData.total_amount)
+      submitFormData.append('recipients', JSON.stringify(formData.recipients))
 
       // Add files
       selectedFiles.forEach((file) => {
@@ -282,6 +311,77 @@ const NewRequisition = () => {
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>
+            </div>
+
+            {/* Recipients Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Send To (Optional)
+              </label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <span>
+                    {(formData.recipients || []).length > 0
+                      ? `${(formData.recipients || []).length} user(s) selected`
+                      : 'Select users to send requisition to'
+                    }
+                  </span>
+                  <svg className={`h-5 w-5 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {showUserDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {/* Search Input */}
+                    <div className="p-2 border-b border-gray-200">
+                      <input
+                        type="text"
+                        placeholder="Search users..."
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                        autoFocus
+                      />
+                    </div>
+                    
+                    <div className="py-1">
+                      {filteredUsers.length > 0 ? (
+                        filteredUsers.map(user => (
+                          <label
+                            key={user.id}
+                            className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={(formData.recipients || []).includes(user.id)}
+                              onChange={() => handleUserSelect(user.id)}
+                              className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                            />
+                            <div className="ml-3 flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {user.name}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {user.email} • {user.role}
+                              </p>
+                            </div>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-gray-500">
+                          No users found
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

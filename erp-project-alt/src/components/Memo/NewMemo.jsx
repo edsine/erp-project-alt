@@ -54,6 +54,7 @@ const getFileIcon = (file) => {
     </svg>
   );
 };
+
 const NewMemo = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   
@@ -68,13 +69,30 @@ const NewMemo = () => {
     reportType: '',
     reportDate: '',
     attachments: '',
-    acknowledgments: []
+    acknowledgments: [],
+    recipients: []
   })
   const [selectedFiles, setSelectedFiles] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [userSearchTerm, setUserSearchTerm] = useState('')
 
+  // Mock users data - replace with actual API call
+  const [users] = useState([
+    { id: 1, name: 'John Doe', email: 'john@company.com', role: 'Manager' },
+    { id: 2, name: 'Jane Smith', email: 'jane@company.com', role: 'HR Director' },
+    { id: 3, name: 'Mike Johnson', email: 'mike@company.com', role: 'Finance Manager' },
+    { id: 4, name: 'Sarah Wilson', email: 'sarah@company.com', role: 'Operations Lead' },
+    { id: 5, name: 'David Brown', email: 'david@company.com', role: 'IT Director' },
+  ])
 
+  // Filter users based on search term
+  const filteredUsers = users.filter(user =>
+    user.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+    user.role.toLowerCase().includes(userSearchTerm.toLowerCase())
+  )
   
   const handleMemoTypeChange = (type) => {
     setMemoType(type)
@@ -86,7 +104,8 @@ const NewMemo = () => {
       reportType: '',
       reportDate: '',
       attachments: '',
-      acknowledgments: []
+      acknowledgments: [],
+      recipients: []
     })
     setSelectedFiles([])
     setError('')
@@ -97,6 +116,15 @@ const NewMemo = () => {
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleUserSelect = (userId) => {
+    setFormData(prev => ({
+      ...prev,
+      recipients: prev.recipients.includes(userId)
+        ? prev.recipients.filter(id => id !== userId)
+        : [...prev.recipients, userId]
     }))
   }
 
@@ -170,7 +198,8 @@ const handleSubmit = async (e) => {
         reportType: formData.reportType,
         reportDate: formData.reportDate,
         attachments: formData.attachments,
-        acknowledgments: formData.acknowledgments
+        acknowledgments: formData.acknowledgments,
+        recipients: formData.recipients
       }
       submitFormData.append('report_data', JSON.stringify(reportData))
     }
@@ -295,91 +324,161 @@ const handleSubmit = async (e) => {
           </select>
         </div>
 
-        {/* File Upload Section */}
-{/* File Upload Section */}
-<div className="mb-6">
-  <label className="block text-sm font-medium text-gray-700 mb-2">
-    Attachments (Optional)
-  </label>
-  
-  {/* Drag and Drop Zone */}
-  <div 
-    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md transition-colors hover:border-primary/50"
-    onDragOver={(e) => {
-      e.preventDefault();
-      e.currentTarget.classList.add('border-primary', 'bg-blue-50');
-    }}
-    onDragLeave={(e) => {
-      e.preventDefault();
-      e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
-    }}
-    onDrop={(e) => {
-      e.preventDefault();
-      e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
-      handleFileChange({ target: { files: e.dataTransfer.files } });
-    }}
-  >
-    <div className="space-y-1 text-center">
-      <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <div className="flex flex-col items-center text-sm text-gray-600">
-        <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
-          <span>Upload files</span>
-          <input
-            id="file-upload"
-            name="file-upload"
-            type="file"
-            multiple
-            className="sr-only"
-            onChange={handleFileChange}
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
-          />
-        </label>
-        <p className="mt-1">or drag and drop</p>
-      </div>
-      <p className="text-xs text-gray-500">
-        PDF, Word, Excel, Text, Images up to 500MB each
-      </p>
-    </div>
-  </div>
-
-  {/* Selected Files Display */}
-  {selectedFiles.length > 0 && (
-    <div className="mt-4">
-      <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Files ({selectedFiles.length})</h4>
-      <div className="space-y-2">
-        {selectedFiles.map((file, index) => (
-          <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-            <div className="flex items-center space-x-3 min-w-0">
-              <div className="flex-shrink-0">
-                {getFileIcon(file)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                <div className="flex items-center text-xs text-gray-500">
-                  <span>{formatFileSize(file.size)}</span>
-                  <span className="mx-2">•</span>
-                  <span>{file.type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                </div>
-              </div>
-            </div>
+        {/* Recipients Selection - Common for both memo types */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Send To (Optional)
+          </label>
+          <div className="relative">
             <button
               type="button"
-              onClick={() => removeFile(index)}
-              className="text-red-500 hover:text-red-700 transition-colors"
-              title="Remove file"
+              onClick={() => setShowUserDropdown(!showUserDropdown)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <span>
+                {(formData.recipients || []).length > 0
+                  ? `${(formData.recipients || []).length} user(s) selected`
+                  : 'Select users to send memo to'
+                }
+              </span>
+              <svg className={`h-5 w-5 transition-transform ${showUserDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
+
+            {/* Dropdown Menu */}
+            {showUserDropdown && (
+              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                {/* Search Input */}
+                <div className="p-2 border-b border-gray-200">
+                  <input
+                    type="text"
+                    placeholder="Search users..."
+                    value={userSearchTerm}
+                    onChange={(e) => setUserSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    autoFocus
+                  />
+                </div>
+                
+                <div className="py-1">
+                  {filteredUsers.length > 0 ? (
+                    filteredUsers.map(user => (
+                      <label
+                        key={user.id}
+                        className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(formData.recipients || []).includes(user.id)}
+                          onChange={() => handleUserSelect(user.id)}
+                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                        />
+                        <div className="ml-3 flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {user.email} • {user.role}
+                          </p>
+                        </div>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      No users found
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
-    </div>
-  )}
-</div>
+        </div>
+
+        {/* File Upload Section */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Attachments (Optional)
+          </label>
+          
+          {/* Drag and Drop Zone */}
+          <div 
+            className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md transition-colors hover:border-primary/50"
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.add('border-primary', 'bg-blue-50');
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.currentTarget.classList.remove('border-primary', 'bg-blue-50');
+              handleFileChange({ target: { files: e.dataTransfer.files } });
+            }}
+          >
+            <div className="space-y-1 text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <div className="flex flex-col items-center text-sm text-gray-600">
+                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+                  <span>Upload files</span>
+                  <input
+                    id="file-upload"
+                    name="file-upload"
+                    type="file"
+                    multiple
+                    className="sr-only"
+                    onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
+                  />
+                </label>
+                <p className="mt-1">or drag and drop</p>
+              </div>
+              <p className="text-xs text-gray-500">
+                PDF, Word, Excel, Text, Images up to 500MB each
+              </p>
+            </div>
+          </div>
+
+          {/* Selected Files Display */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Selected Files ({selectedFiles.length})</h4>
+              <div className="space-y-2">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <div className="flex-shrink-0">
+                        {getFileIcon(file)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                        <div className="flex items-center text-xs text-gray-500">
+                          <span>{formatFileSize(file.size)}</span>
+                          <span className="mx-2">•</span>
+                          <span>{file.type.split('/')[1]?.toUpperCase() || 'FILE'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(index)}
+                      className="text-red-500 hover:text-red-700 transition-colors"
+                      title="Remove file"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Report-specific Fields */}
         {memoType === 'report' && (
@@ -424,6 +523,8 @@ const handleSubmit = async (e) => {
                 />
               </div>
             </div>
+
+
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
