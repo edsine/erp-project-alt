@@ -38,26 +38,25 @@ const Dashboard = () => {
       }
     };
 
+// Replace your existing fetchRequisitionCount function in Dashboard.jsx with this:
+
 const fetchRequisitionCount = async () => {
   try {
-    // Add the role parameter to match backend expectations
-    const res = await fetch(`${BASE_URL}/requisitions/user/${user.id}?role=${user.role}`);
+    // Use the new count endpoint instead of fetching all requisitions
+    const res = await fetch(`${BASE_URL}/requisitions/count/user/${user.id}?role=${user.role}`);
     const data = await res.json();
     
-    console.log('Requisition count response:', data); // Add this for debugging
+    console.log('Requisition count response:', data);
     
-    if (Array.isArray(data)) {
-      setRequisitionCount(data.length);
-    } else if (data && typeof data.count === 'number') {
-      setRequisitionCount(data.count);
+    if (data.success) {
+      setRequisitionCount(data.count || 0);
     } else {
-      // Handle error case
-      console.error('Unexpected response format:', data);
+      console.error('Failed to fetch requisition count:', data.message);
       setRequisitionCount(0);
     }
   } catch (err) {
     console.error('Failed to fetch requisition count:', err);
-    setRequisitionCount(0); // Set to 0 on error instead of leaving undefined
+    setRequisitionCount(0);
   }
 };
 

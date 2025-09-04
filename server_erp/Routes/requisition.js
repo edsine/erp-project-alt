@@ -181,6 +181,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
   }
 });
 
+
 // Updated GET routes with separate files table
 router.get('/requisitions/user/:userId', async (req, res) => {
   try {
@@ -828,5 +829,111 @@ router.post('/requisitions/:id/comments', async (req, res) => {
     res.status(500).json({ message: 'Error adding comment' });
   }
 }); 
+// Add this new route to your requisitions router (after your existing routes)
+
+// Get count of pending requisitions for a specific user
+router.get('/requisitions/count/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.query;
+
+    console.log(`📊 Fetching pending requisition count for user ${userId} with role ${role}`);
+
+    const approvalRoles = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
+    let query;
+    let values;
+
+    // Get user's department and actual role from DB
+    const [userRows] = await db.query(
+      `SELECT department, role FROM users WHERE id = ?`,
+      [userId]
+    );
+
+    if (userRows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { department, role: actualRole } = userRows[0];
+    const userRole = actualRole.toLowerCase();
+    let normalizedRole = role?.toLowerCase();
+
+    // OVERRIDE role if dept ≠ ICT and actual role is finance
+    if (department.toLowerCase() !== 'ict' && userRole === 'finance') {
+      normalizedRole = 'finance';
+    }
+
+    // If no role specified or role is not an approval role, count user's own pending requisitions
+    if (!normalizedRole || !approvalRoles.includes(normalizedRole)) {
+      query = `
+        SELECT COUNT(*) as count
+        FROM requisitions r
+        WHERE r.created_by = ?
+        AND r.status != 'completed'
+        AND r.status != 'rejected'
+        AND (
+          r.approved_by_manager IS NULL 
+          OR r.approved_by_executive IS NULL 
+          OR r.approved_by_finance IS NULL 
+          OR r.approved_by_gmd IS NULL 
+          OR r.approved_by_chairman IS NULL
+        )
+      `;
+      values = [userId];
+    } else {
+      // For approvers, count requisitions they need to approve (pending for their level)
+      const approvalField = `approved_by_${normalizedRole}`;
+      const noDeptRoles = ['finance', 'gmd', 'chairman'];
+
+      if (noDeptRoles.includes(normalizedRole)) {
+        // For roles without department restrictions (finance, gmd, chairman)
+        let additionalCondition = '';
+        if (normalizedRole === 'chairman') {
+          additionalCondition = 'AND approved_by_gmd = 1';
+        }
+
+        query = `
+          SELECT COUNT(*) as count
+          FROM requisitions r
+          JOIN users u ON r.created_by = u.id
+          WHERE ${approvalField} IS NULL
+          AND r.status != 'completed'
+          AND r.status != 'rejected'
+          ${additionalCondition}
+        `;
+        values = [];
+      } else {
+        // For department-restricted roles (manager, executive)
+        query = `
+          SELECT COUNT(*) as count
+          FROM requisitions r
+          JOIN users u ON r.created_by = u.id
+          WHERE ${approvalField} IS NULL
+          AND u.department = ?
+          AND r.status != 'completed'
+          AND r.status != 'rejected'
+        `;
+        values = [department];
+      }
+    }
+
+    const [result] = await db.query(query, values);
+    const count = result[0]?.count || 0;
+
+    res.json({ 
+      success: true, 
+      count: count,
+      user_role: normalizedRole || 'employee',
+      department: department
+    });
+
+  } catch (err) {
+    console.error('❌ Error fetching pending requisition count:', err.message);
+    res.status(500).json({ 
+      success: false,
+      message: 'Internal server error',
+      error: err.message 
+    });
+  }
+});
 
 module.exports = router;
