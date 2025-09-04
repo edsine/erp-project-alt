@@ -1002,54 +1002,141 @@ const MemoList = () => {
               </div>
             )}
 
-            {/* Approval buttons for authorized roles */}
-            {(() => {
-              const userRole = user?.role?.toLowerCase();
-              const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
-              const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
-              const hasUserActed = hasUserApproved || hasUserRejected;
-              
-              // Check if memo is fully approved (Chairman has approved)
-              const isFullyApproved = selectedMemo.approved_by_chairman === 1;
-              
-              // Check if user is authorized and hasn't acted yet
-              const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
-              const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
-              const canAct = !hasUserActed && statusAllowsAction && !isFullyApproved;
-              
-              if (!isAuthorized || !canAct) {
-                return null;
-              }
-              
-              return (
-                <div className="mt-6 space-y-4">
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => handleReject(selectedMemo)}
-                      disabled={hasUserActed}
-                      className={`px-4 py-2 border rounded-md text-sm font-medium ${
-                        hasUserActed 
-                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-                          : 'border-red-500 text-red-500 hover:bg-red-50'
-                      }`}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => handleApprove(selectedMemo)}
-                      disabled={hasUserActed}
-                      className={`px-4 py-2 rounded-md text-sm font-medium ${
-                        hasUserActed 
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                          : 'bg-primary text-white hover:bg-primary-dark'
-                      }`}
-                    >
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
+         {/* Approval buttons for authorized roles */}
+{/* {(() => {
+  const userRole = user?.role?.toLowerCase();
+  const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
+  const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
+  const hasUserActed = hasUserApproved || hasUserRejected;
+  
+  // Check if user is authorized and hasn't acted yet
+  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
+  const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
+  const canAct = !hasUserActed && statusAllowsAction;
+  
+  // Special case for chairman: should be able to approve even if others have approved
+  const isChairman = userRole === 'chairman';
+  const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
+  
+  if ((!isAuthorized || !canAct) && !canChairmanApprove) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => handleReject(selectedMemo)}
+          disabled={hasUserActed && !isChairman}
+          className={`px-4 py-2 border rounded-md text-sm font-medium ${
+            (hasUserActed && !isChairman) 
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+              : 'border-red-500 text-red-500 hover:bg-red-50'
+          }`}
+        >
+          Reject
+        </button>
+        <button
+          onClick={() => handleApprove(selectedMemo)}
+          disabled={hasUserActed && !isChairman}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            (hasUserActed && !isChairman) 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-primary text-white hover:bg-primary-dark'
+          }`}
+        >
+          Approve
+        </button>
+      </div>
+    </div>
+  );
+})()} */}
+{(() => {
+  const userRole = user?.role?.toLowerCase();
+  
+  // Debug logging
+  console.log('=== DEBUG APPROVAL BUTTON ===');
+  console.log('User role:', userRole);
+  console.log('Memo status:', selectedMemo.status);
+  console.log('Memo data:', selectedMemo);
+  
+  // Normalize role for all executive variations
+  const normalizeRole = (role) => {
+    if (!role) return role;
+    if (role.includes('executive') || role.includes('ict')) {
+      return 'executive';
+    }
+    return role;
+  };
+  
+  const normalizedRole = normalizeRole(userRole);
+  console.log('Normalized role:', normalizedRole);
+  
+  const hasUserApproved = selectedMemo[`approved_by_${normalizedRole}`] === 1;
+  const hasUserRejected = selectedMemo[`rejected_by_${normalizedRole}`] === 1;
+  const hasUserActed = hasUserApproved || hasUserRejected;
+  
+  console.log('Approval status:', hasUserApproved);
+  console.log('Rejection status:', hasUserRejected);
+  
+  // Check if user is authorized - include all executive variations
+  const isExecutive = userRole?.includes('executive') || userRole?.includes('ict');
+  const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExecutive;
+  
+  // Allow action if status is pending/submitted OR if it's in_review (which seems common in your data)
+  const statusAllowsAction = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
+  const canAct = !hasUserActed && statusAllowsAction;
+  
+  // Special case for chairman
+  const isChairman = userRole === 'chairman';
+  const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
+  
+  console.log('Is authorized:', isAuthorized);
+  console.log('Status allows action:', statusAllowsAction);
+  console.log('Can act:', canAct);
+  console.log('Is chairman:', isChairman);
+  console.log('Can chairman approve:', canChairmanApprove);
+  
+  // Show buttons if authorized and can act, OR if chairman can approve
+  const shouldShowButtons = (isAuthorized && canAct) || canChairmanApprove;
+  
+  console.log('Should show buttons:', shouldShowButtons);
+  console.log('=== END DEBUG ===');
+  
+  if (!shouldShowButtons) {
+    return null;
+  }
+  
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex justify-end space-x-3">
+        <button
+          onClick={() => handleReject(selectedMemo)}
+          disabled={hasUserActed && !isChairman}
+          className={`px-4 py-2 border rounded-md text-sm font-medium ${
+            (hasUserActed && !isChairman) 
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+              : 'border-red-500 text-red-500 hover:bg-red-50'
+          }`}
+        >
+          Reject
+        </button>
+        <button
+          onClick={() => handleApprove(selectedMemo)}
+          disabled={hasUserActed && !isChairman}
+          className={`px-4 py-2 rounded-md text-sm font-medium ${
+            (hasUserActed && !isChairman) 
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+              : 'bg-primary text-white hover:bg-primary-dark'
+          }`}
+        >
+          Approve
+        </button>
+      </div>
+    </div>
+  );
+})()}
+   
           </div>
         </div>
       )}
