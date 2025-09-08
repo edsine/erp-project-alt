@@ -48,61 +48,6 @@ const upload = multer({
   fileFilter: fileFilter
 })
 
-// Create new memo
-// Create new memo
-// router.post('/memos', async (req, res) => {
-//   try {
-//     const {
-//       title,
-//       content,
-//       priority = 'medium',
-//       memo_type = 'normal',
-//       requires_approval = 1,
-//       created_by,
-//       report_data = {}
-//     } = req.body;
-
-//     const {
-//       reportType = null,
-//       reportDate = null,
-//       attachments = null,
-//       acknowledgments = []
-//     } = memo_type === 'report' ? report_data : {};
-
-//     // ✅ Sanitize: only keep string role names (e.g., "manager")
-//     const cleanAcknowledgments = Array.isArray(acknowledgments)
-//       ? acknowledgments.filter(a => typeof a === 'string')
-//       : [];
-
-//     const acknowledgmentString = cleanAcknowledgments.length > 0
-//       ? JSON.stringify(cleanAcknowledgments)
-//       : null;
-
-//     const [result] = await db.execute(
-//       `INSERT INTO memos 
-//         (title, content, priority, memo_type, requires_approval, created_by, report_type, report_date, attachments, acknowledgments, status) 
-//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-//       [
-//         title,
-//         content,
-//         priority,
-//         memo_type,
-//         requires_approval ? 1 : 0,
-//         created_by,
-//         reportType,
-//         reportDate,
-//         attachments,
-//         acknowledgmentString,
-//         'submitted'
-//       ]
-//     );
-
-//     res.status(201).json({ message: 'Memo created successfully', memo_id: result.insertId, memo_type });
-//   } catch (err) {
-//     console.error('❌ Error creating memo:', err.message);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// });
 
 
 router.post('/memos', upload.array('files'), async (req, res) => {
@@ -178,15 +123,33 @@ router.post('/memos', upload.array('files'), async (req, res) => {
 
 
 // Serve uploaded files
+// Serve uploaded files - FIXED VERSION
 router.get('/uploads/memos/:filename', (req, res) => {
-  const filePath = path.join(__dirname, '../../uploads/memos', req.params.filename);
+  const { filename } = req.params;
+  const filePath = path.join(__dirname, '../../uploads/memos', filename);
 
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({ message: 'File not found' });
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: 'File not found' });
   }
+
+  // Set proper headers for download
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  
+  // Stream the file
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
 });
+// router.get('/uploads/memos/:filename', (req, res) => {
+//   const filePath = path.join(__dirname, '../../uploads/memos', req.params.filename);
+
+//   if (fs.existsSync(filePath)) {
+//     res.sendFile(filePath);
+//   } else {
+//     res.status(404).json({ message: 'File not found' });
+//   }
+// });
 
 
 // GET /memos - fetch all memos
@@ -1233,6 +1196,7 @@ router.post('/memos/:id/reject', async (req, res) => {
 // });
 
 // DELETE /memos/:id - delete memo
+
 router.delete('/memos/:id', async (req, res) => {
   try {
     const memoId = req.params.id;
