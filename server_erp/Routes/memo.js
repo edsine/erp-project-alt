@@ -73,7 +73,7 @@ router.post('/memos', upload.array('files'), async (req, res) => {
     const fileAttachments = req.files?.map(file => ({
       filename: file.filename,
       originalname: file.originalname,
-      path: file.path,
+     // path: file.path,
       size: file.size,
       mimetype: file.mimetype
     })) || []
@@ -141,6 +141,7 @@ router.get('/uploads/memos/:filename', (req, res) => {
   const fileStream = fs.createReadStream(filePath);
   fileStream.pipe(res);
 });
+
 // router.get('/uploads/memos/:filename', (req, res) => {
 //   const filePath = path.join(__dirname, '../../uploads/memos', req.params.filename);
 
@@ -154,14 +155,23 @@ router.get('/uploads/memos/:filename', (req, res) => {
 
 // GET /memos - fetch all memos
 // GET /api/memos - Fetch all memos
-router.get('/memos', async (req, res) => {
-  try {
-    const [memos] = await db.query('SELECT * FROM memos ORDER BY created_at DESC');
-    res.status(200).json(memos);
-  } catch (err) {
-    console.error('Error fetching memos:', err);
-    res.status(500).json({ message: 'Server error while fetching memos' });
+// Serve memo attachments
+router.get('/api/uploads/memos/:filename', (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join(__dirname, 'uploads', 'memos', filename);
+
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ message: 'File not found' });
   }
+
+  // Set proper headers for download
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  
+  // Stream the file
+  const fileStream = fs.createReadStream(filePath);
+  fileStream.pipe(res);
 });
 
 // GET /memos/user/:userId - fetch memos for specific user based on role
