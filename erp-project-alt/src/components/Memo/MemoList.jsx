@@ -33,7 +33,7 @@ const CommentSection = ({ memoId, user }) => {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return;
-    
+
     setLoading(true);
     try {
       const response = await axios.post(
@@ -79,7 +79,7 @@ const CommentSection = ({ memoId, user }) => {
           {showCommentInput ? 'Cancel' : 'Add Comment'}
         </button>
       </div>
-      
+
       {/* Comment input - shown only when button is clicked */}
       {showCommentInput && (
         <div className="mb-4 bg-gray-50 p-4 rounded-md">
@@ -330,11 +330,11 @@ const MemoList = () => {
   // Add this function to filter memos for finance tabs
   const getFinanceFilteredMemos = (tab) => {
     if (user.role?.toLowerCase() !== 'finance') return [];
-    
+
     const chairmanApprovedMemos = searchFilteredMemos.filter(
       memo => memo.approved_by_chairman === 1
     );
-    
+
     if (tab === FINANCE_TABS.TO_BE_ACTED) {
       return chairmanApprovedMemos.filter(
         memo => !financeActionedMemos.includes(memo.id)
@@ -344,15 +344,15 @@ const MemoList = () => {
         memo => financeActionedMemos.includes(memo.id)
       );
     }
-    
+
     return [];
   };
 
   // Filter memos by status based on active tab
   const getFilteredMemosByStatus = () => {
     // Handle finance-specific tabs
-    if (user.role?.toLowerCase() === 'finance' && 
-        (activeTab === FINANCE_TABS.TO_BE_ACTED || activeTab === FINANCE_TABS.ACTED_UPON)) {
+    if (user.role?.toLowerCase() === 'finance' &&
+      (activeTab === FINANCE_TABS.TO_BE_ACTED || activeTab === FINANCE_TABS.ACTED_UPON)) {
       return getFinanceFilteredMemos(activeTab);
     }
 
@@ -360,9 +360,9 @@ const MemoList = () => {
       case 'pending':
         return searchFilteredMemos.filter(memo => {
           if (memo.created_by === user.id) {
-            return !isMemoApproved(memo) && 
-                   !isMemoRejected(memo) && 
-                   !isMemoCompleted(memo);
+            return !isMemoApproved(memo) &&
+              !isMemoRejected(memo) &&
+              !isMemoCompleted(memo);
           }
           const roleField = `approved_by_${user.role}`;
           const rejectField = `rejected_by_${user.role}`;
@@ -417,21 +417,21 @@ const MemoList = () => {
 
     // Add finance-specific counts if user is finance
     const counts = { pending, approved, rejected, completed };
-    
+
     if (user.role?.toLowerCase() === 'finance') {
       const chairmanApproved = searchFilteredMemos.filter(
         memo => memo.approved_by_chairman === 1
       );
-      
+
       counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
         memo => !financeActionedMemos.includes(memo.id)
       ).length;
-      
+
       counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
         memo => financeActionedMemos.includes(memo.id)
       ).length;
     }
-    
+
     return counts;
   };
 
@@ -466,10 +466,10 @@ const MemoList = () => {
         // Add to acted upon list
         const updatedActions = [...financeActionedMemos, memo.id];
         setFinanceActionedMemos(updatedActions);
-        
+
         // Save to localStorage
         localStorage.setItem(`financeMemoActions_${user.id}`, JSON.stringify(updatedActions));
-        
+
         alert('Payment processed successfully!');
       }
     } catch (error) {
@@ -730,8 +730,8 @@ const MemoList = () => {
               <button
                 onClick={() => setActiveTab('pending')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'pending'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Pending ({statusCounts.pending})
@@ -739,44 +739,42 @@ const MemoList = () => {
               <button
                 onClick={() => setActiveTab('approved')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'approved'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Approved ({statusCounts.approved})
               </button>
-              
+
               {/* Finance-specific tabs */}
               {user.role?.toLowerCase() === 'finance' && (
                 <>
                   <button
                     onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === FINANCE_TABS.TO_BE_ACTED
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.TO_BE_ACTED
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
                   </button>
                   <button
                     onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
-                      activeTab === FINANCE_TABS.ACTED_UPON
+                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.ACTED_UPON
                         ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
-                    }`}
+                      }`}
                   >
                     Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
                   </button>
                 </>
               )}
-              
+
               <button
                 onClick={() => setActiveTab('rejected')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
                   }`}
               >
                 Rejected ({statusCounts.rejected})
@@ -919,11 +917,10 @@ const MemoList = () => {
                 return (
                   <div
                     key={role}
-                    className={`p-2 rounded text-center text-xs ${
-                      approved ? 'bg-green-100 text-green-800' :
-                      rejected ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100'
-                    }`}
+                    className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
+                        rejected ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100'
+                      }`}
                   >
                     <div className="font-medium">{label}</div>
                     <div>
@@ -936,25 +933,25 @@ const MemoList = () => {
 
             {/* Comment Section */}
             {selectedMemo && (
-              <CommentSection 
-                memoId={selectedMemo.id} 
-                user={user} 
+              <CommentSection
+                memoId={selectedMemo.id}
+                user={user}
               />
             )}
 
             {/* Pay button for finance users on to-be-acted items */}
-            {user.role?.toLowerCase() === 'finance' && 
-             activeTab === FINANCE_TABS.TO_BE_ACTED && 
-             !financeActionedMemos.includes(selectedMemo.id) && (
-              <div className="mt-6">
-                <button
-                  onClick={() => handlePay(selectedMemo)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Pay
-                </button>
-              </div>
-            )}
+            {user.role?.toLowerCase() === 'finance' &&
+              activeTab === FINANCE_TABS.TO_BE_ACTED &&
+              !financeActionedMemos.includes(selectedMemo.id) && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => handlePay(selectedMemo)}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Pay
+                  </button>
+                </div>
+              )}
 
             {/* Acknowledgment checkbox for reports */}
             {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (
@@ -1002,8 +999,8 @@ const MemoList = () => {
               </div>
             )}
 
-         {/* Approval buttons for authorized roles */}
-{/* {(() => {
+            {/* Approval buttons for authorized roles */}
+            {/* {(() => {
   const userRole = user?.role?.toLowerCase();
   const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
   const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
@@ -1051,92 +1048,90 @@ const MemoList = () => {
     </div>
   );
 })()} */}
-{(() => {
-  const userRole = user?.role?.toLowerCase();
-  
-  // Debug logging
-  console.log('=== DEBUG APPROVAL BUTTON ===');
-  console.log('User role:', userRole);
-  console.log('Memo status:', selectedMemo.status);
-  console.log('Memo data:', selectedMemo);
-  
-  // Normalize role for all executive variations
-  const normalizeRole = (role) => {
-    if (!role) return role;
-    if (role.includes('executive') || role.includes('ict')) {
-      return 'executive';
-    }
-    return role;
-  };
-  
-  const normalizedRole = normalizeRole(userRole);
-  console.log('Normalized role:', normalizedRole);
-  
-  const hasUserApproved = selectedMemo[`approved_by_${normalizedRole}`] === 1;
-  const hasUserRejected = selectedMemo[`rejected_by_${normalizedRole}`] === 1;
-  const hasUserActed = hasUserApproved || hasUserRejected;
-  
-  console.log('Approval status:', hasUserApproved);
-  console.log('Rejection status:', hasUserRejected);
-  
-  // Check if user is authorized - include all executive variations
-  const isExecutive = userRole?.includes('executive') || userRole?.includes('ict');
-  const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExecutive;
-  
-  // Allow action if status is pending/submitted OR if it's in_review (which seems common in your data)
-  const statusAllowsAction = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
-  const canAct = !hasUserActed && statusAllowsAction;
-  
-  // Special case for chairman
-  const isChairman = userRole === 'chairman';
-  const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
-  
-  console.log('Is authorized:', isAuthorized);
-  console.log('Status allows action:', statusAllowsAction);
-  console.log('Can act:', canAct);
-  console.log('Is chairman:', isChairman);
-  console.log('Can chairman approve:', canChairmanApprove);
-  
-  // Show buttons if authorized and can act, OR if chairman can approve
-  const shouldShowButtons = (isAuthorized && canAct) || canChairmanApprove;
-  
-  console.log('Should show buttons:', shouldShowButtons);
-  console.log('=== END DEBUG ===');
-  
-  if (!shouldShowButtons) {
-    return null;
-  }
-  
-  return (
-    <div className="mt-6 space-y-4">
-      <div className="flex justify-end space-x-3">
-        <button
-          onClick={() => handleReject(selectedMemo)}
-          disabled={hasUserActed && !isChairman}
-          className={`px-4 py-2 border rounded-md text-sm font-medium ${
-            (hasUserActed && !isChairman) 
-              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-              : 'border-red-500 text-red-500 hover:bg-red-50'
-          }`}
-        >
-          Reject
-        </button>
-        <button
-          onClick={() => handleApprove(selectedMemo)}
-          disabled={hasUserActed && !isChairman}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            (hasUserActed && !isChairman) 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-              : 'bg-primary text-white hover:bg-primary-dark'
-          }`}
-        >
-          Approve
-        </button>
-      </div>
-    </div>
-  );
-})()}
-   
+            {(() => {
+              const userRole = user?.role?.toLowerCase();
+
+              // Debug logging
+              console.log('=== DEBUG APPROVAL BUTTON ===');
+              console.log('User role:', userRole);
+              console.log('Memo status:', selectedMemo.status);
+              console.log('Memo data:', selectedMemo);
+
+              // Normalize role for all executive variations
+              const normalizeRole = (role) => {
+                if (!role) return role;
+                if (role.includes('executive') || role.includes('ict')) {
+                  return 'executive';
+                }
+                return role;
+              };
+
+              const normalizedRole = normalizeRole(userRole);
+              console.log('Normalized role:', normalizedRole);
+
+              const hasUserApproved = selectedMemo[`approved_by_${normalizedRole}`] === 1;
+              const hasUserRejected = selectedMemo[`rejected_by_${normalizedRole}`] === 1;
+              const hasUserActed = hasUserApproved || hasUserRejected;
+
+              console.log('Approval status:', hasUserApproved);
+              console.log('Rejection status:', hasUserRejected);
+
+              // Check if user is authorized - include all executive variations
+              const isExecutive = userRole?.includes('executive') || userRole?.includes('ict');
+              const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExecutive;
+
+              // Allow action if status is pending/submitted OR if it's in_review (which seems common in your data)
+              const statusAllowsAction = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
+              const canAct = !hasUserActed && statusAllowsAction;
+
+              // Special case for chairman
+              const isChairman = userRole === 'chairman';
+              const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
+
+              console.log('Is authorized:', isAuthorized);
+              console.log('Status allows action:', statusAllowsAction);
+              console.log('Can act:', canAct);
+              console.log('Is chairman:', isChairman);
+              console.log('Can chairman approve:', canChairmanApprove);
+
+              // Show buttons if authorized and can act, OR if chairman can approve
+              const shouldShowButtons = (isAuthorized && canAct) || canChairmanApprove;
+
+              console.log('Should show buttons:', shouldShowButtons);
+              console.log('=== END DEBUG ===');
+
+              if (!shouldShowButtons) {
+                return null;
+              }
+
+              return (
+                <div className="mt-6 space-y-4">
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={() => handleReject(selectedMemo)}
+                      disabled={hasUserActed && !isChairman}
+                      className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
+                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+                          : 'border-red-500 text-red-500 hover:bg-red-50'
+                        }`}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => handleApprove(selectedMemo)}
+                      disabled={hasUserActed && !isChairman}
+                      className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-primary text-white hover:bg-primary-dark'
+                        }`}
+                    >
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
           </div>
         </div>
       )}
