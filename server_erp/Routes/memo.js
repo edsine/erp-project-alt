@@ -48,9 +48,34 @@ const upload = multer({
   fileFilter: fileFilter
 })
 
+// Error handling middleware for multer - ADD THIS FUNCTION
+const handleMulterError = (error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'File too large. Maximum size is 10MB.' 
+      });
+    }
+    // Handle other multer errors
+    return res.status(400).json({ 
+      success: false,
+      message: `File upload error: ${error.message}` 
+    });
+  } else if (error.message === 'Invalid file type') {
+    return res.status(400).json({ 
+      success: false,
+      message: 'Invalid file type. Only documents, PDFs, images, and text files are allowed.' 
+    });
+  }
+  
+  // For any other errors
+  next(error);
+};
 
-
-router.post('/memos', upload.array('files'), async (req, res) => {
+router.post('/memos', upload.array('files'), handleMulterError, async (req, res) => {
+  let uploadedFiles = req.files || [];
+  
   try {
     const {
       title,
@@ -59,26 +84,39 @@ router.post('/memos', upload.array('files'), async (req, res) => {
       memo_type = 'normal',
       requires_approval = 1,
       created_by,
-      report_data = {}
-    } = req.body
+      report_data = '{}'
+    } = req.body;
 
-    const {
-      reportType = null,
-      reportDate = null,
-      attachments = null,
-      acknowledgments = []
-    } = memo_type === 'report' ? JSON.parse(report_data) : {}
+    // Parse report_data safely
+    let reportType = null;
+    let reportDate = null;
+    let attachments = null;
+    let acknowledgments = [];
+    
+    if (memo_type === 'report') {
+      try {
+        const reportData = typeof report_data === 'string' ? JSON.parse(report_data) : report_data;
+        reportType = reportData.reportType || null;
+        reportDate = reportData.reportDate || null;
+        attachments = reportData.attachments || null;
+        acknowledgments = reportData.acknowledgments || [];
+      } catch (parseError) {
+        console.error('Error parsing report_data:', parseError);
+        // Continue with default values if parsing fails
+      }
+    }
 
     // Process uploaded files
-    const fileAttachments = req.files?.map(file => ({
+    const fileAttachments = uploadedFiles.map(file => ({
       filename: file.filename,
       originalname: file.originalname,
-     // path: file.path,
+      path: file.path, // Keep this uncommented - you'll need it to access the file later
       size: file.size,
-      mimetype: file.mimetype
-    })) || []
+      mimetype: file.mimetype,
+      uploadedAt: new Date()
+    }));
 
-    // Rest of your original memo creation logic
+    // Insert into database
     const [result] = await db.execute(
       `INSERT INTO memos 
         (title, content, priority, memo_type, requires_approval, created_by,
@@ -97,29 +135,226 @@ router.post('/memos', upload.array('files'), async (req, res) => {
         JSON.stringify(acknowledgments),
         'submitted'
       ]
-    )
+    );
 
     res.status(201).json({
       message: 'Memo created successfully',
       memo_id: result.insertId,
-      memo_type
-    })
+      memo_type,
+      attachments: fileAttachments
+    });
 
   } catch (err) {
-    console.error('Error creating memo:', err.message)
+    console.error('Error creating memo:', err.message);
 
     // Clean up uploaded files on error
-    if (req.files?.length) {
-      req.files.forEach(file => {
-        fs.unlink(file.path, () => { })
-      })
+    if (uploadedFiles.length > 0) {
+      uploadedFiles.forEach(file => {
+        fs.unlink(file.path, (unlinkErr) => {
+          if (unlinkErr) console.error('Error deleting file:', unlinkErr);
+        });
+      });
     }
 
     res.status(500).json({
       message: err.message || 'Internal server error'
-    })
+    });
   }
-})
+});
+
+
+// GET all memos with complete information
+router.get('/memos', async (req, res) => {
+  try {
+    // First, let's check what columns exist in the users table
+    // For now, let's just get the memo data without user joins
+    const [memos] = await db.execute(`
+      SELECT 
+        m.*
+      FROM memos m
+      ORDER BY m.created_at DESC
+    `);
+
+    // Process each memo to include full file URLs and parsed JSON fields
+    const memosWithDetails = memos.map(memo => {
+      // Parse attachments if they exist
+      let attachments = [];
+      try {
+        if (memo.attachments && memo.attachments !== 'null' && memo.attachments !== '') {
+          attachments = JSON.parse(memo.attachments).map(attachment => ({
+            ...attachment,
+            downloadUrl: `/api/memos/download/${memo.id}/${attachment.filename}`,
+            viewUrl: `/api/memos/view/${memo.id}/${attachment.filename}`,
+            absolutePath: path.join(__dirname, '../../uploads/memos', attachment.filename)
+          }));
+        }
+      } catch (error) {
+        console.error('Error parsing attachments for memo:', memo.id, error);
+        attachments = [];
+      }
+
+      // Parse acknowledgments if they exist
+      let acknowledgments = [];
+      try {
+        if (memo.acknowledgments && memo.acknowledgments !== 'null' && memo.acknowledgments !== '') {
+          acknowledgments = JSON.parse(memo.acknowledgments);
+        }
+      } catch (error) {
+        console.error('Error parsing acknowledgments for memo:', memo.id, error);
+        acknowledgments = [];
+      }
+
+      // Calculate approval status
+      const approvalStatus = {
+        manager: memo.approved_by_manager ? 'approved' : memo.rejected_by_manager ? 'rejected' : 'pending',
+        executive: memo.approved_by_executive ? 'approved' : memo.rejected_by_executive ? 'rejected' : 'pending',
+        finance: memo.approved_by_finance ? 'approved' : memo.rejected_by_finance ? 'rejected' : 'pending',
+        gmd: memo.approved_by_gmd ? 'approved' : memo.rejected_by_gmd ? 'rejected' : 'pending',
+        chairman: memo.approved_by_chairman ? 'approved' : memo.rejected_by_chairman ? 'rejected' : 'pending'
+      };
+
+      // Determine overall status based on individual approvals
+      const allApproved = memo.approved_by_manager && memo.approved_by_executive && 
+                         memo.approved_by_finance && memo.approved_by_gmd && 
+                         memo.approved_by_chairman;
+      
+      const anyRejected = memo.rejected_by_manager || memo.rejected_by_executive || 
+                         memo.rejected_by_finance || memo.rejected_by_gmd || 
+                         memo.rejected_by_chairman;
+
+      const overallStatus = allApproved ? 'approved' : anyRejected ? 'rejected' : memo.status;
+
+      return {
+        id: memo.id,
+        title: memo.title,
+        content: memo.content,
+        priority: memo.priority,
+        memo_type: memo.memo_type,
+        requires_approval: Boolean(memo.requires_approval),
+        created_by: memo.created_by, // Just return the ID for now
+        sender_role: memo.sender_role,
+        sender_department: memo.sender_department,
+        report_type: memo.report_type,
+        report_date: memo.report_date,
+        attachments: attachments,
+        acknowledgments: acknowledgments,
+        status: overallStatus,
+        approval_status: approvalStatus,
+        individual_approvals: {
+          manager: {
+            approved: Boolean(memo.approved_by_manager),
+            rejected: Boolean(memo.rejected_by_manager)
+          },
+          executive: {
+            approved: Boolean(memo.approved_by_executive),
+            rejected: Boolean(memo.rejected_by_executive)
+          },
+          finance: {
+            approved: Boolean(memo.approved_by_finance),
+            rejected: Boolean(memo.rejected_by_finance)
+          },
+          gmd: {
+            approved: Boolean(memo.approved_by_gmd),
+            rejected: Boolean(memo.rejected_by_gmd)
+          },
+          chairman: {
+            approved: Boolean(memo.approved_by_chairman),
+            rejected: Boolean(memo.rejected_by_chairman)
+          }
+        },
+        created_at: memo.created_at,
+        updated_at: memo.updated_at,
+        uploads_directory: path.join(__dirname, '../../uploads/memos')
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: memosWithDetails.length,
+      data: memosWithDetails,
+      uploads_base_path: path.join(__dirname, '../../uploads/memos')
+    });
+
+  } catch (err) {
+    console.error('Error fetching memos:', err.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
+
+
+// router.post('/memos', upload.array('files'), async (req, res) => {
+//   try {
+//     const {
+//       title,
+//       content,
+//       priority = 'medium',
+//       memo_type = 'normal',
+//       requires_approval = 1,
+//       created_by,
+//       report_data = {}
+//     } = req.body
+
+//     const {
+//       reportType = null,
+//       reportDate = null,
+//       attachments = null,
+//       acknowledgments = []
+//     } = memo_type === 'report' ? JSON.parse(report_data) : {}
+
+//     // Process uploaded files
+//     const fileAttachments = req.files?.map(file => ({
+//       filename: file.filename,
+//       originalname: file.originalname,
+//      // path: file.path,
+//       size: file.size,
+//       mimetype: file.mimetype
+//     })) || []
+
+//     // Rest of your original memo creation logic
+//     const [result] = await db.execute(
+//       `INSERT INTO memos 
+//         (title, content, priority, memo_type, requires_approval, created_by,
+//          report_type, report_date, attachments, acknowledgments, status) 
+//        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+//       [
+//         title,
+//         content,
+//         priority,
+//         memo_type,
+//         requires_approval ? 1 : 0,
+//         created_by,
+//         reportType,
+//         reportDate,
+//         JSON.stringify(fileAttachments),
+//         JSON.stringify(acknowledgments),
+//         'submitted'
+//       ]
+//     )
+
+//     res.status(201).json({
+//       message: 'Memo created successfully',
+//       memo_id: result.insertId,
+//       memo_type
+//     })
+
+//   } catch (err) {
+//     console.error('Error creating memo:', err.message)
+
+//     // Clean up uploaded files on error
+//     if (req.files?.length) {
+//       req.files.forEach(file => {
+//         fs.unlink(file.path, () => { })
+//       })
+//     }
+
+//     res.status(500).json({
+//       message: err.message || 'Internal server error'
+//     })
+//   }
+// })
 
 
 // Serve uploaded files
@@ -156,7 +391,7 @@ router.get('/uploads/memos/:filename', (req, res) => {
 // GET /memos - fetch all memos
 // GET /api/memos - Fetch all memos
 // Serve memo attachments
-router.get('/api/uploads/memos/:filename', (req, res) => {
+router.get('/uploads/memos/:filename', (req, res) => {
   const { filename } = req.params;
   const filePath = path.join(__dirname, 'uploads', 'memos', filename);
 

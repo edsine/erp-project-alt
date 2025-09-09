@@ -886,7 +886,7 @@ const MemoList = () => {
                         </div>
                       </div>
                       <a
-                        href={`${BASE_URL}/uploads/memos/${file.filename}`}
+                       href={`${BASE_URL}/uploads/memos/${file.filename}`}
                         download={file.originalname}
                         className="text-primary hover:text-primary-dark transition-colors"
                         target="_blank"
