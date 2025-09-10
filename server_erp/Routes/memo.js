@@ -1204,7 +1204,7 @@ router.post('/memos/:id/approve', async (req, res) => {
       },
       chairman: {
         field: 'approved_by_chairman',
-        dependsOn: 'approved_by_gmd',
+        // dependsOn: 'approved_by_gmd',
         allowed: memo.requires_approval && memo.approved_by_gmd === 1,
         error: 'Requires GMD approval first'
       }

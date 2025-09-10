@@ -570,21 +570,21 @@ router.post('/requisitions/:id/approve', async (req, res) => {
         executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
         finance: { field: 'approved_by_finance', dependsOn: 'approved_by_executive' },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman' }
       };
     } else if (dept === 'finance') {
       // Finance department flow
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman' }
       };
     } else {
       // All other departments
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman' }
       };
     }
 
@@ -653,20 +653,20 @@ router.post('/requisitions/:id/reject', async (req, res) => {
         executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
         finance: { field: 'approved_by_finance', dependsOn: 'approved_by_executive' },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman' }
       };
     } else if (dept === 'finance') {
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman'}
       };
     } else {
       // All other departments
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
-        chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' }
+        chairman: { field: 'approved_by_chairman'}
       };
     }
 
@@ -936,4 +936,45 @@ router.get('/requisitions/count/user/:userId', async (req, res) => {
   }
 });
 
+// Pay endpoint for finance 
+router.post('/requisitions/:id/pay', async (req, res) => {
+  try {
+    const requisitionId = req.params.id;
+    const { user_id } = req.body;
+
+    // Verify user is finance
+    const [userRows] = await db.query(
+      'SELECT role FROM users WHERE id = ?',
+      [user_id]
+    );
+    
+    if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
+      return res.status(403).json({ message: 'Only finance users can process payments' });
+    }
+
+    // Verify requisition exists and is approved by chairman
+    const [reqRows] = await db.query(
+      'SELECT * FROM requisitions WHERE id = ? AND approved_by_chairman = 1',
+      [requisitionId]
+    );
+    
+    if (reqRows.length === 0) {
+      return res.status(404).json({ message: 'Requisition not found or not approved by chairman' });
+    }
+
+    // Update status to completed
+    await db.query(
+      'UPDATE requisitions SET status = "completed" WHERE id = ?',
+      [requisitionId]
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Payment processed successfully' 
+    });
+  } catch (err) {
+    console.error('Payment processing error:', err);
+    res.status(500).json({ message: 'Error processing payment' });
+  }
+});
 module.exports = router;

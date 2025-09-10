@@ -149,6 +149,11 @@ const getMimeTypeFromFilename = (filename) => {
   return mimeTypes[ext] || 'application/octet-stream';
 };
 
+const FINANCE_TABS = {
+  TO_BE_ACTED: 'to_be_acted',
+  ACTED_UPON: 'acted_upon'
+};
+
 // File icon helper function 
 const getFileIcon = (file) => {
   const fileType = file.mimetype?.split('/')[0] || '';
@@ -220,6 +225,16 @@ const RequisitionList = () => {
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
   const [activeTab, setActiveTab] = useState('pending'); // Changed default tab to 'pending'
+  const [financeActionedRequisitions, setFinanceActionedRequisitions] = useState([]);
+
+  useEffect(() => {
+  // Load finance actioned requisitions from localStorage
+  const savedActions = localStorage.getItem(`financeRequisitionActions_${user.id}`);
+  if (savedActions) {
+    setFinanceActionedRequisitions(JSON.parse(savedActions));
+  }
+}, [user.id]);
+
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -363,8 +378,34 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     return req.status.toLowerCase() === 'completed';
   };
 
+  const getFinanceFilteredRequisitions = (tab) => {
+  if (user.role?.toLowerCase() !== 'finance') return [];
+
+  const chairmanApprovedRequisitions = searchFilteredRequisitions.filter(
+    req => req.approved_by_chairman === 1
+  );
+
+  if (tab === FINANCE_TABS.TO_BE_ACTED) {
+    return chairmanApprovedRequisitions.filter(
+      req => !financeActionedRequisitions.includes(req.id)
+    );
+  } else if (tab === FINANCE_TABS.ACTED_UPON) {
+    return chairmanApprovedRequisitions.filter(
+      req => financeActionedRequisitions.includes(req.id)
+    );
+  }
+
+  return [];
+};
+
   // Filter requisitions by status based on active tab
- const getFilteredRequisitionsByStatus = (status) => {
+const getFilteredRequisitionsByStatus = (status) => {
+  // Handle finance-specific tabs
+  if (user.role?.toLowerCase() === 'finance' &&
+    (status === FINANCE_TABS.TO_BE_ACTED || status === FINANCE_TABS.ACTED_UPON)) {
+    return getFinanceFilteredRequisitions(status);
+  }
+
   const role = user.role?.toLowerCase();
   const userId = user.id;
 
@@ -398,14 +439,15 @@ const isRequisitionPendingForUser = (req, role, userId) => {
   }
 };
 
+
   const filteredRequisitions = getFilteredRequisitionsByStatus(activeTab);
 
   // Get counts for each status
-  const getStatusCounts = () => {
+const getStatusCounts = () => {
   const role = user.role?.toLowerCase();
   const userId = user.id;
 
-  return {
+  const counts = {
     all: searchFilteredRequisitions.length,
     pending: searchFilteredRequisitions.filter(req =>
       isRequisitionPendingForUser(req, role, userId)
@@ -421,7 +463,25 @@ const isRequisitionPendingForUser = (req, role, userId) => {
       isRequisitionCompleted(req)
     ).length,
   };
+
+  // Add finance-specific counts if user is finance
+  if (user.role?.toLowerCase() === 'finance') {
+    const chairmanApproved = searchFilteredRequisitions.filter(
+      req => req.approved_by_chairman === 1
+    );
+
+    counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
+      req => !financeActionedRequisitions.includes(req.id)
+    ).length;
+
+    counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
+      req => financeActionedRequisitions.includes(req.id)
+    ).length;
+  }
+
+  return counts;
 };
+
 
   const statusCounts = getStatusCounts();
 
@@ -432,6 +492,45 @@ const isRequisitionPendingForUser = (req, role, userId) => {
       setSelectedRequisition(req);
     }
   };
+
+
+const handlePayRequisition = async (requisition) => {
+  try {
+    // Make API call to mark requisition as paid
+    const response = await axios.post(
+      `${BASE_URL}/requisitions/${requisition.id}/pay`,
+      { user_id: user.id },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      // Add to acted upon list
+      const updatedActions = [...financeActionedRequisitions, requisition.id];
+      setFinanceActionedRequisitions(updatedActions);
+
+      // Save to localStorage
+      localStorage.setItem(`financeRequisitionActions_${user.id}`, JSON.stringify(updatedActions));
+
+      alert('Payment processed successfully!');
+      
+      // Update the requisition status
+      const updatedRequisition = {
+        ...requisition,
+        status: 'completed'
+      };
+      
+      setRequisitions(prev => prev.map(r => r.id === requisition.id ? updatedRequisition : r));
+      setSelectedRequisition(updatedRequisition);
+    }
+  } catch (error) {
+    console.error('Payment failed:', error.response?.data || error.message);
+    alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
+  }
+};
 
   const handleApprove = async (req) => {
     try {
@@ -658,6 +757,30 @@ const isRequisitionPendingForUser = (req, role, userId) => {
               >
                 Approved ({statusCounts.approved})
               </button>
+              {user.role?.toLowerCase() === 'finance' && (
+  <>
+    <button
+      onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
+      className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+        activeTab === FINANCE_TABS.TO_BE_ACTED
+          ? 'bg-white text-gray-900 shadow-sm'
+          : 'text-gray-600 hover:text-gray-900'
+      }`}
+    >
+      To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
+    </button>
+    <button
+      onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
+      className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
+        activeTab === FINANCE_TABS.ACTED_UPON
+          ? 'bg-white text-gray-900 shadow-sm'
+          : 'text-gray-600 hover:text-gray-900'
+      }`}
+    >
+      Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
+    </button>
+  </>
+)}
               <button
                 onClick={() => setActiveTab('rejected')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${
@@ -913,6 +1036,19 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     user={user} 
   />
 )}
+
+{user.role?.toLowerCase() === 'finance' &&
+  activeTab === FINANCE_TABS.TO_BE_ACTED &&
+  !financeActionedRequisitions.includes(selectedRequisition.id) && (
+    <div className="mt-6">
+      <button
+        onClick={() => handlePayRequisition(selectedRequisition)}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+      >
+        Pay
+      </button>
+    </div>
+  )}
 
 {/* Approval buttons for authorized roles */}
 {(() => {
