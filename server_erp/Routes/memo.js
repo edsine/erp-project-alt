@@ -360,32 +360,38 @@ router.get('/memos', async (req, res) => {
 
 // Serve uploaded files
 // Serve uploaded files - FIXED VERSION
-router.get('/uploads/memos/:filename', (req, res) => {
-  const { filename } = req.params
+router.get('/memos/download/:id/:filename', async (req, res) => {
+  const { id, filename } = req.params
 
-  // New location
-  const newPath = path.resolve(process.cwd(), 'uploads/memos', filename)
-  // Old location (one level up)
-  const oldPath = path.resolve(process.cwd(), '..', 'uploads/memos', filename)
+  try {
+    // Get memo by id
+    const [rows] = await db.execute('SELECT attachments FROM memos WHERE id = ?', [id])
+    if (!rows.length) return res.status(404).json({ message: 'Memo not found' })
 
-  let filePath = null
-  if (fs.existsSync(newPath)) {
-    filePath = newPath
-  } else if (fs.existsSync(oldPath)) {
-    filePath = oldPath
-  }
+    const attachments = JSON.parse(rows[0].attachments || '[]')
+    const file = attachments.find(f => f.filename === filename)
 
-  if (!filePath) {
-    return res.status(404).json({ message: 'File not found' })
-  }
+    if (!file) return res.status(404).json({ message: 'File not attached to this memo' })
 
-  res.download(filePath, filename, err => {
-    if (err) {
-      console.error('Download error:', err)
-      res.status(500).json({ message: 'Error downloading file' })
+    // Use the stored path instead of rebuilding manually
+    const filePath = file.path || file.absolutePath
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found on server' })
     }
-  })
+
+    res.download(filePath, file.originalname, err => {
+      if (err) {
+        console.error('Download error:', err)
+        res.status(500).json({ message: 'Error downloading file' })
+      }
+    })
+  } catch (err) {
+    console.error('Download route error:', err)
+    res.status(500).json({ message: 'Internal server error' })
+  }
 })
+
+
 
 
 // router.get('/uploads/memos/:filename', (req, res) => {
