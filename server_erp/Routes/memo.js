@@ -8,7 +8,7 @@ const fs = require('fs');
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/memos')
+    const uploadDir = path.resolve(process.cwd(), 'uploads/memos')
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true })
     }
@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname))
   }
 })
+
 
 // File filter (same as original allowed types)
 const fileFilter = (req, file, cb) => {
