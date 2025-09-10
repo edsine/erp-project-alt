@@ -361,22 +361,32 @@ router.get('/memos', async (req, res) => {
 // Serve uploaded files
 // Serve uploaded files - FIXED VERSION
 router.get('/uploads/memos/:filename', (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, '../../uploads/memos', filename);
+  const { filename } = req.params
 
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ message: 'File not found' });
+  // New location
+  const newPath = path.resolve(process.cwd(), 'uploads/memos', filename)
+  // Old location (one level up)
+  const oldPath = path.resolve(process.cwd(), '..', 'uploads/memos', filename)
+
+  let filePath = null
+  if (fs.existsSync(newPath)) {
+    filePath = newPath
+  } else if (fs.existsSync(oldPath)) {
+    filePath = oldPath
   }
 
-  // Set proper headers for download
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.setHeader('Content-Type', 'application/octet-stream');
-  
-  // Stream the file
-  const fileStream = fs.createReadStream(filePath);
-  fileStream.pipe(res);
-});
+  if (!filePath) {
+    return res.status(404).json({ message: 'File not found' })
+  }
+
+  res.download(filePath, filename, err => {
+    if (err) {
+      console.error('Download error:', err)
+      res.status(500).json({ message: 'Error downloading file' })
+    }
+  })
+})
+
 
 // router.get('/uploads/memos/:filename', (req, res) => {
 //   const filePath = path.join(__dirname, '../../uploads/memos', req.params.filename);
