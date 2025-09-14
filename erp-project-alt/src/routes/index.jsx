@@ -19,6 +19,8 @@ import FileDetails from '../components/Files/FileDetails'
 import NewClient from '../components/Files/NewClient'
 import EditClient from '../components/Files/EditClient'
 import ActivitiesPage from '../components/Activities/ActivitiesPage'
+import DirectMemos from '../components/DirectMemo/DirectMemoList'
+import NewDirectMemo from '../components/DirectMemo/NewDirectMemos'
 
 const router = createBrowserRouter([
   {
@@ -105,6 +107,12 @@ const router = createBrowserRouter([
         path: 'notifications',
         element: <ActivitiesPage />,
       },
+      {
+        path: 'direct-memos', 
+        element: <DirectMemos />},
+      {
+        path: 'direct-memos/new', 
+        element: <NewDirectMemo />}
     ],
   },
 ])

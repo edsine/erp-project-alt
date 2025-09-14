@@ -9,6 +9,7 @@ const filesRoutes = require('./Routes/files');
 const leaveRoutes = require('./Routes/leave');
 const ReportRoutes = require('./Routes/Reprts');
 const activityRoutes = require('./Routes/activityRoutes'); // Uncomment if you have activity routes\
+const directMemosRoutes = require('./Routes/directMemos');
 
 const app = express();
 app.use(cors());
@@ -22,7 +23,9 @@ app.use('/api', TaskRoutes);
 app.use('/api', filesRoutes);
 app.use('/api', leaveRoutes);
 app.use('/api', ReportRoutes);
-app.use('/api', activityRoutes); 
+app.use('/api', activityRoutes);
+app.use('/api/direct-memos', directMemosRoutes);
+
 
 const PORT = process.env.PORT || 7000;
 app.listen(PORT, () => {
