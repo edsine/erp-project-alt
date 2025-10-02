@@ -21,6 +21,10 @@ import EditClient from '../components/Files/EditClient'
 import ActivitiesPage from '../components/Activities/ActivitiesPage'
 import DirectMemos from '../components/DirectMemo/DirectMemoList'
 import NewDirectMemo from '../components/DirectMemo/NewDirectMemos'
+import IncomeModule from '../components/Finance/Income'
+import ExpensesModule from '../components/Finance/Expenses'
+import ReportsModule from '../components/Finance/Reports' 
+import FinancialDashboard from '../components/Finance/Finance'
 
 const router = createBrowserRouter([
   {
@@ -112,7 +116,23 @@ const router = createBrowserRouter([
         element: <DirectMemos />},
       {
         path: 'direct-memos/new', 
-        element: <NewDirectMemo />}
+        element: <NewDirectMemo />},
+      {
+        path: 'finance',
+        element: <FinancialDashboard />,
+      },
+      {
+        path: 'finance/income',
+        element: <IncomeModule />,
+      },
+      { 
+        path: 'finance/expenses',
+        element: <ExpensesModule />,
+      },
+      { 
+        path: 'finance/reports',
+        element: <ReportsModule />,
+      },
     ],
   },
 ])
