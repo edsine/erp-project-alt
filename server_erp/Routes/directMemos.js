@@ -194,6 +194,16 @@ router.get('/:memoId', async (req, res) => {
       attachments: safeParseJSON(memos[0].attachments)
     };
     
+    // Get approval status for this memo
+    const [approvals] = await db.execute(`
+      SELECT dma.*, u.name as user_name, u.department as user_department
+      FROM direct_memo_approvals dma
+      LEFT JOIN users u ON dma.user_id = u.id
+      WHERE dma.memo_id = ?
+    `, [memoId]);
+    
+    memo.approvals = approvals;
+    
     res.json(memo);
   } catch (error) {
     console.error('Error fetching direct memo:', error);
@@ -232,23 +242,29 @@ router.post('/:memoId/read', async (req, res) => {
     
     const [memo] = await db.execute(`SELECT recipients, cc FROM direct_memos WHERE id = ?`, [memoId]);
     
-    // Safely parse JSON data with error handling
+    // Safely parse JSON data with better error handling
     let recipients = [];
     let cc = [];
     
     try {
-      recipients = memo[0].recipients && memo[0].recipients.trim() !== '' 
-        ? JSON.parse(memo[0].recipients) 
-        : [];
+      const recipientsData = memo[0].recipients;
+      if (Array.isArray(recipientsData)) {
+        recipients = recipientsData;
+      } else if (typeof recipientsData === 'string' && recipientsData.trim() !== '') {
+        recipients = JSON.parse(recipientsData);
+      }
     } catch (parseError) {
       console.error('Error parsing recipients JSON:', parseError);
       recipients = [];
     }
     
     try {
-      cc = memo[0].cc && memo[0].cc.trim() !== '' 
-        ? JSON.parse(memo[0].cc) 
-        : [];
+      const ccData = memo[0].cc;
+      if (Array.isArray(ccData)) {
+        cc = ccData;
+      } else if (typeof ccData === 'string' && ccData.trim() !== '') {
+        cc = JSON.parse(ccData);
+      }
     } catch (parseError) {
       console.error('Error parsing cc JSON:', parseError);
       cc = [];
@@ -364,6 +380,108 @@ router.get('/download/:memoId/:filename', async (req, res) => {
   } catch (error) {
     console.error('Error downloading file:', error);
     res.status(500).json({ message: 'Failed to download file', error: error.message });
+  }
+});
+router.post('/:memoId/approve', async (req, res) => {
+  try {
+    const memoId = req.params.memoId;
+    const { user_id, status, comments } = req.body;
+    
+    // Check if user is a recipient (only recipients can approve/reject)
+    const [memos] = await db.execute(
+      `SELECT * FROM direct_memos 
+       WHERE id = ? AND JSON_CONTAINS(recipients, ?)`,
+      [memoId, JSON.stringify(parseInt(user_id))]
+    );
+    
+    if (memos.length === 0) {
+      return res.status(403).json({ message: 'Only recipients can approve/reject memos' });
+    }
+    
+    // Update approval status
+    await db.execute(
+      `INSERT INTO direct_memo_approvals (memo_id, user_id, status, comments) 
+       VALUES (?, ?, ?, ?) 
+       ON DUPLICATE KEY UPDATE status = ?, comments = ?, updated_at = CURRENT_TIMESTAMP`,
+      [memoId, user_id, status, comments, status, comments]
+    );
+    
+    // Check if all recipients have responded
+    const [approvals] = await db.execute(
+      `SELECT status FROM direct_memo_approvals WHERE memo_id = ?`,
+      [memoId]
+    );
+    
+    // Get recipients count
+    let recipients = [];
+    try {
+      const recipientsData = memos[0].recipients;
+      if (Array.isArray(recipientsData)) {
+        recipients = recipientsData;
+      } else if (typeof recipientsData === 'string' && recipientsData.trim() !== '') {
+        recipients = JSON.parse(recipientsData);
+      }
+    } catch (parseError) {
+      console.error('Error parsing recipients JSON:', parseError);
+      recipients = [];
+    }
+    
+    const allApproved = approvals.every(a => a.status === 'approved');
+    const anyRejected = approvals.some(a => a.status === 'rejected');
+    const allResponded = approvals.length === recipients.length;
+    
+    let overallStatus = 'pending';
+    if (anyRejected) {
+      overallStatus = 'rejected';
+    } else if (allApproved && allResponded) {
+      overallStatus = 'approved';
+    }
+    
+    // Update memo's overall approval status
+    await db.execute(
+      `UPDATE direct_memos SET approval_status = ? WHERE id = ?`,
+      [overallStatus, memoId]
+    );
+    
+    res.json({ 
+      message: `Memo ${status} successfully`, 
+      overallStatus,
+      userStatus: status
+    });
+  } catch (error) {
+    console.error('Error updating approval status:', error);
+    res.status(500).json({ message: 'Failed to update approval status', error: error.message });
+  }
+});
+
+// Get approval status for a memo
+router.get('/:memoId/approvals', async (req, res) => {
+  try {
+    const memoId = req.params.memoId;
+    const userId = req.query.userId;
+    
+    // Check if user has access to this memo
+    const [memos] = await db.execute(`
+      SELECT * FROM direct_memos 
+      WHERE id = ? AND (JSON_CONTAINS(recipients, ?) OR JSON_CONTAINS(cc, ?) OR created_by = ?)
+    `, [memoId, JSON.stringify(parseInt(userId)), JSON.stringify(parseInt(userId)), parseInt(userId)]);
+    
+    if (memos.length === 0) {
+      return res.status(404).json({ message: 'Memo not found or access denied' });
+    }
+    
+    // Get approval status
+    const [approvals] = await db.execute(`
+      SELECT dma.*, u.name as user_name, u.department as user_department
+      FROM direct_memo_approvals dma
+      LEFT JOIN users u ON dma.user_id = u.id
+      WHERE dma.memo_id = ?
+    `, [memoId]);
+    
+    res.json(approvals);
+  } catch (error) {
+    console.error('Error fetching approval status:', error);
+    res.status(500).json({ message: 'Failed to fetch approval status', error: error.message });
   }
 });
 

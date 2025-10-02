@@ -196,15 +196,27 @@ const safeJsonParse = (data, fallback = []) => {
   
   // If data is a string, try to parse it
   if (typeof data === 'string') {
+    // Check if it's already a string representation of an array/object
+    if (data.startsWith('[') || data.startsWith('{')) {
+      try {
+        return JSON.parse(data);
+      } catch (error) {
+        console.error('JSON parse error:', error, 'Input:', data);
+        return fallback;
+      }
+    }
+    
+    // If it's a simple string but empty, return fallback
     if (data.trim() === '') {
       return fallback;
     }
     
+    // If it's a simple string with content, try to parse as array
     try {
       return JSON.parse(data);
     } catch (error) {
-      console.error('JSON parse error:', error, 'Input:', data);
-      return fallback;
+      // If parsing fails, return as single item array or fallback
+      return data ? [data] : fallback;
     }
   }
   
@@ -222,7 +234,13 @@ const DirectMemoList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
-  const [activeTab, setActiveTab] = useState('received'); // 'received', 'sent'
+  const [activeTab, setActiveTab] = useState('received'); // 'received', 'sent', 'approved', 'rejected'
+  const [filter, setFilter] = useState('all'); // 'all', 'read', 'unread'
+  const [approvalStatus, setApprovalStatus] = useState({});
+    const [showCommentModal, setShowCommentModal] = useState(false);
+const [pendingApproval, setPendingApproval] = useState({ action: '', memoId: '' });
+const [approvalComment, setApprovalComment] = useState('');
+
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -255,7 +273,7 @@ const DirectMemoList = () => {
     const fetchDirectMemos = async () => {
       try {
         const response = await axios.get(
-          `${BASE_URL}/direct-memos/user/${user.id}`,
+          `${BASE_URL}/direct-memos/user/${user.id}?filter=${filter}`,
           {
             headers: {
               Authorization: `Bearer ${user.token}`,
@@ -282,7 +300,9 @@ const DirectMemoList = () => {
             recipients: recipients,
             cc: cc,
             isRecipient: recipients.includes(user.id),
-            isCC: cc.includes(user.id)
+            isCC: cc.includes(user.id),
+            hasNewComments: memo.hasNewComments || false,
+            approval_status: memo.approval_status || 'pending'
           };
         });
 
@@ -299,7 +319,7 @@ const DirectMemoList = () => {
     if (Object.keys(users).length > 0) {
       fetchDirectMemos();
     }
-  }, [user, users]);
+  }, [user, users, filter]);
 
   // Filter memos based on search term
   const searchFilteredMemos = memos.filter(memo => {
@@ -320,49 +340,150 @@ const DirectMemoList = () => {
       return searchFilteredMemos.filter(memo => 
         memo.isSender
       );
+    } else if (activeTab === 'approved') {
+      return searchFilteredMemos.filter(memo => 
+        memo.approval_status === 'approved'
+      );
+    } else if (activeTab === 'rejected') {
+      return searchFilteredMemos.filter(memo => 
+        memo.approval_status === 'rejected'
+      );
     }
     return searchFilteredMemos;
   };
 
   const filteredMemos = getFilteredMemosByTab();
 
-const handleMemoClick = async (memo) => {
-  if (selectedMemo && selectedMemo.id === memo.id) {
-    setSelectedMemo(null);
-  } else {
-    setSelectedMemo(memo);
-    
-    // Mark as read if user is recipient/CC and memo is unread
-    if ((memo.isRecipient || memo.isCC) && memo.status !== 'read') {
-      try {
-        await axios.post(
-          `${BASE_URL}/direct-memos/${memo.id}/read`,
-          { user_id: user.id },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
+  const handleMemoClick = async (memo) => {
+    if (selectedMemo && selectedMemo.id === memo.id) {
+      setSelectedMemo(null);
+    } else {
+      setSelectedMemo(memo);
+      
+      // Mark as read if user is recipient/CC and memo is unread or has new comments
+      if ((memo.isRecipient || memo.isCC) && (memo.status !== 'read' || memo.hasNewComments)) {
+        try {
+          await axios.post(
+            `${BASE_URL}/direct-memos/${memo.id}/read`,
+            { user_id: user.id },
+            {
+              headers: {
+                Authorization: `Bearer ${user.token}`,
+              },
+            }
+          );
+          
+          // Update the memo status in the list
+          setMemos(prev => prev.map(m => 
+            m.id === memo.id ? { ...m, status: 'read', hasNewComments: false } : m
+          ));
+          
+          // Also update selected memo if it's the same one
+          if (selectedMemo && selectedMemo.id === memo.id) {
+            setSelectedMemo({ ...selectedMemo, status: 'read' });
           }
-        );
-        
-        // Update the memo status in the list
-        setMemos(prev => prev.map(m => 
-          m.id === memo.id ? { ...m, status: 'read' } : m
-        ));
-        
-        // Also update selected memo if it's the same one
-        if (selectedMemo && selectedMemo.id === memo.id) {
-          setSelectedMemo({ ...selectedMemo, status: 'read' });
+        } catch (error) {
+          console.error('Failed to mark as read:', error);
         }
-      } catch (error) {
-        console.error('Failed to mark as read:', error);
       }
     }
+  };
+
+const handleApproval = async (memoId, status, comments = '') => {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/direct-memos/${memoId}/approve`,
+      {
+        user_id: user.id,
+        status,
+        comments
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+    
+    // Refresh the memo to show updated status
+    if (selectedMemo && selectedMemo.id === memoId) {
+      const updatedResponse = await axios.get(
+        `${BASE_URL}/direct-memos/${memoId}?userId=${user.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      setSelectedMemo(updatedResponse.data);
+    }
+    
+    // Refresh the memo list to show updated approval status
+    const memosResponse = await axios.get(
+      `${BASE_URL}/direct-memos/user/${user.id}?filter=${filter}`,
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+    
+    const updatedMemos = memosResponse.data.map(memo => ({
+      ...memo,
+      sender: users[memo.created_by]?.name || `User ${memo.created_by}`,
+      senderDetails: users[memo.created_by],
+      isSender: memo.created_by === user.id,
+      date: new Date(memo.created_at).toLocaleDateString(),
+      recipients: safeJsonParse(memo.recipients, []),
+      cc: safeJsonParse(memo.cc, []),
+      isRecipient: safeJsonParse(memo.recipients, []).includes(user.id),
+      isCC: safeJsonParse(memo.cc, []).includes(user.id),
+      hasNewComments: memo.hasNewComments || false,
+      approval_status: memo.approval_status || 'pending'
+    }));
+    
+    setMemos(updatedMemos);
+    
+    // Show success message
+    alert(`Memo ${status} successfully`);
+  } catch (error) {
+    console.error('Failed to update approval status:', error);
+    alert('Failed to update approval status. Please try again.');
   }
 };
 
-  const getStatusBadge = (status) => {
-    switch (status.toLowerCase()) {
+const handleApprovalWithModal = (memoId, action) => {
+  setPendingApproval({ action, memoId });
+  setApprovalComment('');
+  setShowCommentModal(true);
+};
+
+const submitApproval = () => {
+  if (pendingApproval.memoId && pendingApproval.action) {
+    handleApproval(pendingApproval.memoId, pendingApproval.action, approvalComment);
+    setShowCommentModal(false);
+    setPendingApproval({ action: '', memoId: '' });
+    setApprovalComment('');
+  }
+};
+
+  const getStatusBadge = (memo) => {
+    const hasNewComments = memo.hasNewComments;
+    const isUnread = memo.status !== 'read' || hasNewComments;
+    
+    if (isUnread) {
+      return {
+        className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        text: hasNewComments ? 'New Comments' : 'Unread',
+        icon: (
+          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      };
+    }
+    
+    switch (memo.status.toLowerCase()) {
       case 'read':
         return {
           className: 'bg-green-100 text-green-800 border-green-200',
@@ -396,11 +517,88 @@ const handleMemoClick = async (memo) => {
     }
   };
 
+  const getApprovalBadge = (approvalStatus) => {
+    switch (approvalStatus) {
+      case 'approved':
+        return {
+          className: 'bg-green-100 text-green-800 border-green-200',
+          text: 'Approved',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          )
+        };
+      case 'rejected':
+        return {
+          className: 'bg-red-100 text-red-800 border-red-200',
+          text: 'Rejected',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          )
+        };
+      default:
+        return {
+          className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+          text: 'Pending',
+          icon: (
+            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )
+        };
+    }
+  };
+
   if (loading) return <p className="text-center py-4">Loading direct memos...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
+          {/* Comment Modal */}
+    {showCommentModal && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Add Comments (Optional)
+            </h3>
+            <textarea
+              value={approvalComment}
+              onChange={(e) => setApprovalComment(e.target.value)}
+              placeholder="Enter your comments here..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+              rows="4"
+            />
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCommentModal(false);
+                  setPendingApproval({ action: '', memoId: '' });
+                  setApprovalComment('');
+                }}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitApproval}
+                className={`px-4 py-2 text-white rounded-md transition-colors ${
+                  pendingApproval.action === 'approved' 
+                    ? 'bg-green-600 hover:bg-green-700' 
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {pendingApproval.action === 'approved' ? 'Approve' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
       {/* Memo List Panel */}
       <div className={`${selectedMemo ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
         <div className="bg-white rounded-lg shadow-md p-4">
@@ -413,7 +611,20 @@ const handleMemoClick = async (memo) => {
               New Direct Memo
             </Link>
           </div>
-
+          
+          {/* Filter Dropdown */}
+          <div className="flex space-x-2 mb-4">
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">All Memos</option>
+              <option value="unread">Unread</option>
+              <option value="read">Read</option>
+            </select>
+          </div>
+        
           {/* Search Input */}
           <div className="mb-4">
             <input
@@ -446,6 +657,24 @@ const handleMemoClick = async (memo) => {
               >
                 Sent ({memos.filter(m => m.isSender).length})
               </button>
+              <button
+                onClick={() => setActiveTab('approved')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'approved'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                Approved ({memos.filter(m => m.approval_status === 'approved').length})
+              </button>
+              <button
+                onClick={() => setActiveTab('rejected')}
+                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
+              >
+                Rejected ({memos.filter(m => m.approval_status === 'rejected').length})
+              </button>
             </div>
           </div>
 
@@ -456,7 +685,7 @@ const handleMemoClick = async (memo) => {
                 <div
                   key={memo.id}
                   onClick={() => handleMemoClick(memo)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${memo.status === 'unread' ? 'border-l-4 border-l-primary bg-blue-50' : ''
+                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${memo.status === 'unread' || memo.hasNewComments ? 'border-l-4 border-l-primary bg-blue-50' : ''
                     } ${selectedMemo?.id === memo.id ? 'bg-gray-100' : ''}`}
                 >
                   <div className="flex justify-between items-start">
@@ -464,14 +693,22 @@ const handleMemoClick = async (memo) => {
                       <h3 className="font-medium">{memo.title}</h3>
                       <div className="flex gap-2 mt-1">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo.status).className}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo).className}`}
                         >
-                          {getStatusBadge(memo.status).icon}
-                          {getStatusBadge(memo.status).text}
+                          {getStatusBadge(memo).icon}
+                          {getStatusBadge(memo).text}
                         </span>
                         {memo.priority === 'high' && (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                             High Priority
+                          </span>
+                        )}
+                        {(memo.approval_status === 'approved' || memo.approval_status === 'rejected') && (
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getApprovalBadge(memo.approval_status).className}`}
+                          >
+                            {getApprovalBadge(memo.approval_status).icon}
+                            {getApprovalBadge(memo.approval_status).text}
                           </span>
                         )}
                       </div>
@@ -508,14 +745,22 @@ const handleMemoClick = async (memo) => {
                   {selectedMemo.senderDetails?.department && ` (${selectedMemo.senderDetails.department})`}
                 </p>
                 <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
-                <div className="mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo.status).className}`}>
-                    {getStatusBadge(selectedMemo.status).icon}
-                    {getStatusBadge(selectedMemo.status).text}
+                <div className="mt-2 flex gap-2">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo).className}`}>
+                    {getStatusBadge(selectedMemo).icon}
+                    {getStatusBadge(selectedMemo).text}
                   </span>
                   {selectedMemo.priority === 'high' && (
-                    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                       High Priority
+                    </span>
+                  )}
+                  {(selectedMemo.approval_status === 'approved' || selectedMemo.approval_status === 'rejected') && (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getApprovalBadge(selectedMemo.approval_status).className}`}
+                    >
+                      {getApprovalBadge(selectedMemo.approval_status).icon}
+                      {getApprovalBadge(selectedMemo.approval_status).text}
                     </span>
                   )}
                 </div>
@@ -602,6 +847,64 @@ const handleMemoClick = async (memo) => {
                 memoId={selectedMemo.id}
                 user={user}
               />
+            )}
+            
+            {/* Approval Section */}
+            {selectedMemo && (selectedMemo.isRecipient || selectedMemo.isSender) && (
+              <div className="mt-6 border-t pt-4">
+                <h3 className="text-lg font-semibold text-gray-500 mb-4">Approval Status</h3>
+                
+{selectedMemo.isRecipient && selectedMemo.approval_status === 'pending' && (
+  <div className="mb-4">
+    <p className="text-sm text-gray-600 mb-2">Your response required:</p>
+    <div className="flex space-x-2">
+      <button
+        onClick={() => handleApprovalWithModal(selectedMemo.id, 'approved')}
+        className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+      >
+        Approve
+      </button>
+      <button
+        onClick={() => handleApprovalWithModal(selectedMemo.id, 'rejected')}
+        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+      >
+        Reject
+      </button>
+    </div>
+  </div>
+)}
+                
+                {/* Display approval status for all recipients */}
+                <div className="space-y-3">
+                  {selectedMemo.approvals && selectedMemo.approvals.map(approval => (
+                    <div key={approval.user_id} className="bg-gray-50 p-3 rounded-md">
+                      <div className="flex justify-between items-center">
+                        <div className="font-medium text-sm">
+                          {approval.user_name}
+                          {approval.user_department && ` (${approval.user_department})`}
+                        </div>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          approval.status === 'approved' 
+                            ? 'bg-green-100 text-green-800' 
+                            : approval.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {approval.status || 'Pending'}
+                        </span>
+                      </div>
+                      {approval.comments && (
+                        <p className="text-sm text-gray-600 mt-2">Comments: {approval.comments}</p>
+                      )}
+                      {approval.updated_at && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Updated: {new Date(approval.updated_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </div>
