@@ -484,5 +484,40 @@ router.get('/:memoId/approvals', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch approval status', error: error.message });
   }
 });
+// Get direct memo count for a user
+router.get('/count/user/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    
+    const [unreadCount] = await db.execute(`
+      SELECT COUNT(DISTINCT dm.id) as count
+      FROM direct_memos dm
+      LEFT JOIN direct_memo_read_status dmrs ON dm.id = dmrs.memo_id AND dmrs.user_id = ?
+      WHERE (JSON_CONTAINS(dm.recipients, ?) OR JSON_CONTAINS(dm.cc, ?))
+      AND dm.created_by != ?
+      AND (
+        dmrs.memo_id IS NULL 
+        OR EXISTS (
+          SELECT 1 FROM direct_memo_comments dmc 
+          WHERE dmc.memo_id = dm.id 
+          AND dmc.created_at > COALESCE(dmrs.read_at, '1970-01-01')
+          AND dmc.user_id != ?
+        )
+      )
+    `, [parseInt(userId), JSON.stringify(parseInt(userId)), JSON.stringify(parseInt(userId)), parseInt(userId), parseInt(userId)]);
+    
+    res.json({
+      success: true,
+      count: unreadCount[0].count
+    });
+  } catch (error) {
+    console.error('Error fetching unread direct memo count:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch unread direct memo count', 
+      error: error.message 
+    });
+  }
+});
 
 module.exports = router;

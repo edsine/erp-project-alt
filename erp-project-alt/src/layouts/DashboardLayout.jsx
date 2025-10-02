@@ -7,7 +7,7 @@ import {
   Folder, Users, CheckSquare, DollarSign,
   Menu, X, ChevronLeft, ChevronRight,
   Search, Bell, ChevronDown, LogOut,
-  User, Clock
+  User, Clock, Mail
 } from 'lucide-react'
 
 const DashboardLayout = () => {
@@ -145,6 +145,18 @@ const DashboardLayout = () => {
                 )}
               </Link>
             </li>
+            <li>
+            <Link
+              to="direct-memos"
+              onClick={closeSidebar}
+              className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
+            >
+              <Mail className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+              {(sidebarOpen || window.innerWidth < 1024) && (
+                <span className="ml-3">Direct Memos</span>
+              )}
+            </Link>
+          </li>
             <li>
               <Link
                 to="requisitions"
