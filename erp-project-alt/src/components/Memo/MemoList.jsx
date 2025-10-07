@@ -208,14 +208,6 @@ const MemoList = () => {
   const [activeTab, setActiveTab] = useState('pending'); // Changed default to 'pending'
   const [financeActionedMemos, setFinanceActionedMemos] = useState([]);
 
-  // Add useEffect to track finance actions
-  useEffect(() => {
-    // Load finance actioned memos from localStorage or initialize
-    const savedActions = localStorage.getItem(`financeMemoActions_${user.id}`);
-    if (savedActions) {
-      setFinanceActionedMemos(JSON.parse(savedActions));
-    }
-  }, [user.id]);
 
   // Fetch all users when component mounts
   useEffect(() => {
@@ -266,10 +258,15 @@ const MemoList = () => {
           date: new Date(memo.created_at).toLocaleDateString(),
           status: memo.status || 'submitted',
           priority: memo.priority || 'medium',
-          acknowledged: isMemoAcknowledgedByUser(memo, user.id)
+          acknowledged: isMemoAcknowledgedByUser(memo, user.id),
+          paid_by_finance: memo.paid_by_finance === 1
         }));
 
         setMemos(transformedMemos);
+        const paidMemoIds = transformedMemos
+  .filter(m => m.paid_by_finance)
+  .map(m => m.id);
+setFinanceActionedMemos(paidMemoIds);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch memos');
       } finally {
@@ -449,34 +446,36 @@ const MemoList = () => {
   };
 
   // Add this function to handle the Pay action for memos
-  const handlePay = async (memo) => {
-    try {
-      // Make API call to mark as paid
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/pay`,
-        { user_id: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        // Add to acted upon list
-        const updatedActions = [...financeActionedMemos, memo.id];
-        setFinanceActionedMemos(updatedActions);
-
-        // Save to localStorage
-        localStorage.setItem(`financeMemoActions_${user.id}`, JSON.stringify(updatedActions));
-
-        alert('Payment processed successfully!');
+const handlePay = async (memo) => {
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/pay`,
+      { user_id: user.id },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
       }
-    } catch (error) {
-      console.error('Payment failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
+    );
+
+    if (response.status === 200) {
+      alert('Payment processed successfully!');
+      
+      const updatedMemos = memos.map(m => 
+        m.id === memo.id 
+          ? { ...m, paid_by_finance: 1, status: 'completed' }
+          : m
+      );
+      setMemos(updatedMemos);
+      
+      setFinanceActionedMemos(prev => [...prev, memo.id]);
+      setSelectedMemo(null);
     }
-  };
+  } catch (error) {
+    console.error('Payment failed:', error.response?.data || error.message);
+    alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
+  }
+};
 
   const handleApprove = async (memo) => {
     try {

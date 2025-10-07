@@ -665,6 +665,7 @@ router.get('/memos/user/:userId', async (req, res) => {
         m.approved_by_finance AS finance_approved,
         m.approved_by_gmd AS gmd_approved,
         m.approved_by_chairman AS chairman_approved
+        m.paid_by_finance
       FROM memos m
       JOIN users u ON m.created_by = u.id
     `;
@@ -1570,7 +1571,7 @@ router.post('/memos/:id/comments', async (req, res) => {
   }
 });
 
-// Pay endpoint for finance (memos)
+// Pay endpoint for finance 
 router.post('/memos/:id/pay', async (req, res) => {
   try {
     const memoId = req.params.id;
@@ -1593,22 +1594,35 @@ router.post('/memos/:id/pay', async (req, res) => {
     );
     
     if (memoRows.length === 0) {
-      return res.status(404).json({ message: 'Memo not found or not approved by chairman' });
+      return res.status(404).json({ 
+        message: 'Memo not found or not approved by chairman yet' 
+      });
     }
 
-    // Update status to completed
+    // Check if already paid
+    if (memoRows[0].paid_by_finance === 1) {
+      return res.status(400).json({ 
+        message: 'This memo has already been paid' 
+      });
+    }
+
+    // Update both paid_by_finance flag AND status
     await db.query(
-      'UPDATE memos SET status = "completed" WHERE id = ?',
+      'UPDATE memos SET paid_by_finance = 1, status = "completed", updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [memoId]
     );
 
     res.status(200).json({ 
       success: true, 
-      message: 'Payment processed successfully' 
+      message: 'Payment processed successfully',
+      paid_by_finance: 1
     });
   } catch (err) {
     console.error('Payment processing error:', err);
-    res.status(500).json({ message: 'Error processing payment' });
+    res.status(500).json({ 
+      message: 'Error processing payment',
+      error: err.message 
+    });
   }
 });
 

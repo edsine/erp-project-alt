@@ -199,7 +199,8 @@ router.get('/requisitions/user/:userId', async (req, res) => {
         SELECT 
           r.*,
           u.name as creator_name,
-          u.department as creator_department
+          u.department as creator_department,
+          r.paid_by_finance
         FROM requisitions r
         LEFT JOIN users u ON r.created_by = u.id
         WHERE r.created_by = ?
@@ -975,6 +976,38 @@ router.post('/requisitions/:id/pay', async (req, res) => {
   } catch (err) {
     console.error('Payment processing error:', err);
     res.status(500).json({ message: 'Error processing payment' });
+  }
+});
+
+// Mark requisition as paid by finance
+router.post('/requisitions/:id/mark-paid', async (req, res) => {
+  try {
+    const requisitionId = req.params.id;
+    const { user_id } = req.body;
+
+    // Verify user is finance
+    const [userRows] = await db.query(
+      'SELECT role FROM users WHERE id = ?',
+      [user_id]
+    );
+    
+    if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
+      return res.status(403).json({ message: 'Only finance users can mark requisitions as paid' });
+    }
+
+    // Update paid_by_finance flag
+    await db.query(
+      'UPDATE requisitions SET paid_by_finance = 1 WHERE id = ?',
+      [requisitionId]
+    );
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Requisition marked as paid successfully' 
+    });
+  } catch (err) {
+    console.error('Error marking requisition as paid:', err);
+    res.status(500).json({ message: 'Error marking requisition as paid' });
   }
 });
 module.exports = router;

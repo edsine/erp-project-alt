@@ -227,13 +227,7 @@ const RequisitionList = () => {
   const [activeTab, setActiveTab] = useState('pending'); // Changed default tab to 'pending'
   const [financeActionedRequisitions, setFinanceActionedRequisitions] = useState([]);
 
-  useEffect(() => {
-  // Load finance actioned requisitions from localStorage
-  const savedActions = localStorage.getItem(`financeRequisitionActions_${user.id}`);
-  if (savedActions) {
-    setFinanceActionedRequisitions(JSON.parse(savedActions));
-  }
-}, [user.id]);
+
 
 
   // Fetch all users when component mounts
@@ -378,7 +372,7 @@ const isRequisitionPendingForUser = (req, role, userId) => {
     return req.status.toLowerCase() === 'completed';
   };
 
-  const getFinanceFilteredRequisitions = (tab) => {
+const getFinanceFilteredRequisitions = (tab) => {
   if (user.role?.toLowerCase() !== 'finance') return [];
 
   const chairmanApprovedRequisitions = searchFilteredRequisitions.filter(
@@ -387,11 +381,11 @@ const isRequisitionPendingForUser = (req, role, userId) => {
 
   if (tab === FINANCE_TABS.TO_BE_ACTED) {
     return chairmanApprovedRequisitions.filter(
-      req => !financeActionedRequisitions.includes(req.id)
+      req => req.paid_by_finance !== 1
     );
   } else if (tab === FINANCE_TABS.ACTED_UPON) {
     return chairmanApprovedRequisitions.filter(
-      req => financeActionedRequisitions.includes(req.id)
+      req => req.paid_by_finance === 1
     );
   }
 
@@ -464,18 +458,18 @@ const getStatusCounts = () => {
     ).length,
   };
 
-  // Add finance-specific counts if user is finance
+  //finance-specific counts if user is finance
   if (user.role?.toLowerCase() === 'finance') {
     const chairmanApproved = searchFilteredRequisitions.filter(
       req => req.approved_by_chairman === 1
     );
 
     counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
-      req => !financeActionedRequisitions.includes(req.id)
+      req => req.paid_by_finance !== 1
     ).length;
 
     counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
-      req => financeActionedRequisitions.includes(req.id)
+      req => req.paid_by_finance === 1
     ).length;
   }
 
@@ -496,9 +490,9 @@ const getStatusCounts = () => {
 
 const handlePayRequisition = async (requisition) => {
   try {
-    // Make API call to mark requisition as paid
+    // Make API call to mark requisition as paid in database
     const response = await axios.post(
-      `${BASE_URL}/requisitions/${requisition.id}/pay`,
+      `${BASE_URL}/requisitions/${requisition.id}/mark-paid`,
       { user_id: user.id },
       {
         headers: {
@@ -508,19 +502,12 @@ const handlePayRequisition = async (requisition) => {
     );
 
     if (response.status === 200) {
-      // Add to acted upon list
-      const updatedActions = [...financeActionedRequisitions, requisition.id];
-      setFinanceActionedRequisitions(updatedActions);
-
-      // Save to localStorage
-      localStorage.setItem(`financeRequisitionActions_${user.id}`, JSON.stringify(updatedActions));
-
-      alert('Payment processed successfully!');
+      alert('Requisition marked as paid successfully!');
       
-      // Update the requisition status
+      // Update the requisition status locally
       const updatedRequisition = {
         ...requisition,
-        status: 'completed'
+        paid_by_finance: 1
       };
       
       setRequisitions(prev => prev.map(r => r.id === requisition.id ? updatedRequisition : r));
@@ -1039,13 +1026,13 @@ const handlePayRequisition = async (requisition) => {
 
 {user.role?.toLowerCase() === 'finance' &&
   activeTab === FINANCE_TABS.TO_BE_ACTED &&
-  !financeActionedRequisitions.includes(selectedRequisition.id) && (
+  selectedRequisition.paid_by_finance !== 1 && (
     <div className="mt-6">
       <button
         onClick={() => handlePayRequisition(selectedRequisition)}
         className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
       >
-        Pay
+        Mark as Paid
       </button>
     </div>
   )}
