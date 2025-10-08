@@ -5,7 +5,8 @@ import axios from 'axios';
 import {
   FileText, ShoppingCart, CheckSquare, Calendar,
   Plus, Clock, User, AlertTriangle,
-  Home, Bell, Activity, ArrowRight
+  Home, Bell, Activity, ArrowRight,
+  PieChart // Add this import
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -27,7 +28,16 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [directMemoCount, setDirectMemoCount] = useState(0);
 
-  // Fetch data functions
+  // Check if user has access to finance features
+  const hasFinanceAccess = () => {
+    return user && (
+      user.role === 'finance' || 
+      user.role === 'chairman' || 
+      user.department === 'finance' ||
+      user.role === 'admin'
+    )
+  }
+
   useEffect(() => {
     const fetchTaskCount = async () => {
       try {
@@ -189,7 +199,6 @@ const Dashboard = () => {
       </div>
     );
   }
-
   const StatCard = ({ icon: Icon, title, value, color, link }) => (
     <Link to={link} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
@@ -200,7 +209,8 @@ const Dashboard = () => {
         <div className={`p-3 rounded-full ${color === 'blue' ? 'bg-blue-50 text-blue-600' : 
           color === 'green' ? 'bg-green-50 text-green-600' :
           color === 'yellow' ? 'bg-yellow-50 text-yellow-600' :
-          color === 'purple' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-600'}`}>
+          color === 'purple' ? 'bg-purple-50 text-purple-600' : 
+          color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-50 text-gray-600'}`}>
           <Icon className="h-6 w-6" />
         </div>
       </div>
@@ -212,57 +222,28 @@ const Dashboard = () => {
       </div>
     </Link>
   );
-
-  const ActivityItem = ({ activity }) => {
-    const getIcon = () => {
-      switch(activity.type) {
-        case 'Memo': return <FileText className="h-5 w-5 text-blue-600" />;
-        case 'Requisition': return <ShoppingCart className="h-5 w-5 text-green-600" />;
-        case 'Task': return <CheckSquare className="h-5 w-5 text-yellow-600" />;
-        case 'Leave': return <Calendar className="h-5 w-5 text-purple-600" />;
-        default: return <Activity className="h-5 w-5 text-gray-600" />;
-      }
-    };
-
-    return (
-      <div className="flex items-start p-4 rounded-lg hover:bg-gray-50 transition-colors">
-        <div className="flex-shrink-0 mt-1">
-          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
-            {getIcon()}
-          </div>
-        </div>
-        <div className="ml-4 flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
-          <div className="flex items-center mt-1 text-xs text-gray-500">
-            <span className="capitalize">{activity.type.toLowerCase()}</span>
-            <span className="mx-2">•</span>
-            <Clock className="mr-1 h-3 w-3" />
-            <span>{activity.time}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const QuickAction = ({ icon: Icon, title, description, link, color }) => (
-    <Link
-      to={link}
-      className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors group"
-    >
-      <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform ${
-        color === 'blue' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' :
-        color === 'green' ? 'bg-green-50 text-green-600 group-hover:bg-green-100' :
-        color === 'purple' ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-100' : 'bg-gray-50 text-gray-600 group-hover:bg-gray-100'
-      }`}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="ml-4">
-        <p className="text-sm font-medium text-gray-900">{title}</p>
-        <p className="text-xs text-gray-500 mt-1">{description}</p>
-      </div>
-    </Link>
-  );
-
+const QuickAction = ({ icon: Icon, title, description, link, color }) => (
+  <Link 
+    to={link} 
+    className="flex items-start p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-gray-50 transition-all group"
+  >
+    <div className={`p-2 rounded-lg ${
+      color === 'blue' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' : 
+      color === 'green' ? 'bg-green-50 text-green-600 group-hover:bg-green-100' :
+      color === 'purple' ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-100' : 
+      'bg-gray-50 text-gray-600'
+    }`}>
+      <Icon className="h-5 w-5" />
+    </div>
+    <div className="ml-3 flex-1">
+      <h3 className="text-sm font-medium text-gray-800 group-hover:text-primary transition-colors">
+        {title}
+      </h3>
+      <p className="text-xs text-gray-500 mt-1">{description}</p>
+    </div>
+    <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors mt-1" />
+  </Link>
+);
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -310,9 +291,18 @@ const Dashboard = () => {
           color="purple" 
           link="/dashboard/leaves" 
         />
+        
+        {/* Finance Dashboard Card - Only for authorized users */}
+        {hasFinanceAccess() && (
+          <StatCard 
+            icon={PieChart} 
+            title="Finance Dashboard" 
+            value="View" 
+            color="indigo" 
+            link="/dashboard/finance" 
+          />
+        )}
       </div>
-
-      {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activities */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200">

@@ -5,71 +5,13 @@ const IncomeModule = () => {
   const [incomeData, setIncomeData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateRange, setDateRange] = useState({
-    from: '',
-    to: ''
-  })
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({
-    day: '',
-    month: '',
-    week: '',
-    voucher: '',
-    transactionDetails: '',
-    income: '',
-    duty: '',
-    wht: '',
-    vat: '',
-    grossAmount: '',
-    incomeCentre: '',
-    type: '',
-    stamp: '',
-    project: ''
+    day: '', month: '', week: '', voucher: '', transactionDetails: '',
+    income: '', duty: '', wht: '', vat: '', grossAmount: '',
+    incomeCentre: '', type: '', stamp: '', project: ''
   })
-
-  // Sample initial data matching your format
-  useEffect(() => {
-    const sampleData = [
-      {
-        id: 1,
-        day: '15',
-        month: 'JAN',
-        week: 3,
-        voucher: 'INV-001',
-        transactionDetails: 'Client Payment - Project Alpha',
-        income: 500000,
-        duty: 5000,
-        wht: 25000,
-        vat: 75000,
-        grossAmount: 575000,
-        incomeCentre: 'Operations',
-        type: 'Service',
-        stamp: 'Yes',
-        project: 'Project Alpha',
-        date: '2024-01-15'
-      },
-      {
-        id: 2,
-        day: '22',
-        month: 'JAN',
-        week: 4,
-        voucher: 'INV-002',
-        transactionDetails: 'Consulting Fees',
-        income: 250000,
-        duty: 2500,
-        wht: 12500,
-        vat: 37500,
-        grossAmount: 287500,
-        incomeCentre: 'Professional Services',
-        type: 'Consulting',
-        stamp: 'Yes',
-        project: 'Advisory Project',
-        date: '2024-01-22'
-      }
-    ]
-    setIncomeData(sampleData)
-    setFilteredData(sampleData)
-  }, [])
 
   // Filter data based on search and date range
   useEffect(() => {
@@ -77,9 +19,9 @@ const IncomeModule = () => {
 
     if (searchTerm) {
       filtered = filtered.filter(item =>
-        item.transactionDetails.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.voucher.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.project.toLowerCase().includes(searchTerm.toLowerCase())
+        item.transactionDetails?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.voucher?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.project?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -98,45 +40,41 @@ const IncomeModule = () => {
   const handleEdit = (income) => {
     setEditingId(income.id)
     setEditForm({
-      day: income.day,
-      month: income.month,
-      week: income.week,
-      voucher: income.voucher,
-      transactionDetails: income.transactionDetails,
-      income: income.income,
-      duty: income.duty,
-      wht: income.wht,
-      vat: income.vat,
-      grossAmount: income.grossAmount,
-      incomeCentre: income.incomeCentre,
-      type: income.type,
-      stamp: income.stamp,
-      project: income.project
+      day: income.day || '',
+      month: income.month || '',
+      week: income.week || '',
+      voucher: income.voucher || '',
+      transactionDetails: income.transactionDetails || '',
+      income: income.income || '',
+      duty: income.duty || '',
+      wht: income.wht || '',
+      vat: income.vat || '',
+      grossAmount: income.grossAmount || '',
+      incomeCentre: income.incomeCentre || '',
+      type: income.type || '',
+      stamp: income.stamp || 'No',
+      project: income.project || ''
     })
   }
 
   const handleEditChange = (e) => {
     const { name, value } = e.target
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setEditForm(prev => ({ ...prev, [name]: value }))
   }
 
   const handleSave = (id) => {
     setIncomeData(incomeData.map(income => {
       if (income.id === id) {
-        const updatedIncome = {
+        return {
           ...income,
           ...editForm,
-          income: Number(editForm.income),
-          duty: Number(editForm.duty),
-          wht: Number(editForm.wht),
-          vat: Number(editForm.vat),
-          grossAmount: Number(editForm.grossAmount),
-          week: Number(editForm.week)
+          income: Number(editForm.income) || 0,
+          duty: Number(editForm.duty) || 0,
+          wht: Number(editForm.wht) || 0,
+          vat: Number(editForm.vat) || 0,
+          grossAmount: Number(editForm.grossAmount) || 0,
+          week: Number(editForm.week) || 1
         }
-        return updatedIncome
       }
       return income
     }))
@@ -188,47 +126,52 @@ const IncomeModule = () => {
 
   const handleImport = (event) => {
     const file = event.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
-          
-          // Map Excel columns to our data structure
-          const importedData = jsonData.map((row, index) => ({
-            id: Date.now() + index,
-            day: row.Day || '',
-            month: row.Month || '',
-            week: row.Week || 1,
-            voucher: row.Voucher || '',
-            transactionDetails: row['Transaction Details'] || '',
-            income: Number(row.Income) || 0,
-            duty: Number(row.Duty) || 0,
-            wht: Number(row.WHT) || 0,
-            vat: Number(row.VAT) || 0,
-            grossAmount: Number(row['Gross Amount']) || 0,
-            incomeCentre: row['Income Centre'] || '',
-            type: row.Type || '',
-            stamp: row.Stamp || 'No',
-            project: row.Project || '',
-            date: row.Date || new Date().toISOString().split('T')[0]
-          }))
-          
-          setIncomeData([...incomeData, ...importedData])
-        } catch (error) {
-          console.error('Error parsing Excel file:', error)
-          alert('Error importing file. Please check the format.')
-        }
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        
+        const importedData = jsonData.map((row, index) => ({
+          id: Date.now() + index,
+          day: String(row.Day || row.day || ''),
+          month: String(row.Month || row.month || ''),
+          week: Number(row.Week || row.week || 1),
+          voucher: String(row.Voucher || row.voucher || ''),
+          transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
+          income: Number(row.Income || row.income || 0),
+          duty: Number(row.Duty || row.duty || 0),
+          wht: Number(row.WHT || row.wht || 0),
+          vat: Number(row.VAT || row.vat || 0),
+          grossAmount: Number(row['Gross Amount'] || row.grossAmount || 0),
+          incomeCentre: String(row['Income Centre'] || row.incomeCentre || ''),
+          type: String(row.Type || row.type || ''),
+          stamp: String(row.Stamp || row.stamp || 'No'),
+          project: String(row.Project || row.project || ''),
+          date: row.Date || row.date || new Date().toISOString().split('T')[0]
+        }))
+        
+        setIncomeData(prev => [...prev, ...importedData])
+        event.target.value = '' // Reset file input
+      } catch (error) {
+        console.error('Error importing file:', error)
+        alert('Error importing Excel file. Please check the format.')
       }
-      reader.readAsArrayBuffer(file)
     }
+    reader.readAsArrayBuffer(file)
   }
 
   const handleExport = () => {
+    if (incomeData.length === 0) {
+      alert('No data to export')
+      return
+    }
+
     const worksheet = XLSX.utils.json_to_sheet(incomeData.map(item => ({
       'Day': item.day,
       'Month': item.month,
@@ -249,26 +192,24 @@ const IncomeModule = () => {
     
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Income Data')
-    XLSX.writeFile(workbook, 'income_data.xlsx')
+    XLSX.writeFile(workbook, `income_data_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  const totalIncome = filteredData.reduce((sum, item) => sum + item.income, 0)
-  const totalGrossAmount = filteredData.reduce((sum, item) => sum + item.grossAmount, 0)
+  const totalIncome = filteredData.reduce((sum, item) => sum + (item.income || 0), 0)
+  const totalGrossAmount = filteredData.reduce((sum, item) => sum + (item.grossAmount || 0), 0)
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">ANNUAL INCOME</h2>
         <div className="flex items-center space-x-4">
-          <div className="w-64">
-            <input
-              type="text"
-              placeholder="Search income records..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Search income records..."
+            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
           <button
             onClick={handleAddNew}
             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
@@ -278,15 +219,23 @@ const IncomeModule = () => {
         </div>
       </div>
 
-      {/* Date Range Filter */}
       <div className="flex space-x-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">MONTH UNDER REVIEW</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
           <input
-            type="month"
+            type="date"
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
             value={dateRange.from}
             onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+          <input
+            type="date"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            value={dateRange.to}
+            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
           />
         </div>
         <div className="flex items-end space-x-2">
@@ -312,15 +261,10 @@ const IncomeModule = () => {
         </div>
       </div>
 
-      {/* Summary */}
       <div className="mb-6 p-4 bg-gray-50 rounded-md">
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold">TOTAL INCOME:</span>
           <span className="text-xl font-bold text-green-600">₦{totalIncome.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between items-center mt-2">
-          <span className="text-lg font-semibold">TOTAL GROSS AMOUNT:</span>
-          <span className="text-xl font-bold text-blue-600">₦{totalGrossAmount.toLocaleString()}</span>
         </div>
       </div>
 
@@ -351,205 +295,69 @@ const IncomeModule = () => {
               filteredData.map((income, index) => (
                 <tr key={income.id} className="hover:bg-gray-50">
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="day"
-                        value={editForm.day}
-                        onChange={handleEditChange}
-                        className="w-12 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.day
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <select
-                        name="month"
-                        value={editForm.month}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                      >
-                        {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(month => (
-                          <option key={month} value={month}>{month}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      income.month
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="week"
-                        value={editForm.week}
-                        onChange={handleEditChange}
-                        className="w-12 px-2 py-1 border border-gray-300 rounded-md"
-                        min="1"
-                        max="5"
-                      />
-                    ) : (
-                      income.week
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="voucher"
-                        value={editForm.voucher}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.voucher
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="transactionDetails"
-                        value={editForm.transactionDetails}
-                        onChange={handleEditChange}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.transactionDetails
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm font-medium">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="income"
-                        value={editForm.income}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${income.income.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="duty"
-                        value={editForm.duty}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${income.duty.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="wht"
-                        value={editForm.wht}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${income.wht.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="vat"
-                        value={editForm.vat}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${income.vat.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm font-medium">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="grossAmount"
-                        value={editForm.grossAmount}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${income.grossAmount.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="incomeCentre"
-                        value={editForm.incomeCentre}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.incomeCentre
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="type"
-                        value={editForm.type}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.type
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <select
-                        name="stamp"
-                        value={editForm.stamp}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                      >
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                    ) : (
-                      income.stamp
-                    )}
-                  </td>
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="project"
-                        value={editForm.project}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      income.project
-                    )}
-                  </td>
+                  
+                  {/* Editable fields */}
+                  {['day', 'month', 'week', 'voucher', 'transactionDetails', 'income', 'duty', 'wht', 'vat', 'grossAmount', 'incomeCentre', 'type', 'stamp', 'project'].map((field) => (
+                    <td key={field} className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {editingId === income.id ? (
+                        field === 'month' ? (
+                          <select
+                            name="month"
+                            value={editForm.month}
+                            onChange={handleEditChange}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
+                          >
+                            {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(month => (
+                              <option key={month} value={month}>{month}</option>
+                            ))}
+                          </select>
+                        ) : field === 'stamp' ? (
+                          <select
+                            name="stamp"
+                            value={editForm.stamp}
+                            onChange={handleEditChange}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
+                          >
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        ) : ['income', 'duty', 'wht', 'vat', 'grossAmount'].includes(field) ? (
+                          <input
+                            type="number"
+                            name={field}
+                            value={editForm[field]}
+                            onChange={handleEditChange}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
+                            min="0"
+                            step="0.01"
+                          />
+                        ) : field === 'week' ? (
+                          <input
+                            type="number"
+                            name="week"
+                            value={editForm.week}
+                            onChange={handleEditChange}
+                            className="w-12 px-2 py-1 border border-gray-300 rounded-md"
+                            min="1"
+                            max="5"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            name={field}
+                            value={editForm[field]}
+                            onChange={handleEditChange}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
+                          />
+                        )
+                      ) : (
+                        ['income', 'duty', 'wht', 'vat', 'grossAmount'].includes(field) 
+                          ? `₦${(income[field] || 0).toLocaleString()}`
+                          : income[field] || ''
+                      )}
+                    </td>
+                  ))}
+                  
                   <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                     {editingId === income.id ? (
                       <div className="space-x-2">
@@ -587,8 +395,8 @@ const IncomeModule = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="16" className="px-6 py-4 text-center text-gray-500">
-                  No income records found
+                <td colSpan={16} className="px-6 py-4 text-center text-gray-500">
+                  {incomeData.length === 0 ? 'No income records. Click "Add Income" to get started.' : 'No records match your search.'}
                 </td>
               </tr>
             )}

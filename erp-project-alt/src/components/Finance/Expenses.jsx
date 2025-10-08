@@ -5,69 +5,21 @@ const ExpensesModule = () => {
   const [expensesData, setExpensesData] = useState([])
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateRange, setDateRange] = useState({
-    from: '',
-    to: ''
-  })
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({
-    day: '',
-    month: '',
-    week: '',
-    voucher: '',
-    transactionDetails: '',
-    spent: '',
-    category: '',
-    costCentre: '',
-    subCostCentre: '',
-    bankDebited: ''
+    day: '', month: '', week: '', voucher: '', transactionDetails: '',
+    spent: '', category: '', costCentre: '', subCostCentre: '', bankDebited: ''
   })
 
-  // Sample initial data matching your template
-  useEffect(() => {
-    const sampleData = [
-      {
-        id: 1,
-        day: '10',
-        month: 'JAN',
-        week: 2,
-        voucher: 'EXP-001',
-        transactionDetails: 'Office Supplies Purchase',
-        spent: 150000,
-        category: 'Office Expenses',
-        costCentre: 'Administration',
-        subCostCentre: 'Supplies',
-        bankDebited: 'Yes',
-        date: '2024-01-10'
-      },
-      {
-        id: 2,
-        day: '18',
-        month: 'JAN',
-        week: 3,
-        voucher: 'EXP-002',
-        transactionDetails: 'Software Subscription Renewal',
-        spent: 75000,
-        category: 'Technology',
-        costCentre: 'IT Department',
-        subCostCentre: 'Software',
-        bankDebited: 'Yes',
-        date: '2024-01-18'
-      }
-    ]
-    setExpensesData(sampleData)
-    setFilteredData(sampleData)
-  }, [])
-
-  // Filter data based on search and date range
   useEffect(() => {
     let filtered = expensesData
 
     if (searchTerm) {
       filtered = filtered.filter(item =>
-        item.transactionDetails.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.voucher.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+        item.transactionDetails?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.voucher?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -86,25 +38,22 @@ const ExpensesModule = () => {
   const handleEdit = (expense) => {
     setEditingId(expense.id)
     setEditForm({
-      day: expense.day,
-      month: expense.month,
-      week: expense.week,
-      voucher: expense.voucher,
-      transactionDetails: expense.transactionDetails,
-      spent: expense.spent,
-      category: expense.category,
-      costCentre: expense.costCentre,
-      subCostCentre: expense.subCostCentre,
-      bankDebited: expense.bankDebited
+      day: expense.day || '',
+      month: expense.month || '',
+      week: expense.week || '',
+      voucher: expense.voucher || '',
+      transactionDetails: expense.transactionDetails || '',
+      spent: expense.spent || '',
+      category: expense.category || '',
+      costCentre: expense.costCentre || '',
+      subCostCentre: expense.subCostCentre || '',
+      bankDebited: expense.bankDebited || 'No'
     })
   }
 
   const handleEditChange = (e) => {
     const { name, value } = e.target
-    setEditForm(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setEditForm(prev => ({ ...prev, [name]: value }))
   }
 
   const handleSave = (id) => {
@@ -113,8 +62,8 @@ const ExpensesModule = () => {
         return {
           ...expense,
           ...editForm,
-          spent: Number(editForm.spent),
-          week: Number(editForm.week)
+          spent: Number(editForm.spent) || 0,
+          week: Number(editForm.week) || 1
         }
       }
       return expense
@@ -159,42 +108,48 @@ const ExpensesModule = () => {
 
   const handleImport = (event) => {
     const file = event.target.files[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
-          
-          const importedData = jsonData.map((row, index) => ({
-            id: Date.now() + index,
-            day: row.Day || '',
-            month: row.Month || '',
-            week: row.Week || 1,
-            voucher: row.Voucher || '',
-            transactionDetails: row['Transaction Details'] || '',
-            spent: Number(row.Spent) || 0,
-            category: row.Category || '',
-            costCentre: row['Cost Centre'] || '',
-            subCostCentre: row['Sub Cost Centre'] || '',
-            bankDebited: row['Bank Debited'] || 'No',
-            date: row.Date || new Date().toISOString().split('T')[0]
-          }))
-          
-          setExpensesData([...expensesData, ...importedData])
-        } catch (error) {
-          console.error('Error parsing Excel file:', error)
-          alert('Error importing file. Please check the format.')
-        }
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+        
+        const importedData = jsonData.map((row, index) => ({
+          id: Date.now() + index,
+          day: String(row.Day || row.day || ''),
+          month: String(row.Month || row.month || ''),
+          week: Number(row.Week || row.week || 1),
+          voucher: String(row.Voucher || row.voucher || ''),
+          transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
+          spent: Number(row.Spent || row.spent || 0),
+          category: String(row.Category || row.category || ''),
+          costCentre: String(row['Cost Centre'] || row.costCentre || ''),
+          subCostCentre: String(row['Sub Cost Centre'] || row.subCostCentre || ''),
+          bankDebited: String(row['Bank Debited'] || row.bankDebited || 'No'),
+          date: row.Date || row.date || new Date().toISOString().split('T')[0]
+        }))
+        
+        setExpensesData(prev => [...prev, ...importedData])
+        event.target.value = ''
+      } catch (error) {
+        console.error('Error importing file:', error)
+        alert('Error importing Excel file. Please check the format.')
       }
-      reader.readAsArrayBuffer(file)
     }
+    reader.readAsArrayBuffer(file)
   }
 
   const handleExport = () => {
+    if (expensesData.length === 0) {
+      alert('No data to export')
+      return
+    }
+
     const worksheet = XLSX.utils.json_to_sheet(expensesData.map(item => ({
       'Day': item.day,
       'Month': item.month,
@@ -211,25 +166,23 @@ const ExpensesModule = () => {
     
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses Data')
-    XLSX.writeFile(workbook, 'expenses_data.xlsx')
+    XLSX.writeFile(workbook, `expenses_data_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  const totalExpenses = filteredData.reduce((sum, item) => sum + item.spent, 0)
+  const totalExpenses = filteredData.reduce((sum, item) => sum + (item.spent || 0), 0)
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">ANNUAL EXPENSES</h2>
         <div className="flex items-center space-x-4">
-          <div className="w-64">
-            <input
-              type="text"
-              placeholder="Search expense records..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+          <input
+            type="text"
+            placeholder="Search expense records..."
+            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
           <button
             onClick={handleAddNew}
             className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
@@ -239,15 +192,23 @@ const ExpensesModule = () => {
         </div>
       </div>
 
-      {/* Date Range Filter */}
       <div className="flex space-x-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">MONTH UNDER REVIEW</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
           <input
-            type="month"
+            type="date"
             className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
             value={dateRange.from}
             onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+          <input
+            type="date"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            value={dateRange.to}
+            onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
           />
         </div>
         <div className="flex items-end space-x-2">
@@ -273,7 +234,6 @@ const ExpensesModule = () => {
         </div>
       </div>
 
-      {/* Summary */}
       <div className="mb-6 p-4 bg-gray-50 rounded-md">
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold">TOTAL SPENT:</span>
@@ -302,145 +262,67 @@ const ExpensesModule = () => {
             {filteredData.length > 0 ? (
               filteredData.map((expense) => (
                 <tr key={expense.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="day"
-                        value={editForm.day}
-                        onChange={handleEditChange}
-                        className="w-12 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.day
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <select
-                        name="month"
-                        value={editForm.month}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                      >
-                        {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(month => (
-                          <option key={month} value={month}>{month}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      expense.month
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="number"
-                        name="week"
-                        value={editForm.week}
-                        onChange={handleEditChange}
-                        className="w-12 px-2 py-1 border border-gray-300 rounded-md"
-                        min="1"
-                        max="5"
-                      />
-                    ) : (
-                      expense.week
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="voucher"
-                        value={editForm.voucher}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.voucher
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="transactionDetails"
-                        value={editForm.transactionDetails}
-                        onChange={handleEditChange}
-                        className="w-full px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.transactionDetails
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
-                    {editingId === expense.id ? (
-                      <input
-                        type="number"
-                        name="spent"
-                        value={editForm.spent}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                        min="0"
-                        step="0.01"
-                      />
-                    ) : (
-                      `₦${expense.spent.toLocaleString()}`
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="category"
-                        value={editForm.category}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.category
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="costCentre"
-                        value={editForm.costCentre}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.costCentre
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <input
-                        type="text"
-                        name="subCostCentre"
-                        value={editForm.subCostCentre}
-                        onChange={handleEditChange}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                      />
-                    ) : (
-                      expense.subCostCentre
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingId === expense.id ? (
-                      <select
-                        name="bankDebited"
-                        value={editForm.bankDebited}
-                        onChange={handleEditChange}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                      >
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
-                      </select>
-                    ) : (
-                      expense.bankDebited
-                    )}
-                  </td>
+                  {['day', 'month', 'week', 'voucher', 'transactionDetails', 'spent', 'category', 'costCentre', 'subCostCentre', 'bankDebited'].map((field) => (
+                    <td key={field} className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                      {editingId === expense.id ? (
+                        field === 'month' ? (
+                          <select
+                            name="month"
+                            value={editForm.month}
+                            onChange={handleEditChange}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
+                          >
+                            {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(month => (
+                              <option key={month} value={month}>{month}</option>
+                            ))}
+                          </select>
+                        ) : field === 'bankDebited' ? (
+                          <select
+                            name="bankDebited"
+                            value={editForm.bankDebited}
+                            onChange={handleEditChange}
+                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
+                          >
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                          </select>
+                        ) : field === 'spent' ? (
+                          <input
+                            type="number"
+                            name="spent"
+                            value={editForm.spent}
+                            onChange={handleEditChange}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
+                            min="0"
+                            step="0.01"
+                          />
+                        ) : field === 'week' ? (
+                          <input
+                            type="number"
+                            name="week"
+                            value={editForm.week}
+                            onChange={handleEditChange}
+                            className="w-12 px-2 py-1 border border-gray-300 rounded-md"
+                            min="1"
+                            max="5"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            name={field}
+                            value={editForm[field]}
+                            onChange={handleEditChange}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
+                          />
+                        )
+                      ) : (
+                        field === 'spent' 
+                          ? `₦${(expense[field] || 0).toLocaleString()}`
+                          : expense[field] || ''
+                      )}
+                    </td>
+                  ))}
+                  
                   <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                     {editingId === expense.id ? (
                       <div className="space-x-2">
@@ -478,8 +360,8 @@ const ExpensesModule = () => {
               ))
             ) : (
               <tr>
-                <td colSpan="11" className="px-6 py-4 text-center text-gray-500">
-                  No expense records found
+                <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                  {expensesData.length === 0 ? 'No expense records. Click "Add Expense" to get started.' : 'No records match your search.'}
                 </td>
               </tr>
             )}

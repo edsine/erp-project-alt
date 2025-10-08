@@ -7,7 +7,7 @@ import {
   Folder, Users, CheckSquare, DollarSign,
   Menu, X, ChevronLeft, ChevronRight,
   Search, Bell, ChevronDown, LogOut,
-  User, Clock, Mail
+  User, Clock, Mail, PieChart
 } from 'lucide-react'
 
 const DashboardLayout = () => {
@@ -78,6 +78,16 @@ const DashboardLayout = () => {
 
   const closeSidebar = () => {
     setSidebarOpen(false)
+  }
+
+  // Check if user has access to finance features
+  const hasFinanceAccess = () => {
+    return user && (
+      user.role === 'finance' || 
+      user.role === 'chairman' || 
+      user.department === 'finance' ||
+      user.role === 'admin' // Add admin if they should also have access
+    )
   }
 
   return (
@@ -221,6 +231,23 @@ const DashboardLayout = () => {
                 )}
               </Link>
             </li>
+            
+            {/* Finance Dashboard Link - Only for finance department and chairman */}
+            {hasFinanceAccess() && (
+              <li>
+                <Link
+                  to="finance"
+                  onClick={closeSidebar}
+                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
+                >
+                  <PieChart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
+                  {(sidebarOpen || window.innerWidth < 1024) && (
+                    <span className="ml-3">Finance Dashboard</span>
+                  )}
+                </Link>
+              </li>
+            )}
+            
             {user && user.role === 'finance' && (
               <li>
                 <Link
@@ -236,7 +263,6 @@ const DashboardLayout = () => {
               </li>
             )}
           </ul>
-
         </nav>
       </div>
 
@@ -304,7 +330,6 @@ const DashboardLayout = () => {
                       <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
                     </div>
                     <div className="py-1">
-
                       <button 
                         onClick={handleLogout} 
                         className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"

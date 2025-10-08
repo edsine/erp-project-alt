@@ -16,7 +16,6 @@ const FinancialDashboard = () => {
           <p className="text-gray-600">Manage your income, expenses, and view financial reports</p>
         </div>
 
-        {/* Navigation Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -41,7 +40,6 @@ const FinancialDashboard = () => {
           </div>
         </div>
 
-        {/* Content */}
         <div>
           {activeTab === 'income' && (
             <IncomeModule 
