@@ -33,8 +33,7 @@ const Dashboard = () => {
     return user && (
       user.role === 'finance' || 
       user.role === 'chairman' || 
-      user.department === 'finance' ||
-      user.role === 'admin'
+      user.department === 'finance' 
     )
   }
 
