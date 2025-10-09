@@ -664,7 +664,7 @@ router.get('/memos/user/:userId', async (req, res) => {
         m.approved_by_executive AS executive_approved,
         m.approved_by_finance AS finance_approved,
         m.approved_by_gmd AS gmd_approved,
-        m.approved_by_chairman AS chairman_approved
+        m.approved_by_chairman AS chairman_approved,
         m.paid_by_finance
       FROM memos m
       JOIN users u ON m.created_by = u.id
