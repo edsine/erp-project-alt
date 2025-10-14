@@ -9,6 +9,8 @@ import {
   Search, Bell, ChevronDown, LogOut,
   User, Clock, Mail, PieChart
 } from 'lucide-react'
+import { FiSettings, FiKey } from 'react-icons/fi';
+
 
 const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
@@ -296,52 +298,72 @@ const DashboardLayout = () => {
             </div>
 
             {/* Right side items */}
-            <div className="flex items-center space-x-4">
-              {/* <Link to='/dashboard/notifications' className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-              </Link> */}
-              
-              {/* Profile dropdown */}
-              <div className="relative" ref={dropdownRef}>
-                <button 
-                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary rounded-full p-1 transition-colors"
-                >
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary flex items-center justify-center text-white font-medium">
-                    {user?.name?.charAt(0) || 'U'}
-                  </div>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-700 truncate max-w-24">
-                      {user?.name || 'User'}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user?.role || 'Role'}
-                    </p>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? 'transform rotate-180' : ''}`} />
-                </button>
-                
-                {/* Dropdown menu */}
-                {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
-                      <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
-                    </div>
-                    <div className="py-1">
-                      <button 
-                        onClick={handleLogout} 
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                      >
-                        <LogOut className="h-4 w-4 mr-3" />
-                        Sign out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+<div className="flex items-center space-x-4">
+  {/* Profile dropdown */}
+  <div className="relative" ref={dropdownRef}>
+    <button 
+      onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+      className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary rounded-full p-1 transition-colors"
+    >
+      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary flex items-center justify-center text-white font-medium">
+        {user?.name?.charAt(0) || 'U'}
+      </div>
+      <div className="hidden sm:block text-left">
+        <p className="text-sm font-medium text-gray-700 truncate max-w-24">
+          {user?.name || 'User'}
+        </p>
+        <p className="text-xs text-gray-500 capitalize">
+          {user?.role || 'Role'}
+        </p>
+      </div>
+      <ChevronDown
+        className={`h-4 w-4 text-gray-500 transition-transform ${
+          profileDropdownOpen ? 'transform rotate-180' : ''
+        }`}
+      />
+    </button>
+
+    {/* Dropdown menu */}
+    {profileDropdownOpen && (
+      <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+          <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
+        </div>
+
+        <div className="py-1">
+          {/* Settings link */}
+          <Link
+            to="settings/change-password"
+            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <FiSettings className="h-4 w-4 mr-3" />
+            Settings
+          </Link>
+
+          {/* Change Password link */}
+          {/* <Link
+            to="/change-password"
+            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <FiKey className="h-4 w-4 mr-3" />
+            Change Password
+          </Link> */}
+
+          {/* Sign out */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <LogOut className="h-4 w-4 mr-3" />
+            Sign out
+          </button>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
           </div>
         </header>
 

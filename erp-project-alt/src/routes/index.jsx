@@ -25,6 +25,7 @@ import IncomeModule from '../components/Finance/Income'
 import ExpensesModule from '../components/Finance/Expenses'
 import ReportsModule from '../components/Finance/Reports' 
 import FinancialDashboard from '../components/Finance/Finance'
+import ChangePassword from '../components/Settings/ChangePassword'  
 
 const router = createBrowserRouter([
   {
@@ -133,6 +134,10 @@ const router = createBrowserRouter([
         path: 'finance/reports',
         element: <ReportsModule />,
       },
+      {
+        path: 'settings/change-password',
+        element: <ChangePassword />,
+      }
     ],
   },
 ])
