@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 
-const IncomeModule = () => {
-  const [incomeData, setIncomeData] = useState([])
+const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
@@ -12,6 +12,7 @@ const IncomeModule = () => {
     income: '', duty: '', wht: '', vat: '', grossAmount: '',
     incomeCentre: '', type: '', stamp: '', project: ''
   })
+  const [loading, setLoading] = useState(false)
 
   // Filter data based on search and date range
   useEffect(() => {
@@ -62,32 +63,77 @@ const IncomeModule = () => {
     setEditForm(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSave = (id) => {
-    setIncomeData(incomeData.map(income => {
-      if (income.id === id) {
-        return {
-          ...income,
-          ...editForm,
-          income: Number(editForm.income) || 0,
-          duty: Number(editForm.duty) || 0,
-          wht: Number(editForm.wht) || 0,
-          vat: Number(editForm.vat) || 0,
-          grossAmount: Number(editForm.grossAmount) || 0,
-          week: Number(editForm.week) || 1
-        }
+  const handleSave = async (id) => {
+    try {
+      setLoading(true)
+      const incomeToUpdate = incomeData.find(income => income.id === id)
+      
+      const updatedData = {
+        ...incomeToUpdate,
+        ...editForm,
+        income: Number(editForm.income) || 0,
+        duty: Number(editForm.duty) || 0,
+        wht: Number(editForm.wht) || 0,
+        vat: Number(editForm.vat) || 0,
+        grossAmount: Number(editForm.grossAmount) || 0,
+        week: Number(editForm.week) || 1
       }
-      return income
-    }))
-    setEditingId(null)
+
+      // Update in backend
+      const response = await fetch(`${BASE_URL}/api/finance/income/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedData)
+      })
+
+      if (response.ok) {
+        // Update local state
+        setIncomeData(incomeData.map(income => {
+          if (income.id === id) {
+            return updatedData
+          }
+          return income
+        }))
+        setEditingId(null)
+        refreshData() // Refresh all data
+      } else {
+        throw new Error('Failed to update income record')
+      }
+    } catch (error) {
+      console.error('Error updating income:', error)
+      alert('Error updating income record')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleDelete = (id) => {
-    setIncomeData(incomeData.filter(income => income.id !== id))
+  const handleDelete = async (id) => {
+    if (!confirm('Are you sure you want to delete this income record?')) return
+
+    try {
+      setLoading(true)
+      const response = await fetch(`${BASE_URL}/api/finance/income/${id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setIncomeData(incomeData.filter(income => income.id !== id))
+        refreshData() // Refresh all data
+      } else {
+        throw new Error('Failed to delete income record')
+      }
+    } catch (error) {
+      console.error('Error deleting income:', error)
+      alert('Error deleting income record')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleAddNew = () => {
+  const handleAddNew = async () => {
     const newIncome = {
-      id: Date.now(),
       day: new Date().getDate().toString(),
       month: new Date().toLocaleString('default', { month: 'short' }).toUpperCase(),
       week: Math.ceil(new Date().getDate() / 7),
@@ -104,66 +150,95 @@ const IncomeModule = () => {
       project: '',
       date: new Date().toISOString().split('T')[0]
     }
-    setIncomeData([...incomeData, newIncome])
-    setEditingId(newIncome.id)
-    setEditForm({
-      day: newIncome.day,
-      month: newIncome.month,
-      week: newIncome.week,
-      voucher: newIncome.voucher,
-      transactionDetails: '',
-      income: '',
-      duty: '',
-      wht: '',
-      vat: '',
-      grossAmount: '',
-      incomeCentre: '',
-      type: '',
-      stamp: 'No',
-      project: ''
-    })
+
+    try {
+      setLoading(true)
+      const response = await fetch(`${BASE_URL}/api/finance/income`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newIncome)
+      })
+
+      if (response.ok) {
+        const savedIncome = await response.json()
+        setIncomeData([...incomeData, { ...newIncome, id: savedIncome.id }])
+        refreshData() // Refresh all data
+      } else {
+        throw new Error('Failed to create income record')
+      }
+    } catch (error) {
+      console.error('Error creating income:', error)
+      alert('Error creating income record')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleImport = (event) => {
+  const handleImport = async (event) => {
     const file = event.target.files[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result)
-        const workbook = XLSX.read(data, { type: 'array' })
-        const sheetName = workbook.SheetNames[0]
-        const worksheet = workbook.Sheets[sheetName]
-        const jsonData = XLSX.utils.sheet_to_json(worksheet)
-        
-        const importedData = jsonData.map((row, index) => ({
-          id: Date.now() + index,
-          day: String(row.Day || row.day || ''),
-          month: String(row.Month || row.month || ''),
-          week: Number(row.Week || row.week || 1),
-          voucher: String(row.Voucher || row.voucher || ''),
-          transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
-          income: Number(row.Income || row.income || 0),
-          duty: Number(row.Duty || row.duty || 0),
-          wht: Number(row.WHT || row.wht || 0),
-          vat: Number(row.VAT || row.vat || 0),
-          grossAmount: Number(row['Gross Amount'] || row.grossAmount || 0),
-          incomeCentre: String(row['Income Centre'] || row.incomeCentre || ''),
-          type: String(row.Type || row.type || ''),
-          stamp: String(row.Stamp || row.stamp || 'No'),
-          project: String(row.Project || row.project || ''),
-          date: row.Date || row.date || new Date().toISOString().split('T')[0]
-        }))
-        
-        setIncomeData(prev => [...prev, ...importedData])
-        event.target.value = '' // Reset file input
-      } catch (error) {
-        console.error('Error importing file:', error)
-        alert('Error importing Excel file. Please check the format.')
+    try {
+      setLoading(true)
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const sheetName = workbook.SheetNames[0]
+          const worksheet = workbook.Sheets[sheetName]
+          const jsonData = XLSX.utils.sheet_to_json(worksheet)
+          
+          const importedData = jsonData.map((row, index) => ({
+            day: String(row.Day || row.day || ''),
+            month: String(row.Month || row.month || ''),
+            week: Number(row.Week || row.week || 1),
+            voucher: String(row.Voucher || row.voucher || ''),
+            transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
+            income: Number(row.Income || row.income || 0),
+            duty: Number(row.Duty || row.duty || 0),
+            wht: Number(row.WHT || row.wht || 0),
+            vat: Number(row.VAT || row.vat || 0),
+            grossAmount: Number(row['Gross Amount'] || row.grossAmount || 0),
+            incomeCentre: String(row['Income Centre'] || row.incomeCentre || ''),
+            type: String(row.Type || row.type || ''),
+            stamp: String(row.Stamp || row.stamp || 'No'),
+            project: String(row.Project || row.project || ''),
+            date: row.Date || row.date || new Date().toISOString().split('T')[0]
+          }))
+
+          // Save to backend
+          const response = await fetch(`${BASE_URL}/api/finance/income/import`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(importedData)
+          })
+
+          if (response.ok) {
+            const savedData = await response.json()
+            setIncomeData(prev => [...prev, ...savedData])
+            refreshData() // Refresh all data
+            event.target.value = ''
+            alert('Income data imported successfully!')
+          } else {
+            throw new Error('Failed to import income data')
+          }
+        } catch (error) {
+          console.error('Error processing import file:', error)
+          alert('Error importing Excel file. Please check the format.')
+        }
       }
+      reader.readAsArrayBuffer(file)
+    } catch (error) {
+      console.error('Error importing income data:', error)
+      alert('Error importing income data')
+    } finally {
+      setLoading(false)
     }
-    reader.readAsArrayBuffer(file)
   }
 
   const handleExport = () => {
@@ -200,6 +275,15 @@ const IncomeModule = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-2">Loading...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">ANNUAL INCOME</h2>
         <div className="flex items-center space-x-4">
@@ -212,7 +296,8 @@ const IncomeModule = () => {
           />
           <button
             onClick={handleAddNew}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark"
+            disabled={loading}
+            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
           >
             Add Income
           </button>

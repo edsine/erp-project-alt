@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../../context/AuthContext'
 import IncomeModule from './Income'
 import ExpensesModule from './Expenses'
 import ReportsModule from './Reports'
@@ -7,6 +8,62 @@ const FinancialDashboard = () => {
   const [activeTab, setActiveTab] = useState('income')
   const [incomeData, setIncomeData] = useState([])
   const [expensesData, setExpensesData] = useState([])
+  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+
+  // Fetch all financial data on component mount
+  useEffect(() => {
+    fetchFinancialData()
+  }, [])
+
+// In FinancialDashboard component, update the fetchFinancialData function:
+const fetchFinancialData = async () => {
+  try {
+    setLoading(true)
+    await Promise.all([
+      fetchIncomeData(),
+      fetchExpensesData()
+    ])
+  } catch (error) {
+    console.error('Error fetching financial data:', error)
+  } finally {
+    setLoading(false)
+  }
+}
+
+const fetchExpensesData = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/api/finance/expenses`)
+    if (response.ok) {
+      const data = await response.json()
+      setExpensesData(data)
+    }
+  } catch (error) {
+    console.error('Error fetching expenses data:', error)
+  }
+}
+
+  const fetchIncomeData = async () => {
+    try {
+      // Replace with your actual API endpoint
+      const response = await fetch('/api/finance/income')
+      if (response.ok) {
+        const data = await response.json()
+        setIncomeData(data)
+      }
+    } catch (error) {
+      console.error('Error fetching income data:', error)
+    }
+  }
+
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-64">
+        <div className="animate-pulse text-lg">Loading financial data...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
@@ -16,6 +73,7 @@ const FinancialDashboard = () => {
           <p className="text-gray-600">Manage your income, expenses, and view financial reports</p>
         </div>
 
+        {/* Navigation Tabs */}
         <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -40,17 +98,20 @@ const FinancialDashboard = () => {
           </div>
         </div>
 
+        {/* Content */}
         <div>
           {activeTab === 'income' && (
             <IncomeModule 
               incomeData={incomeData}
               setIncomeData={setIncomeData}
+              refreshData={fetchFinancialData}
             />
           )}
           {activeTab === 'expenses' && (
             <ExpensesModule 
               expensesData={expensesData}
               setExpensesData={setExpensesData}
+              refreshData={fetchFinancialData}
             />
           )}
           {activeTab === 'reports' && (
