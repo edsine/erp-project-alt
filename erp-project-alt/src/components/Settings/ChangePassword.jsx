@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiLock, FiKey, FiEye, FiEyeOff, FiCheckCircle } from 'react-icons/fi';
 
 const ChangePassword = () => {
@@ -8,20 +8,79 @@ const ChangePassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  
+  const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:7000/api';
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
 
+    // Validation
     if (newPassword !== confirmPassword) {
-      setSuccessMessage('Passwords do not match.');
+      setErrorMessage('New passwords do not match.');
       return;
     }
 
-    // Just a mock success (frontend only)
-    setSuccessMessage('Password changed successfully!');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+    if (newPassword.length < 6) {
+      setErrorMessage('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (oldPassword === newPassword) {
+      setErrorMessage('New password must be different from current password.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const user = JSON.parse(localStorage.getItem('user'));
+      
+      if (!user || !token) {
+        setErrorMessage('Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(`${BASE_URL}/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          oldPassword,
+          newPassword
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccessMessage('Password changed successfully!');
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        
+        // Redirect after success
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+      } else {
+        setErrorMessage(data.error || 'Failed to change password');
+      }
+    } catch (err) {
+      console.error('Password change error:', err);
+      setErrorMessage('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -61,11 +120,12 @@ const ChangePassword = () => {
             <FiKey className="absolute left-3 top-3.5 text-gray-400 h-4 w-4" />
             <input
               type={showPassword ? 'text' : 'password'}
-              placeholder="Enter new password"
+              placeholder="Enter new password (min. 6 characters)"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               className="w-full pl-9 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
               required
+              minLength="6"
             />
           </div>
         </div>
@@ -83,6 +143,7 @@ const ChangePassword = () => {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full pl-9 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
               required
+              minLength="6"
             />
             <button
               type="button"
@@ -94,24 +155,35 @@ const ChangePassword = () => {
           </div>
         </div>
 
+        {/* Success Message */}
         {successMessage && (
-          <div
-            className={`flex items-center text-sm ${
-              successMessage.includes('success')
-                ? 'text-green-600'
-                : 'text-red-500'
-            }`}
-          >
+          <div className="flex items-center text-sm text-green-600 bg-green-50 p-3 rounded-lg">
             <FiCheckCircle className="mr-2 h-4 w-4" />
             {successMessage}
           </div>
         )}
 
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="flex items-center text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            <FiCheckCircle className="mr-2 h-4 w-4" />
+            {errorMessage}
+          </div>
+        )}
+
         <button
           type="submit"
-          className="w-full bg-primary hover:bg-[#1e5369e4] text-white py-2 rounded-lg font-medium text-sm transition-colors"
+          disabled={isLoading}
+          className="w-full bg-primary hover:bg-[#1e5369e4] disabled:bg-gray-400 text-white py-2 rounded-lg font-medium text-sm transition-colors flex items-center justify-center"
         >
-          Update Password
+          {isLoading ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Updating...
+            </>
+          ) : (
+            'Update Password'
+          )}
         </button>
       </form>
     </div>

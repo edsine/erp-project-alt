@@ -197,6 +197,62 @@ router.put('/users', async (req, res) => {
   }
 });
 
+// Change Password Route
+router.put('/change-password', async (req, res) => {
+  const { userId, oldPassword, newPassword } = req.body;
+
+  if (!userId || !oldPassword || !newPassword) {
+    return res.status(400).json({ 
+      error: 'User ID, current password, and new password are required' 
+    });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({
+      error: 'New password must be at least 6 characters long'
+    });
+  }
+
+  try {
+    // Fetch user from database
+    const sql = `SELECT id, password FROM users WHERE id = ?`;
+    const [results] = await db.query(sql, [userId]);
+    
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = results[0];
+
+    // Verify old password
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    // Hash new password
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update password in database
+    const updateSql = `UPDATE users SET password = ? WHERE id = ?`;
+    const [updateResult] = await db.query(updateSql, [hashedNewPassword, userId]);
+
+    if (updateResult.affectedRows === 0) {
+      return res.status(500).json({ error: 'Failed to update password' });
+    }
+
+    res.json({ 
+      message: 'Password updated successfully' 
+    });
+  } catch (err) {
+    console.error('Password change error:', err);
+    res.status(500).json({ 
+      error: 'Failed to change password', 
+      details: err.message 
+    });
+  }
+});
+
 // DELETE /users/:id - Delete a user by ID
 router.delete('/users/:id', async (req, res) => {
   const userId = req.params.id;
