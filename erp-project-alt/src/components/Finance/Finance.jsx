@@ -5,6 +5,7 @@ import ExpensesModule from './Expenses'
 import ReportsModule from './Reports'
 
 const FinancialDashboard = () => {
+  const BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const [activeTab, setActiveTab] = useState('income')
   const [incomeData, setIncomeData] = useState([])
   const [expensesData, setExpensesData] = useState([])
@@ -33,7 +34,7 @@ const fetchFinancialData = async () => {
 
 const fetchExpensesData = async () => {
   try {
-    const response = await fetch(`${BASE_URL}/api/finance/expenses`)
+    const response = await fetch(`${BASE_URL}/finance/expenses`)
     if (response.ok) {
       const data = await response.json()
       setExpensesData(data)
@@ -45,8 +46,7 @@ const fetchExpensesData = async () => {
 
   const fetchIncomeData = async () => {
     try {
-      // Replace with your actual API endpoint
-      const response = await fetch('/api/finance/income')
+      const response = await fetch('/finance/income')
       if (response.ok) {
         const data = await response.json()
         setIncomeData(data)

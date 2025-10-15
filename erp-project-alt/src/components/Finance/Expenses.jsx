@@ -71,7 +71,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
       }
 
       // Update in backend
-      const response = await fetch(`${BASE_URL}/api/finance/expenses/${id}`, {
+      const response = await fetch(`${BASE_URL}/finance/expenses/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/api/finance/expenses/${id}`, {
+      const response = await fetch(`${BASE_URL}/finance/expenses/${id}`, {
         method: 'DELETE'
       })
 
@@ -140,7 +140,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/api/finance/expenses`, {
+      const response = await fetch(`${BASE_URL}/finance/expenses`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -193,7 +193,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
           }))
 
           // Save to backend
-          const response = await fetch(`${BASE_URL}/api/finance/expenses/import`, {
+          const response = await fetch(`${BASE_URL}/finance/expenses/import`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

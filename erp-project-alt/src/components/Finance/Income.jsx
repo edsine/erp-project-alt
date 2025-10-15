@@ -80,7 +80,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
       }
 
       // Update in backend
-      const response = await fetch(`${BASE_URL}/api/finance/income/${id}`, {
+      const response = await fetch(`${BASE_URL}/finance/income/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/api/finance/income/${id}`, {
+      const response = await fetch(`${BASE_URL}/finance/income/${id}`, {
         method: 'DELETE'
       })
 
@@ -153,7 +153,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/api/finance/income`, {
+      const response = await fetch(`${BASE_URL}/finance/income`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +210,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
           }))
 
           // Save to backend
-          const response = await fetch(`${BASE_URL}/api/finance/income/import`, {
+          const response = await fetch(`${BASE_URL}/finance/income/import`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

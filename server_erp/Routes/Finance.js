@@ -1,10 +1,9 @@
-// routes/finance.js
 const express = require('express')
 const router = express.Router()
-const db = require('../config/database')
+const db = require('../db')
 
 // Get all income records
-router.get('/income', async (req, res) => {
+router.get('/api/finance/income', async (req, res) => {
   try {
     const [rows] = await db.execute(`
       SELECT * FROM income 
@@ -18,7 +17,7 @@ router.get('/income', async (req, res) => {
 })
 
 // Create new income record
-router.post('/income', async (req, res) => {
+router.post('/api/finance/income', async (req, res) => {
   try {
     const {
       day, month, week, voucher, transactionDetails,
@@ -47,7 +46,7 @@ router.post('/income', async (req, res) => {
 })
 
 // Update income record
-router.put('/income/:id', async (req, res) => {
+router.put('/api/finance/income/:id', async (req, res) => {
   try {
     const { id } = req.params
     const {
@@ -79,7 +78,7 @@ router.put('/income/:id', async (req, res) => {
 })
 
 // Delete income record
-router.delete('/income/:id', async (req, res) => {
+router.delete('/api/finance/income/:id', async (req, res) => {
   try {
     const { id } = req.params
     await db.execute('DELETE FROM income WHERE id = ?', [id])
@@ -91,7 +90,7 @@ router.delete('/income/:id', async (req, res) => {
 })
 
 // Import multiple income records
-router.post('/income/import', async (req, res) => {
+router.post('/api/finance/income/import', async (req, res) => {
   try {
     const records = req.body
     const savedRecords = []
@@ -120,22 +119,8 @@ router.post('/income/import', async (req, res) => {
   }
 })
 
-// Similar endpoints for expenses...
-router.get('/expenses', async (req, res) => {
-  try {
-    const [rows] = await db.execute(`
-      SELECT * FROM expenses 
-      ORDER BY date DESC, created_at DESC
-    `)
-    res.json(rows)
-  } catch (error) {
-    console.error('Error fetching expenses:', error)
-    res.status(500).json({ error: 'Failed to fetch expense records' })
-  }
-})
-
 // Get all expense records
-router.get('/expenses', async (req, res) => {
+router.get('/api/finance/expenses', async (req, res) => {
   try {
     const [rows] = await db.execute(`
       SELECT * FROM expenses 
@@ -149,7 +134,7 @@ router.get('/expenses', async (req, res) => {
 })
 
 // Create new expense record
-router.post('/expenses', async (req, res) => {
+router.post('/api/finance/expenses', async (req, res) => {
   try {
     const {
       day, month, week, voucher, transactionDetails,
@@ -176,7 +161,7 @@ router.post('/expenses', async (req, res) => {
 })
 
 // Update expense record
-router.put('/expenses/:id', async (req, res) => {
+router.put('/api/finance/expenses/:id', async (req, res) => {
   try {
     const { id } = req.params
     const {
@@ -205,7 +190,7 @@ router.put('/expenses/:id', async (req, res) => {
 })
 
 // Delete expense record
-router.delete('/expenses/:id', async (req, res) => {
+router.delete('/api/finance/expenses/:id', async (req, res) => {
   try {
     const { id } = req.params
     await db.execute('DELETE FROM expenses WHERE id = ?', [id])
@@ -217,7 +202,7 @@ router.delete('/expenses/:id', async (req, res) => {
 })
 
 // Import multiple expense records
-router.post('/expenses/import', async (req, res) => {
+router.post('/api/finance/expenses/import', async (req, res) => {
   try {
     const records = req.body
     const savedRecords = []
@@ -244,4 +229,5 @@ router.post('/expenses/import', async (req, res) => {
     res.status(500).json({ error: 'Failed to import expense records' })
   }
 })
+
 module.exports = router
