@@ -199,53 +199,69 @@ router.put('/users', async (req, res) => {
 
 // Change Password Route
 router.put('/change-password', async (req, res) => {
+  console.log('=== CHANGE PASSWORD ENDPOINT HIT ===');
+  console.log('Request body:', req.body);
+  
   const { userId, oldPassword, newPassword } = req.body;
 
   if (!userId || !oldPassword || !newPassword) {
+    console.log('❌ Missing required fields');
     return res.status(400).json({ 
       error: 'User ID, current password, and new password are required' 
     });
   }
 
-  if (newPassword.length < 6) {
-    return res.status(400).json({
-      error: 'New password must be at least 6 characters long'
-    });
-  }
+  console.log('✅ All required fields present');
 
   try {
+    console.log('🔍 Fetching user from database...');
     // Fetch user from database
     const sql = `SELECT id, password FROM users WHERE id = ?`;
     const [results] = await db.query(sql, [userId]);
     
+    console.log('📊 Database results:', results);
+    
     if (results.length === 0) {
+      console.log('❌ User not found');
       return res.status(404).json({ error: 'User not found' });
     }
 
     const user = results[0];
+    console.log('✅ User found:', user.id);
 
     // Verify old password
+    console.log('🔐 Verifying old password...');
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    console.log('Password valid:', isOldPasswordValid);
+    
     if (!isOldPasswordValid) {
+      console.log('❌ Current password is incorrect');
       return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
     // Hash new password
+    console.log('🔑 Hashing new password...');
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
     // Update password in database
+    console.log('💾 Updating password in database...');
     const updateSql = `UPDATE users SET password = ? WHERE id = ?`;
     const [updateResult] = await db.query(updateSql, [hashedNewPassword, userId]);
 
+    console.log('📝 Update result:', updateResult);
+
     if (updateResult.affectedRows === 0) {
+      console.log('❌ Failed to update password - no rows affected');
       return res.status(500).json({ error: 'Failed to update password' });
     }
 
+    console.log('✅ Password updated successfully');
     res.json({ 
       message: 'Password updated successfully' 
     });
+    
   } catch (err) {
-    console.error('Password change error:', err);
+    console.error('💥 Password change error:', err);
     res.status(500).json({ 
       error: 'Failed to change password', 
       details: err.message 
