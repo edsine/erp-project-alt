@@ -10,7 +10,7 @@ const leaveRoutes = require('./Routes/leave');
 const ReportRoutes = require('./Routes/Reprts');
 // const activityRoutes = require('./Routes/activityRoutes'); 
 const directMemosRoutes = require('./Routes/directMemos');
-const financeRoutes = require('./Routes/finance'); 
+// const financeRoutes = require('./Routes/finance'); 
 
 
 const app = express();
@@ -27,7 +27,7 @@ app.use('/api', leaveRoutes);
 app.use('/api', ReportRoutes);
 // app.use('/api', activityRoutes);
 app.use('/api/direct-memos', directMemosRoutes);
-app.use('/api/finance', financeRoutes); 
+// app.use('/api/finance', financeRoutes); 
 
 
 
