@@ -12,7 +12,10 @@ const ChangePassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   
-  const BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:7000/api';
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
+
+  console.log('BASE_URL:', BASE_URL);
+console.log('Full endpoint URL:', `${BASE_URL}/change-password`);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
