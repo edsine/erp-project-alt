@@ -23,9 +23,10 @@ import DirectMemos from '../components/DirectMemo/DirectMemoList'
 import NewDirectMemo from '../components/DirectMemo/NewDirectMemos'
 import IncomeModule from '../components/Finance/Income'
 import ExpensesModule from '../components/Finance/Expenses'
-import ReportsModule from '../components/Finance/Reports' 
+import ReportsModule from '../components/Finance/Reports'
 import FinancialDashboard from '../components/Finance/Finance'
-import ChangePassword from '../components/Settings/ChangePassword'  
+import ChangePassword from '../components/Settings/ChangePassword'
+import SingleMemo from '../components/Memo/Singlememo'
 
 const router = createBrowserRouter([
   {
@@ -49,13 +50,18 @@ const router = createBrowserRouter([
         element: <Dashboard />,
       },
       {
-        path: 'memos',
-        element: <MemoList />,
+        path: 'memos/:memoId?',
+        element: <MemoList/>,
       },
       {
         path: 'memos/new',
         element: <NewMemo />,
       },
+      {
+        path: 'memos/:id',
+        element: <SingleMemo />,
+      },
+
       {
         path: 'requisitions',
         element: <RequisitionList />,
@@ -113,11 +119,13 @@ const router = createBrowserRouter([
         element: <ActivitiesPage />,
       },
       {
-        path: 'direct-memos', 
-        element: <DirectMemos />},
+        path: 'direct-memos',
+        element: <DirectMemos />
+      },
       {
-        path: 'direct-memos/new', 
-        element: <NewDirectMemo />},
+        path: 'direct-memos/new',
+        element: <NewDirectMemo />
+      },
       {
         path: 'finance',
         element: <FinancialDashboard />,
@@ -126,11 +134,11 @@ const router = createBrowserRouter([
         path: 'finance/income',
         element: <IncomeModule />,
       },
-      { 
+      {
         path: 'finance/expenses',
         element: <ExpensesModule />,
       },
-      { 
+      {
         path: 'finance/reports',
         element: <ReportsModule />,
       },
@@ -146,6 +154,6 @@ export default router
 
 // Don't forget to update your DashboardLayout navigation links:
 // - Change to="/dashboard" to to=""
-// - Change to="/memos" to to="memos"  
+// - Change to="/memos" to to="memos"
 // - Change to="/requisitions" to to="requisitions"
 // - etc. 
