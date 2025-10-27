@@ -106,6 +106,59 @@ router.get('/leave/:id', async (req, res) => {
 
 
 // GET leave requests by user ID
+// router.get('/leave/user/:user_id', async (req, res) => {
+//   const { user_id } = req.params;
+
+//   try {
+//     // Step 1: Fetch user's role and department
+//     const [userResult] = await db.query(
+//       'SELECT role, department FROM users WHERE id = ?',
+//       [user_id]
+//     );
+
+//     if (userResult.length === 0) {
+//       return res.status(404).json({ error: 'User not found' });
+//     }
+
+//     const { role, department } = userResult[0];
+
+//     let query = '';
+//     let params = [];
+
+//     // Step 2: Build query based on role
+//     if (role === 'staff') {
+//       query = `SELECT * FROM leave_requests WHERE user_id = ? ORDER BY created_at DESC`;
+//       params = [user_id];
+//     } else if (role === 'manager' || role === 'executive') {
+//       query = `
+//         SELECT lr.*, u.name AS requester_name
+//         FROM leave_requests lr
+//         JOIN users u ON lr.user_id = u.id
+//         WHERE u.department = ? AND lr.user_id != ?
+//         ORDER BY lr.created_at DESC
+//       `;
+//       params = [department, user_id];
+//     } else if (['hr', 'gmd', 'chairman'].includes(role)) {
+//       query = `
+//         SELECT lr.*, u.name AS requester_name, u.department
+//         FROM leave_requests lr
+//         JOIN users u ON lr.user_id = u.id
+//         ORDER BY lr.created_at DESC
+//       `;
+//     } else {
+//       return res.status(403).json({ error: 'Unauthorized role' });
+//     }
+
+//     // Step 3: Run query
+//     const [rows] = await db.query(query, params);
+//     res.json(rows);
+
+//   } catch (err) {
+//     console.error('❌ Error in /leave/user/:user_id:', err);
+//     res.status(500).json({ error: 'Failed to fetch leave requests' });
+//   }
+// });
+
 router.get('/leave/user/:user_id', async (req, res) => {
   const { user_id } = req.params;
 
@@ -121,35 +174,53 @@ router.get('/leave/user/:user_id', async (req, res) => {
     }
 
     const { role, department } = userResult[0];
+    const normalizedRole = role?.trim().toLowerCase();
+    const normalizedDept = department?.trim().toLowerCase();
 
     let query = '';
     let params = [];
 
-    // Step 2: Build query based on role
-    if (role === 'staff') {
-      query = `SELECT * FROM leave_requests WHERE user_id = ? ORDER BY created_at DESC`;
-      params = [user_id];
-    } else if (role === 'manager' || role === 'executive') {
-      query = `
-        SELECT lr.*, u.name AS requester_name
-        FROM leave_requests lr
-        JOIN users u ON lr.user_id = u.id
-        WHERE u.department = ? AND lr.user_id != ?
-        ORDER BY lr.created_at DESC
-      `;
-      params = [department, user_id];
-    } else if (['hr', 'gmd', 'chairman'].includes(role)) {
+    // Step 2: Build query logic by role
+    if (normalizedRole === 'staff') {
+      // Staff → only their own leave requests
       query = `
         SELECT lr.*, u.name AS requester_name, u.department
         FROM leave_requests lr
         JOIN users u ON lr.user_id = u.id
+        WHERE lr.user_id = ?
         ORDER BY lr.created_at DESC
       `;
-    } else {
+      params = [user_id];
+    }
+
+    else if (normalizedRole === 'manager' || normalizedRole === 'executive') {
+      // Manager / Executive → handle ICT department only
+      query = `
+        SELECT lr.*, u.name AS requester_name, u.department
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        WHERE u.department = 'ict' AND lr.user_id != ?
+        ORDER BY lr.created_at DESC
+      `;
+      params = [user_id];
+    }
+
+    else if (['finance', 'hr', 'gmd', 'chairman'].includes(normalizedRole)) {
+      // Finance, HR, GMD, Chairman → handle NON-ICT leave requests
+      query = `
+        SELECT lr.*, u.name AS requester_name, u.department
+        FROM leave_requests lr
+        JOIN users u ON lr.user_id = u.id
+        WHERE u.department != 'ict'
+        ORDER BY lr.created_at DESC
+      `;
+    }
+
+    else {
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
-    // Step 3: Run query
+    // Step 3: Execute query
     const [rows] = await db.query(query, params);
     res.json(rows);
 
@@ -161,6 +232,87 @@ router.get('/leave/user/:user_id', async (req, res) => {
 
 
 
+
+// Approve leave request
+// router.post('/leave/:id/approve', async (req, res) => {
+//   const leaveId = req.params.id;
+//   const { user_id } = req.body;
+
+//   if (!user_id) {
+//     return res.status(400).json({ message: 'User ID is required for approval.' });
+//   }
+
+//   // Map roles to approval fields and their dependencies
+//   const roleApprovalMap = {
+//     manager:   { field: 'approved_by_manager',   dependsOn: null },
+//     executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+//     hr:        { field: 'approved_by_hr',        dependsOn: 'approved_by_executive' },
+//     gmd:       { field: 'approved_by_gmd',       dependsOn: 'approved_by_hr' },
+//     chairman:  { field: 'approved_by_chairman',  dependsOn: 'approved_by_gmd' },
+//   };
+
+//   try {
+//     // 1. Get user's role
+//     const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
+
+//     if (userResults.length === 0) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     const role = userResults[0].role?.trim().toLowerCase();
+
+//     if (!roleApprovalMap[role]) {
+//       return res.status(403).json({ message: `User role (${role}) is not authorized to approve.` });
+//     }
+
+//     const { field, dependsOn } = roleApprovalMap[role];
+
+//     // 2. Get current approval status
+//     const [leaveCheck] = await db.query(
+//       `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM leave_requests WHERE id = ?`,
+//       [leaveId]
+//     );
+
+//     if (leaveCheck.length === 0) {
+//       return res.status(404).json({ message: 'Leave request not found.' });
+//     }
+
+//     const leave = leaveCheck[0];
+
+//     if (leave[field] === 1) {
+//       return res.status(400).json({ message: `Already approved by ${role}` });
+//     }
+
+//     if (dependsOn && leave[dependsOn] !== 1) {
+//       return res.status(403).json({
+//         message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`
+//       });
+//     }
+
+//     // 3. Approve the request
+//     await db.query(`UPDATE leave_requests SET ${field} = 1 WHERE id = ?`, [leaveId]);
+
+//     // 4. Check if all stages are approved
+//     const [all] = await db.query(`
+//       SELECT approved_by_manager, approved_by_executive, approved_by_hr, approved_by_gmd, approved_by_chairman
+//       FROM leave_requests WHERE id = ?
+//     `, [leaveId]);
+
+//     if (all.length > 0) {
+//       const allApproved = Object.values(all[0]).every(val => val === 1);
+//       if (allApproved) {
+//         await db.query(`UPDATE leave_requests SET status = 'approved' WHERE id = ?`, [leaveId]);
+//       }
+//     }
+
+//     return res.status(200).json({ message: `Approved by ${role}`, field });
+
+//   } catch (err) {
+//     console.error('🔥 Error in leave approval process:', err);
+//     return res.status(500).json({ message: 'Error updating approval status' });
+//   }
+// });
+
 // Approve leave request
 router.post('/leave/:id/approve', async (req, res) => {
   const leaveId = req.params.id;
@@ -170,40 +322,64 @@ router.post('/leave/:id/approve', async (req, res) => {
     return res.status(400).json({ message: 'User ID is required for approval.' });
   }
 
-  // Map roles to approval fields and their dependencies
-  const roleApprovalMap = {
-    manager:   { field: 'approved_by_manager',   dependsOn: null },
-    executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
-    hr:        { field: 'approved_by_hr',        dependsOn: 'approved_by_executive' },
-    gmd:       { field: 'approved_by_gmd',       dependsOn: 'approved_by_hr' },
-    chairman:  { field: 'approved_by_chairman',  dependsOn: 'approved_by_gmd' },
-  };
-
   try {
-    // 1. Get user's role
-    const [userResults] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
+    // 1. Get approver's role
+    const [userResults] = await db.query('SELECT role, department FROM users WHERE id = ?', [user_id]);
+    if (userResults.length === 0) return res.status(404).json({ message: 'User not found.' });
 
-    if (userResults.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+    const approver = userResults[0];
+    const role = approver.role?.trim().toLowerCase();
+    const department = approver.department?.trim().toLowerCase();
+
+    // 2. Get leave request details (to determine sender’s department)
+    const [leaveRequest] = await db.query(
+      'SELECT user_id FROM leave_requests WHERE id = ?',
+      [leaveId]
+    );
+    if (leaveRequest.length === 0)
+      return res.status(404).json({ message: 'Leave request not found.' });
+
+    const requesterId = leaveRequest[0].user_id;
+    const [requesterInfo] = await db.query(
+      'SELECT department FROM users WHERE id = ?',
+      [requesterId]
+    );
+
+    const requesterDept = requesterInfo[0]?.department?.trim().toLowerCase();
+
+    // 3. Determine approval flow
+    let roleApprovalMap;
+
+    if (requesterDept !== 'ict') {
+      // Non-ICT flow
+      roleApprovalMap = {
+        finance:  { field: 'approved_by_executive', dependsOn: null }, // finance executive first
+        hr:       { field: 'approved_by_hr',        dependsOn: 'approved_by_executive' },
+        gmd:      { field: 'approved_by_gmd',       dependsOn: 'approved_by_hr' },
+        chairman: { field: 'approved_by_chairman',  dependsOn: 'approved_by_gmd' },
+      };
+    } else {
+      // Default ICT flow
+      roleApprovalMap = {
+        manager:   { field: 'approved_by_manager',   dependsOn: null },
+        executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+        hr:        { field: 'approved_by_hr',        dependsOn: 'approved_by_executive' },
+        gmd:       { field: 'approved_by_gmd',       dependsOn: 'approved_by_hr' },
+        chairman:  { field: 'approved_by_chairman',  dependsOn: 'approved_by_gmd' },
+      };
     }
 
-    const role = userResults[0].role?.trim().toLowerCase();
-
     if (!roleApprovalMap[role]) {
-      return res.status(403).json({ message: `User role (${role}) is not authorized to approve.` });
+      return res.status(403).json({ message: `Role '${role}' is not authorized to approve this leave.` });
     }
 
     const { field, dependsOn } = roleApprovalMap[role];
 
-    // 2. Get current approval status
+    // 4. Check current approval status
     const [leaveCheck] = await db.query(
       `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM leave_requests WHERE id = ?`,
       [leaveId]
     );
-
-    if (leaveCheck.length === 0) {
-      return res.status(404).json({ message: 'Leave request not found.' });
-    }
 
     const leave = leaveCheck[0];
 
@@ -213,14 +389,14 @@ router.post('/leave/:id/approve', async (req, res) => {
 
     if (dependsOn && leave[dependsOn] !== 1) {
       return res.status(403).json({
-        message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`
+        message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`,
       });
     }
 
-    // 3. Approve the request
+    // 5. Approve current step
     await db.query(`UPDATE leave_requests SET ${field} = 1 WHERE id = ?`, [leaveId]);
 
-    // 4. Check if all stages are approved
+    // 6. If all are approved, mark as fully approved
     const [all] = await db.query(`
       SELECT approved_by_manager, approved_by_executive, approved_by_hr, approved_by_gmd, approved_by_chairman
       FROM leave_requests WHERE id = ?
@@ -241,6 +417,28 @@ router.post('/leave/:id/approve', async (req, res) => {
   }
 });
 
+
+router.post('/leave/:id/reject', async (req, res) => {
+  const leaveId = req.params.id;
+  const { user_id } = req.body;
+
+  const [userRes] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
+  const role = userRes[0]?.role?.trim().toLowerCase();
+
+  const roleRejectMap = {
+    manager: 'rejected_by_manager',
+    executive: 'rejected_by_executive',
+    hr: 'rejected_by_hr',
+    gmd: 'rejected_by_gmd',
+    chairman: 'rejected_by_chairman',
+  };
+
+  const field = roleRejectMap[role];
+  if (!field) return res.status(403).json({ message: `Role ${role} not authorized to reject.` });
+
+  await db.query(`UPDATE leave_requests SET ${field} = 1, status = 'rejected' WHERE id = ?`, [leaveId]);
+  res.json({ message: `Rejected by ${role}`, field });
+});
 
 
 

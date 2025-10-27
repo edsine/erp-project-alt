@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
@@ -199,6 +200,7 @@ const MemoList = () => {
 
   const { user } = useAuth();
   const [memos, setMemos] = useState([]);
+  const { memoId } = useParams();
   const [acknowledgments, setAcknowledgments] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -276,6 +278,16 @@ setFinanceActionedMemos(paidMemoIds);
 
     fetchMemos();
   }, [user, users]);
+
+  useEffect(() => {
+  if (memoId && memos.length > 0) {
+    const memoToOpen = memos.find(m => m.id === parseInt(memoId));
+    if (memoToOpen) {
+      setSelectedMemo(memoToOpen);
+    }
+  }
+}, [memoId, memos]);
+
 
   // Filter memos based on search term
   const searchFilteredMemos = memos.filter(memo => {
@@ -437,11 +449,13 @@ setFinanceActionedMemos(paidMemoIds);
   const handleMemoClick = (memo) => {
     if (selectedMemo && selectedMemo.id === memo.id) {
       setSelectedMemo(null);
+       navigate('/dashboard/memos');
     } else {
       setSelectedMemo({
         ...memo,
         acknowledged: isMemoAcknowledgedByUser(memo, user.id)
       });
+      navigate(`/dashboard/memos/${memo.id}`);
     }
   };
 
@@ -518,41 +532,78 @@ const handlePay = async (memo) => {
     }
   };
 
-  const handleReject = async (memo) => {
-    if (!memo) return;
+  // const handleReject = async (memo) => {
+  //   if (!memo) return;
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/reject`,
-        { userId: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
+  //   try {
+  //     const response = await axios.post(
+  //       `${BASE_URL}/memos/${memo.id}/reject`,
+  //       { userId: user.id },
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${user.token}`,
+  //         },
+  //       }
+  //     );
 
-      if (response.data?.success) {
-        const { field } = response.data;
+  //     if (response.data?.success) {
+  //       const { field } = response.data;
 
-        const updatedMemos = memos.map(m =>
-          m.id === memo.id
-            ? {
+  //       const updatedMemos = memos.map(m =>
+  //         m.id === memo.id
+  //           ? {
+  //             ...m,
+  //             status: 'rejected',
+  //             [field]: -1,
+  //           }
+  //           : m
+  //       );
+
+  //       setMemos(updatedMemos);
+  //       setSelectedMemo(null); // Close the memo view
+  //       setError(null);
+  //     }
+  //   } catch (err) {
+  //     setError(err.response?.data?.message || 'Failed to reject memo');
+  //   }
+  // };
+
+const handleReject = async (memo) => {
+  if (!memo) return;
+
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/reject`,
+      { userId: user.id },
+      { headers: { Authorization: `Bearer ${user.token}` } }
+    );
+
+    if (response.data?.success) {
+      const { field, rejectedBy, message } = response.data;
+
+      const updatedMemos = memos.map((m) =>
+        m.id === memo.id
+          ? {
               ...m,
               status: 'rejected',
-              [field]: -1,
+              [field]: 1,
+              rejected_by_name: rejectedBy,
             }
-            : m
-        );
+          : m
+      );
 
-        setMemos(updatedMemos);
-        setSelectedMemo(null); // Close the memo view
-        setError(null);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject memo');
+      setMemos(updatedMemos);
+      setSelectedMemo(null);
+      console.log(message);
     }
-  };
+  } catch (err) {
+    console.error('Reject error:', err);
+    setError(err.response?.data?.message || 'Failed to reject memo');
+  }
+};
+
+
+
 
   const getStatusBadge = (status) => {
     const statusLower = status.toLowerCase();
