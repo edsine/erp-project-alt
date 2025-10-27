@@ -266,9 +266,9 @@ const MemoList = () => {
 
         setMemos(transformedMemos);
         const paidMemoIds = transformedMemos
-  .filter(m => m.paid_by_finance)
-  .map(m => m.id);
-setFinanceActionedMemos(paidMemoIds);
+          .filter(m => m.paid_by_finance)
+          .map(m => m.id);
+        setFinanceActionedMemos(paidMemoIds);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to fetch memos');
       } finally {
@@ -280,13 +280,13 @@ setFinanceActionedMemos(paidMemoIds);
   }, [user, users]);
 
   useEffect(() => {
-  if (memoId && memos.length > 0) {
-    const memoToOpen = memos.find(m => m.id === parseInt(memoId));
-    if (memoToOpen) {
-      setSelectedMemo(memoToOpen);
+    if (memoId && memos.length > 0) {
+      const memoToOpen = memos.find(m => m.id === parseInt(memoId));
+      if (memoToOpen) {
+        setSelectedMemo(memoToOpen);
+      }
     }
-  }
-}, [memoId, memos]);
+  }, [memoId, memos]);
 
 
   // Filter memos based on search term
@@ -404,52 +404,56 @@ setFinanceActionedMemos(paidMemoIds);
 
   // Get counts for each status
   const getStatusCounts = () => {
-    const pending = searchFilteredMemos.filter(memo =>
-      (memo.status.toLowerCase() === 'pending' ||
-        memo.status.toLowerCase() === 'submitted') &&
-      !isMemoApproved(memo) &&
-      !isMemoRejected(memo) &&
-      !isMemoCompleted(memo)
-    ).length;
-
-    const approved = searchFilteredMemos.filter(memo =>
-      isMemoApproved(memo) && !isMemoCompleted(memo)
-    ).length;
-
-    const rejected = searchFilteredMemos.filter(memo =>
-      isMemoRejected(memo) && !isMemoCompleted(memo)
-    ).length;
-
-    const completed = searchFilteredMemos.filter(memo =>
-      isMemoCompleted(memo)
-    ).length;
-
-    // Add finance-specific counts if user is finance
-    const counts = { pending, approved, rejected, completed };
-
-    if (user.role?.toLowerCase() === 'finance') {
-      const chairmanApproved = searchFilteredMemos.filter(
-        memo => memo.approved_by_chairman === 1
-      );
-
-      counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
-        memo => !financeActionedMemos.includes(memo.id)
-      ).length;
-
-      counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
-        memo => financeActionedMemos.includes(memo.id)
-      ).length;
+  // Use the same logic as getFilteredMemosByStatus()
+  const pending = searchFilteredMemos.filter(memo => {
+    if (memo.created_by === user.id) {
+      return !isMemoApproved(memo) &&
+        !isMemoRejected(memo) &&
+        !isMemoCompleted(memo);
     }
+    const roleField = `approved_by_${user.role}`;
+    const rejectField = `rejected_by_${user.role}`;
+    return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
+  }).length;
 
-    return counts;
-  };
+  const approved = searchFilteredMemos.filter(memo =>
+    isMemoApproved(memo) && !isMemoCompleted(memo)
+  ).length;
+
+  const rejected = searchFilteredMemos.filter(memo =>
+    isMemoRejected(memo) && !isMemoCompleted(memo)
+  ).length;
+
+  const completed = searchFilteredMemos.filter(memo =>
+    isMemoCompleted(memo)
+  ).length;
+
+  // Add finance-specific counts if user is finance
+  const counts = { pending, approved, rejected, completed };
+
+  if (user.role?.toLowerCase() === 'finance') {
+    const chairmanApproved = searchFilteredMemos.filter(
+      memo => memo.approved_by_chairman === 1
+    );
+
+    counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
+      memo => !financeActionedMemos.includes(memo.id)
+    ).length;
+
+    counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
+      memo => financeActionedMemos.includes(memo.id)
+    ).length;
+  }
+
+  return counts;
+};
 
   const statusCounts = getStatusCounts();
 
   const handleMemoClick = (memo) => {
     if (selectedMemo && selectedMemo.id === memo.id) {
       setSelectedMemo(null);
-       navigate('/dashboard/memos');
+      navigate('/dashboard/memos');
     } else {
       setSelectedMemo({
         ...memo,
@@ -460,36 +464,36 @@ setFinanceActionedMemos(paidMemoIds);
   };
 
   // Add this function to handle the Pay action for memos
-const handlePay = async (memo) => {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/pay`,
-      { user_id: user.id },
-      {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      }
-    );
-
-    if (response.status === 200) {
-      alert('Payment processed successfully!');
-      
-      const updatedMemos = memos.map(m => 
-        m.id === memo.id 
-          ? { ...m, paid_by_finance: 1, status: 'completed' }
-          : m
+  const handlePay = async (memo) => {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/pay`,
+        { user_id: user.id },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
       );
-      setMemos(updatedMemos);
-      
-      setFinanceActionedMemos(prev => [...prev, memo.id]);
-      setSelectedMemo(null);
+
+      if (response.status === 200) {
+        alert('Payment processed successfully!');
+
+        const updatedMemos = memos.map(m =>
+          m.id === memo.id
+            ? { ...m, paid_by_finance: 1, status: 'completed' }
+            : m
+        );
+        setMemos(updatedMemos);
+
+        setFinanceActionedMemos(prev => [...prev, memo.id]);
+        setSelectedMemo(null);
+      }
+    } catch (error) {
+      console.error('Payment failed:', error.response?.data || error.message);
+      alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
     }
-  } catch (error) {
-    console.error('Payment failed:', error.response?.data || error.message);
-    alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
-  }
-};
+  };
 
   const handleApprove = async (memo) => {
     try {
@@ -516,7 +520,10 @@ const handlePay = async (memo) => {
           [`rejected_by_${user.role}`]: 0
         };
 
-        setMemos(prev => prev.map(m => m.id === memo.id ? updatedMemo : m));
+        setMemos(prev =>
+          prev.map(m => Number(m.id) === Number(memo.id) ? updatedMemo : m)
+        );
+
         setSelectedMemo(null); // Close the memo view
 
         if (response.data.nextApprover) {
@@ -568,41 +575,61 @@ const handlePay = async (memo) => {
   //   }
   // };
 
-const handleReject = async (memo) => {
-  if (!memo) return;
+  const handleReject = async (memo) => {
+    if (!memo) return;
 
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/reject`,
-      { userId: user.id },
-      { headers: { Authorization: `Bearer ${user.token}` } }
-    );
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/memos/${memo.id}/reject`,
+        { userId: user.id },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
 
-    if (response.data?.success) {
-      const { field, rejectedBy, message } = response.data;
+      if (response.data?.success) {
+        const { field, rejectedBy, message } = response.data;
 
-      const updatedMemos = memos.map((m) =>
-        m.id === memo.id
-          ? {
+        const updatedMemos = memos.map((m) =>
+          m.id === memo.id
+            ? {
               ...m,
               status: 'rejected',
               [field]: 1,
               rejected_by_name: rejectedBy,
             }
-          : m
-      );
+            : m
+        );
 
-      setMemos(updatedMemos);
-      setSelectedMemo(null);
-      console.log(message);
+        setMemos(updatedMemos);
+        setSelectedMemo(null);
+        console.log(message);
+      }
+    } catch (err) {
+      console.error('Reject error:', err);
+      setError(err.response?.data?.message || 'Failed to reject memo');
     }
-  } catch (err) {
-    console.error('Reject error:', err);
-    setError(err.response?.data?.message || 'Failed to reject memo');
-  }
-};
+  };
 
 
+  const handleDeleteMemo = async (memoId) => {
+    if (!window.confirm("Are you sure you want to delete this memo?")) return;
+
+    try {
+      const response = await axios.delete(`${BASE_URL}/memos/${memoId}`, {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      });
+
+      if (response.status === 200) {
+        alert("✅ Memo deleted successfully");
+        setMemos((prev) => prev.filter((m) => m.id !== memoId));
+        setSelectedMemo(null);
+      }
+    } catch (error) {
+      console.error("Failed to delete memo:", error);
+      alert(`❌ Error: ${error.response?.data?.message || "Delete failed"}`);
+    }
+  };
 
 
   const getStatusBadge = (status) => {
@@ -802,8 +829,8 @@ const handleReject = async (memo) => {
                   <button
                     onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
                     className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.TO_BE_ACTED
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
                     To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
@@ -811,8 +838,8 @@ const handleReject = async (memo) => {
                   <button
                     onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
                     className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.ACTED_UPON
-                        ? 'bg-white text-gray-900 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
                       }`}
                   >
                     Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
@@ -936,7 +963,7 @@ const handleReject = async (memo) => {
                         </div>
                       </div>
                       <a
-                       href={`${BASE_URL}/memos/download/${selectedMemo.id}/${file.filename}`}
+                        href={`${BASE_URL}/memos/download/${selectedMemo.id}/${file.filename}`}
                         download={file.originalname}
                         className="text-primary hover:text-primary-dark transition-colors"
                         target="_blank"
@@ -968,8 +995,8 @@ const handleReject = async (memo) => {
                   <div
                     key={role}
                     className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
-                        rejected ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100'
+                      rejected ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100'
                       }`}
                   >
                     <div className="font-medium">{label}</div>
@@ -1161,8 +1188,8 @@ const handleReject = async (memo) => {
                       onClick={() => handleReject(selectedMemo)}
                       disabled={hasUserActed && !isChairman}
                       className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
-                          : 'border-red-500 text-red-500 hover:bg-red-50'
+                        ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+                        : 'border-red-500 text-red-500 hover:bg-red-50'
                         }`}
                     >
                       Reject
@@ -1171,8 +1198,8 @@ const handleReject = async (memo) => {
                       onClick={() => handleApprove(selectedMemo)}
                       disabled={hasUserActed && !isChairman}
                       className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-primary text-white hover:bg-primary-dark'
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-primary text-white hover:bg-primary-dark'
                         }`}
                     >
                       Approve

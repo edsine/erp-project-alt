@@ -1080,7 +1080,7 @@ router.get('/memos/user/:userId', async (req, res) => {
           ${baseSelect}
           WHERE (
             (u.department = ? AND m.memo_type = 'normal' AND m.requires_approval = 1
-             AND m.status = 'submitted'
+             AND m.status IN ('submitted', 'in_review')
              ${dependencyCondition}
              ${pendingCondition}
              ${approvedCondition})
@@ -1095,7 +1095,7 @@ router.get('/memos/user/:userId', async (req, res) => {
           ${baseSelect}
           WHERE (
             (m.memo_type = 'normal' AND m.requires_approval = 1
-             AND m.status = 'submitted'
+             AND m.status IN ('submitted', 'in_review')
              ${dependencyCondition}
              ${pendingCondition}
              ${approvedCondition})
@@ -1250,6 +1250,7 @@ router.get('/memos/user/:userId', async (req, res) => {
 //   }
 // });
 
+
 router.get('/memos/counts/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1296,21 +1297,19 @@ router.get('/memos/counts/:userId', async (req, res) => {
       // 🧩 Special handling per role
       if (userRole === 'chairman') {
         // ✅ Chairman: memos have reached his stage (GMD approved)
-        // He sees those not yet approved or rejected by chairman himself.
         query = `
-    SELECT COUNT(*) AS count
-    FROM memos m
-    WHERE m.memo_type = 'normal'
-      AND m.requires_approval = 1
-      AND m.approved_by_gmd = 1
-      AND (m.approved_by_chairman IS NULL OR m.approved_by_chairman = 0)
-      AND (m.rejected_by_chairman IS NULL OR m.rejected_by_chairman = 0)
-      AND m.status IN ('submitted', 'in_review', 'approved') -- still active
-  `;
+          SELECT COUNT(*) AS count
+          FROM memos m
+          WHERE m.memo_type = 'normal'
+            AND m.requires_approval = 1
+            AND m.approved_by_gmd = 1
+            AND (m.approved_by_chairman IS NULL OR m.approved_by_chairman = 0)
+            AND (m.rejected_by_chairman IS NULL OR m.rejected_by_chairman = 0)
+            AND m.status IN ('submitted', 'in_review', 'approved')
+        `;
       }
 
       else if (userRole === 'gmd') {
-        // GMD sees memos after Finance approval
         query = `
           SELECT COUNT(*) AS count
           FROM memos m
@@ -1318,22 +1317,24 @@ router.get('/memos/counts/:userId', async (req, res) => {
             AND m.requires_approval = 1
             AND m.approved_by_finance = 1
             AND (m.approved_by_gmd IS NULL OR m.approved_by_gmd = 0)
-            AND m.status IN ('submitted', 'approved')
+            AND m.status IN ('submitted', 'in_review', 'approved')
         `;
       }
+
       else if (userRole === 'finance' && department !== 'ict') {
-        // Non-ICT finance starts flow — see memos not yet finance-approved
+        // ✅ Non-ICT finance: include 'in_review'
         query = `
           SELECT COUNT(*) AS count
           FROM memos m
           WHERE m.memo_type = 'normal'
             AND m.requires_approval = 1
             AND (m.approved_by_finance IS NULL OR m.approved_by_finance = 0)
-            AND m.status = 'submitted'
+            AND m.status IN ('submitted', 'in_review')
         `;
       }
+
       else if (department === 'ict' && ['manager', 'executive'].includes(userRole)) {
-        // ICT department internal stages
+        // ✅ ICT internal flow: include 'in_review'
         query = `
           SELECT COUNT(*) AS count
           FROM memos m
@@ -1342,11 +1343,12 @@ router.get('/memos/counts/:userId', async (req, res) => {
             AND m.requires_approval = 1
             AND m.${approvalField} IS NULL
             ${dependencyCondition}
-            AND m.status = 'submitted'
+            AND m.status IN ('submitted', 'in_review')
             AND u.department = 'ict'
             AND m.rejected_by_${userRole} IS NULL
         `;
       }
+
       else {
         // Default approver logic (finance, gmd for ICT)
         query = `
@@ -1356,12 +1358,13 @@ router.get('/memos/counts/:userId', async (req, res) => {
             AND m.requires_approval = 1
             AND m.${approvalField} IS NULL
             ${dependencyCondition}
-            AND m.status IN ('submitted', 'approved')
+            AND m.status IN ('submitted', 'in_review', 'approved')
             AND m.rejected_by_${userRole} IS NULL
         `;
       }
-    } else {
-      // ✅ Regular sender (count their own active memos)
+    } 
+    else {
+      // ✅ Regular sender
       query = `
         SELECT COUNT(*) AS count
         FROM memos
@@ -1386,6 +1389,7 @@ router.get('/memos/counts/:userId', async (req, res) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });
+
 
 
 
@@ -1499,163 +1503,7 @@ router.get('/memos/:id', async (req, res) => {
 
 
 
-router.post('/memos/:id/approve', async (req, res) => {
-  const memoId = req.params.id;
-  const { user_id, role } = req.body;
 
-  const roleApprovalMap = {
-    manager: { field: 'approved_by_manager', dependsOn: null },
-    executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
-    finance: { field: 'approved_by_finance', dependsOn: 'approved_by_manager' },
-    gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_manager' },
-    chairman: { field: 'approved_by_chairman', dependsOn: 'approved_by_gmd' },
-  };
-
-  if (!roleApprovalMap[role]) {
-    return res.status(400).json({ success: false, message: 'Invalid role' });
-  }
-
-  const { field, dependsOn } = roleApprovalMap[role];
-
-  try {
-    // 1. Fetch the memo
-    const [memos] = await db.query('SELECT * FROM memos WHERE id = ?', [memoId]);
-
-    if (memos.length === 0) {
-      return res.status(404).json({ success: false, message: 'Memo not found' });
-    }
-
-    const memo = memos[0];
-
-    // 2. Check if approval dependency is satisfied
-    if (dependsOn && memo[dependsOn] !== 1) {
-      return res.status(403).json({
-        success: false,
-        message: `Cannot approve yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`,
-      });
-    }
-
-    // 3. Update approval field
-    const updateQuery = `
-      UPDATE memos 
-      SET ${field} = 1, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = ?
-    `;
-    await db.query(updateQuery, [memoId]);
-
-    return res.status(200).json({
-      success: true,
-      message: `${role} approved the memo.`,
-      updatedFields: {
-        [field]: 1,
-      },
-    });
-  } catch (err) {
-    console.error('Error approving memo:', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
-
-
-router.post('/memos/:id/approve', async (req, res) => {
-  const memoId = req.params.id;
-  const { user_id, role } = req.body;
-
-  try {
-    // 1. Fetch memo with creator's department and role
-    const [memos] = await db.query(`
-      SELECT m.*, u.department, u.role as creator_role 
-      FROM memos m
-      JOIN users u ON m.created_by = u.id
-      WHERE m.id = ?
-    `, [memoId]);
-
-    if (memos.length === 0) {
-      return res.status(404).json({ success: false, message: 'Memo not found' });
-    }
-
-    const memo = memos[0];
-    const isFinanceCreator = memo.sender_department?.toLowerCase() === 'finance';
-    const isFinanceApprover = role?.toLowerCase() === 'finance';
-
-
-
-    // 2. Define approval rules with Finance exception
-    const approvalRules = {
-      manager: {
-        field: 'approved_by_manager',
-        dependsOn: null,
-        skip: isFinanceCreator
-      },
-      executive: {
-        field: 'approved_by_executive',
-        dependsOn: 'approved_by_manager',
-        skip: isFinanceCreator
-      },
-      finance: {
-        field: 'approved_by_finance',
-        dependsOn: isFinanceCreator ? null : 'approved_by_manager'
-      },
-      gmd: {
-        field: 'approved_by_gmd',
-        dependsOn: isFinanceCreator ? 'approved_by_finance' : 'approved_by_manager'
-      },
-      chairman: {
-        field: 'approved_by_chairman',
-        dependsOn: 'approved_by_gmd'
-      }
-    };
-
-
-    if (!approvalRules[role]) {
-      return res.status(400).json({ success: false, message: 'Invalid role' });
-    }
-
-    const { field, dependsOn, skip } = approvalRules[role];
-
-    // 3. Handle skipped steps
-    if (skip) {
-      return res.status(403).json({
-        success: false,
-        message: `This memo skips ${role} approval due to Finance creator rules.`
-      });
-    }
-
-    // 4. Check dependency
-    if (dependsOn && memo[dependsOn] !== 1) {
-      return res.status(403).json({
-        success: false,
-        message: `Requires ${dependsOn.replace('approved_by_', '')} approval first.`
-      });
-    }
-
-    // 5. Update approval
-    await db.query(`
-      UPDATE memos 
-      SET ${field} = 1, 
-          updated_at = CURRENT_TIMESTAMP,
-          status = CASE 
-            WHEN ? = 'chairman' THEN 'approved'
-            WHEN ? = 'gmd' THEN 'pending_chairman'
-            ELSE status
-          END
-      WHERE id = ?
-    `, [role, role, memoId]);
-
-    return res.status(200).json({
-      success: true,
-      message: `${role} approved the memo.`,
-      updatedFields: { [field]: 1 },
-      nextApprover: getNextApprover(role, isFinanceCreator)
-    });
-
-  } catch (err) {
-    console.error('Error approving memo:', err);
-    return res.status(500).json({ success: false, message: 'Internal server error' });
-  }
-});
-
-// Helper to determine next approver
 function getNextApprover(currentRole, isFinanceCreator) {
   const flow = isFinanceCreator
     ? ['finance', 'gmd', 'chairman']  // Finance creator flow
@@ -1666,225 +1514,145 @@ function getNextApprover(currentRole, isFinanceCreator) {
 }
 
 
-// router.post('/memos/:id/approve', async (req, res) => {
-//   const memoId = req.params.id;
-//   const { user_id, role } = req.body;
-
-//   try {
-//     // 1. Fetch memo with creator details
-//     const [memos] = await db.query(`
-//       SELECT m.*, u.department as sender_department, u.role as sender_role
-//       FROM memos m
-//       JOIN users u ON m.created_by = u.id
-//       WHERE m.id = ?
-//     `, [memoId]);
-
-//     if (memos.length === 0) {
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Memo not found',
-//         details: `No memo found with ID: ${memoId}`
-//       });
-//     }
-
-//     const memo = memos[0];
-//     const isICTDepartment = memo.sender_department?.toLowerCase() === 'ict';
-//     const isFinanceDepartment = memo.sender_department?.toLowerCase() === 'finance';
-
-//     // 2. Define approval rules
-//     const approvalRules = {
-//       manager: {
-//         field: 'approved_by_manager',
-//         dependsOn: null,
-//         allowed: !isFinanceDepartment && memo.requires_approval,
-//         error: isFinanceDepartment
-//           ? 'Finance memos skip manager approval'
-//           : 'Manager approval required'
-//       },
-//       executive: {
-//         field: 'approved_by_executive',
-//         dependsOn: 'approved_by_manager',
-//         allowed: !isFinanceDepartment && memo.requires_approval && memo.approved_by_manager === 1,
-//         error: !memo.approved_by_manager
-//           ? 'Requires manager approval first'
-//           : 'Executive approval not permitted'
-//       },
-//       finance: {
-//         field: 'approved_by_finance',
-//         dependsOn: isICTDepartment ? 'approved_by_executive' : null,
-//         allowed: memo.requires_approval &&
-//           (isICTDepartment ? memo.approved_by_executive === 1 : true),
-//         error: isICTDepartment
-//           ? 'Requires executive approval first from cto'
-//           : 'Finance approval not permitted'
-//       },
-//       gmd: {
-//         field: 'approved_by_gmd',
-//         allowed: memo.requires_approval &&
-//           (isFinanceDepartment ? memo.approved_by_finance === 1 : true),
-//         error: isFinanceDepartment
-//           ? 'Requires finance approval first'
-//           : 'GMD approval not permitted'
-//       },
-//       chairman: {
-//         field: 'approved_by_chairman',
-//         // dependsOn: 'approved_by_gmd',
-//         allowed: memo.requires_approval && memo.approved_by_gmd === 1,
-//         error: 'Requires GMD approval first'
-//       }
-//     };
-
-//     // 3. Validate approval attempt
-//     if (!approvalRules[role]) {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Invalid approval role',
-//         details: `Role ${role} cannot approve memos`
-//       });
-//     }
-
-//     const { field, dependsOn, allowed, error } = approvalRules[role];
-
-//     if (!allowed) {
-//       return res.status(403).json({
-//         success: false,
-//         message: 'Approval not permitted',
-//         details: error
-//       });
-//     }
-
-//     // 4. Determine new status - FIXED VERSION
-//     let newStatus = memo.status;
-//     if (role === 'chairman') {
-//       newStatus = 'approved'; // ✅ Valid
-//     } else if (role === 'gmd') {
-//       newStatus = 'in_review'; // Changed from invalid 'pending_chairman' to valid 'in_review'
-//     } else if (role === 'finance' && isFinanceDepartment) {
-//       newStatus = 'in_review'; // Changed from invalid 'pending_gmd' to valid 'in_review'
-//     } else {
-//       newStatus = 'in_review'; // ✅ Valid
-//     }
-
-//     // 5. Update memo
-//     await db.query(`
-//       UPDATE memos 
-//       SET ${field} = 1,
-//           status = ?,
-//           updated_at = CURRENT_TIMESTAMP
-//       WHERE id = ?
-//     `, [newStatus, memoId]);
-
-//     // 6. Prepare response
-//     const response = {
-//       success: true,
-//       message: `${role} approval successful`,
-//       updatedFields: {
-//         [field]: 1,
-//         status: newStatus
-//       },
-//       nextApprover: getNextApprover(role, isFinanceDepartment)
-//     };
-
-//     return res.status(200).json(response);
-
-//   } catch (err) {
-//     console.error('Approval error:', err);
-//     return res.status(500).json({
-//       success: false,
-//       message: 'Internal server error',
-//       error: err.message
-//     });
-//   }
-// });
-
-
 router.post('/memos/:id/approve', async (req, res) => {
+  const memoId = req.params.id;
+  const { user_id, role } = req.body;
+
   try {
-    const { id } = req.params;
-    const { userId, role } = req.body;
+    // 1. Fetch memo with creator details
+    const [memos] = await db.query(`
+      SELECT m.*, u.department as sender_department, u.role as sender_role
+      FROM memos m
+      JOIN users u ON m.created_by = u.id
+      WHERE m.id = ?
+    `, [memoId]);
 
-    if (!role) return res.status(400).json({ error: 'Role is required' });
-
-    const normalizedRole = role.toLowerCase();
-    const approvalField = `approved_by_${normalizedRole}`;
-    const validRoles = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
-
-    if (!validRoles.includes(normalizedRole)) {
-      return res.status(400).json({ error: 'Invalid role for approval' });
+    if (memos.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Memo not found',
+        details: `No memo found with ID: ${memoId}`
+      });
     }
 
-    // ✅ Mark as approved by the current role
-    const [result] = await db.query(
-      `UPDATE memos SET ${approvalField} = 1, updated_at = NOW() WHERE id = ?`,
-      [id]
-    );
+    const memo = memos[0];
+    const isICTDepartment = memo.sender_department?.toLowerCase() === 'ict';
+    const isFinanceDepartment = memo.sender_department?.toLowerCase() === 'finance';
 
-    if (result.affectedRows === 0)
-      return res.status(404).json({ error: 'Memo not found' });
-
-    // ✅ Handle final approval (Chairman)
-    if (normalizedRole === 'chairman') {
-      await db.query(
-        `UPDATE memos SET status = 'approved', updated_at = NOW() WHERE id = ?`,
-        [id]
-      );
-    } else {
-      // For all other roles, move memo into in_review
-      await db.query(
-        `UPDATE memos SET status = 'in_review', updated_at = NOW() WHERE id = ?`,
-        [id]
-      );
-    }
-
-    // ✅ Update pending count for this role
-    let newPendingCount = 0;
-
-    if (userId) {
-      const [userRows] = await db.query(
-        `SELECT department, role FROM users WHERE id = ?`,
-        [userId]
-      );
-
-      if (userRows.length > 0) {
-        const deptLower = (userRows[0].department || '').toLowerCase();
-
-        const [countRows] = await db.query(
-          `
-          SELECT COUNT(*) AS count
-          FROM memos m
-          JOIN users u ON m.created_by = u.id
-          WHERE m.memo_type = 'normal'
-            AND m.requires_approval = 1
-            AND (m.approved_by_${normalizedRole} = 0 OR m.approved_by_${normalizedRole} IS NULL)
-            AND m.status IN ('submitted', 'in_review')
-            ${deptLower === 'ict' && ['manager', 'executive'].includes(normalizedRole)
-            ? 'AND u.department = ?'
-            : ''}
-          `,
-          deptLower === 'ict' && ['manager', 'executive'].includes(normalizedRole)
-            ? [deptLower]
-            : []
-        );
-
-        newPendingCount = countRows[0]?.count || 0;
+    // 2. Define approval rules
+    const approvalRules = {
+      manager: {
+        field: 'approved_by_manager',
+        dependsOn: null,
+        allowed: !isFinanceDepartment && memo.requires_approval,
+        error: isFinanceDepartment
+          ? 'Finance memos skip manager approval'
+          : 'Manager approval required'
+      },
+      executive: {
+        field: 'approved_by_executive',
+        dependsOn: 'approved_by_manager',
+        allowed: !isFinanceDepartment && memo.requires_approval && memo.approved_by_manager === 1,
+        error: !memo.approved_by_manager
+          ? 'Requires manager approval first'
+          : 'Executive approval not permitted'
+      },
+      finance: {
+        field: 'approved_by_finance',
+        dependsOn: isICTDepartment ? 'approved_by_executive' : null,
+        allowed: memo.requires_approval &&
+          (isICTDepartment ? memo.approved_by_executive === 1 : true),
+        error: isICTDepartment
+          ? 'Requires executive approval first from cto'
+          : 'Finance approval not permitted'
+      },
+      gmd: {
+        field: 'approved_by_gmd',
+        allowed: memo.requires_approval &&
+          (isFinanceDepartment ? memo.approved_by_finance === 1 : true),
+        error: isFinanceDepartment
+          ? 'Requires finance approval first'
+          : 'GMD approval not permitted'
+      },
+      chairman: {
+        field: 'approved_by_chairman',
+        // dependsOn: 'approved_by_gmd',
+        allowed: memo.requires_approval && memo.approved_by_gmd === 1,
+        error: 'Requires GMD approval first'
       }
+    };
+
+    // 3. Validate approval attempt
+    if (!approvalRules[role]) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid approval role',
+        details: `Role ${role} cannot approve memos`
+      });
     }
 
-    res.json({
+    const { field, dependsOn, allowed, error } = approvalRules[role];
+
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        message: 'Approval not permitted',
+        details: error
+      });
+    }
+
+    // 4. Determine new status - FIXED VERSION
+    let newStatus = memo.status;
+    if (role === 'chairman') {
+      newStatus = 'approved'; // ✅ Valid
+    } else if (role === 'gmd') {
+      newStatus = 'in_review'; // Changed from invalid 'pending_chairman' to valid 'in_review'
+    } else if (role === 'finance' && isFinanceDepartment) {
+      newStatus = 'in_review'; // Changed from invalid 'pending_gmd' to valid 'in_review'
+    } else {
+      newStatus = 'in_review'; // ✅ Valid
+    }
+
+    // 5. Update memo
+    await db.query(`
+      UPDATE memos 
+      SET ${field} = 1,
+          status = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [newStatus, memoId]);
+
+    // 6. Prepare response
+    const response = {
       success: true,
-      message: `Memo ${id} approved by ${role}`,
-      newPendingCount,
-    });
+      message: `${role} approval successful`,
+      updatedFields: {
+        [field]: 1,
+        status: newStatus
+      },
+      nextApprover: getNextApprover(role, isFinanceDepartment)
+    };
+
+    return res.status(200).json(response);
+
   } catch (err) {
-    console.error('❌ Error approving memo:', err);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
+    console.error('Approval error:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: err.message
+    });
   }
 });
 
 
 
 
+
+
 // Helper functions
+
+
 function getNextApprover(currentRole, isFinanceDepartment) {
   const flow = isFinanceDepartment
     ? ['finance', 'gmd', 'chairman']
@@ -2237,6 +2005,39 @@ router.post('/memos/:id/comments', async (req, res) => {
     res.status(500).json({ message: 'Error adding comment' });
   }
 });
+
+
+// DELETE a comment by ID
+router.delete('/comments/:commentId', async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { user_id } = req.body; // optional: if you want to ensure only the author can delete
+
+    // ✅ Optional check: verify the comment exists and belongs to this user
+    const [existing] = await db.execute(
+      'SELECT * FROM memo_comments WHERE id = ?',
+      [commentId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Optional ownership check (uncomment if needed)
+    // if (existing[0].user_id !== user_id) {
+    //   return res.status(403).json({ message: 'You are not allowed to delete this comment' });
+    // }
+
+    // ✅ Delete the comment
+    await db.execute('DELETE FROM memo_comments WHERE id = ?', [commentId]);
+
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting comment:', err);
+    res.status(500).json({ message: 'Error deleting comment' });
+  }
+});
+
 
 // Pay endpoint for finance 
 router.post('/memos/:id/pay', async (req, res) => {
