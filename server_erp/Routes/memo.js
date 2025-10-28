@@ -259,7 +259,7 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
         } else {
           // General route: manager → executive → finance → gmd → chairman
           const [manager] = await db.execute(
-            `SELECT id FROM users WHERE role = 'manager' AND department = ? LIMIT 1`,
+            `SELECT id FROM users WHERE role = 'manager' AND department = ? `,
             [senderDept]
           );
           const [executive] = await db.execute(`SELECT id FROM users WHERE role = 'executive' LIMIT 1`);
@@ -323,7 +323,7 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
   }
 });
 
-// Get all notifications for a user
+// Get all notificationsc for a user
 router.get('/notifications/:userId', async (req, res) => {
   const { userId } = req.params;
 
