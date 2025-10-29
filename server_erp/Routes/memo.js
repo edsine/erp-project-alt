@@ -76,6 +76,7 @@ const handleMulterError = (error, req, res, next) => {
 
 
 //so this is the route pre notifications
+
 // router.post('/memos', upload.array('files'), handleMulterError, async (req, res) => {
 //   let uploadedFiles = req.files || [];
 
@@ -105,7 +106,6 @@ const handleMulterError = (error, req, res, next) => {
 //         acknowledgments = reportData.acknowledgments || [];
 //       } catch (parseError) {
 //         console.error('Error parsing report_data:', parseError);
-//         // Continue with default values if parsing fails
 //       }
 //     }
 
@@ -113,13 +113,13 @@ const handleMulterError = (error, req, res, next) => {
 //     const fileAttachments = uploadedFiles.map(file => ({
 //       filename: file.filename,
 //       originalname: file.originalname,
-//       path: file.path, // Keep this uncommented - you'll need it to access the file later
+//       path: file.path,
 //       size: file.size,
 //       mimetype: file.mimetype,
 //       uploadedAt: new Date()
 //     }));
 
-//     // Insert into database
+//     // Insert memo
 //     const [result] = await db.execute(
 //       `INSERT INTO memos 
 //         (title, content, priority, memo_type, requires_approval, created_by,
@@ -140,9 +140,84 @@ const handleMulterError = (error, req, res, next) => {
 //       ]
 //     );
 
+//     const memoId = result.insertId;
+
+//     // ✅ Notification insert (inline)
+//     // 🔔 Notification logic
+//     let nextApprovers = [];
+
+//     try {
+//       const [creator] = await db.execute(`SELECT role, department FROM users WHERE id = ?`, [created_by]);
+//       const sender = creator[0];
+//       const senderRole = sender?.role;
+//       const senderDept = sender?.department;
+
+//       if (memo_type === 'report') {
+//   // Reports are for acknowledgment
+//   if (acknowledgments.length > 0) {
+//     nextApprovers = acknowledgments; // Array of user IDs
+//   }
+// } else {
+//   // 🧭 Approval flow for normal memos
+//   const [executive] = await db.execute(`SELECT id FROM users WHERE role = 'executive' LIMIT 1`);
+//   const [finance] = await db.execute(`SELECT id FROM users WHERE role = 'finance' LIMIT 1`);
+//   const [gmd] = await db.execute(`SELECT id FROM users WHERE role = 'gmd' LIMIT 1`);
+//   const [chairman] = await db.execute(`SELECT id FROM users WHERE role = 'chairman' LIMIT 1`);
+
+//   if (senderDept === 'Finance') {
+//     // ✅ Finance route: finance → gmd → chairman
+//     if (gmd.length) nextApprovers.push(gmd[0].id);
+//     if (chairman.length) nextApprovers.push(chairman[0].id);
+//   } 
+//   else if (senderDept === 'ICT') {
+//     // ✅ ICT route: manager(ict) → executive → finance → gmd → chairman
+//     const [ictManager] = await db.execute(
+//       `SELECT id FROM users WHERE role = 'manager' AND department = 'ICT' LIMIT 1`
+//     );
+//     if (ictManager.length) nextApprovers.push(ictManager[0].id);
+//     if (executive.length) nextApprovers.push(executive[0].id);
+//     if (finance.length) nextApprovers.push(finance[0].id);
+//     if (gmd.length) nextApprovers.push(gmd[0].id);
+//     if (chairman.length) nextApprovers.push(chairman[0].id);
+//   } 
+//   else {
+//     // ✅ Other departments: executive → finance → gmd → chairman
+//     if (executive.length) nextApprovers.push(executive[0].id);
+//     if (finance.length) nextApprovers.push(finance[0].id);
+//     if (gmd.length) nextApprovers.push(gmd[0].id);
+//     if (chairman.length) nextApprovers.push(chairman[0].id);
+//   }
+
+//   console.log(`✅ Approval route for ${senderDept}:`, nextApprovers);
+// }
+
+
+//       // ✅ Insert notifications for each next approver
+//       for (const userId of nextApprovers) {
+//         await db.execute(
+//           `INSERT INTO notifications (user_id, title, message, link, memo_id)
+//            VALUES (?, ?, ?, ?, ?)`,
+//           [
+//             userId,
+//             memo_type === 'report' ? 'New Report Submitted' : 'New Memo Submitted',
+//             memo_type === 'report'
+//               ? `A report titled "${title}" requires your acknowledgment.`
+//               : `A memo titled "${title}" requires your approval.`,
+//             `/dashboard/memos/${memoId}`, // ✅ correct link
+//             memoId
+//           ]
+//         );
+//       }
+
+//       console.log('✅ Notifications created for users:', nextApprovers);
+//     } catch (notifErr) {
+//       console.error('❌ Error creating notifications:', notifErr.message);
+//     }
+
+
 //     res.status(201).json({
 //       message: 'Memo created successfully',
-//       memo_id: result.insertId,
+//       memo_id: memoId,
 //       memo_type,
 //       attachments: fileAttachments
 //     });
@@ -164,9 +239,6 @@ const handleMulterError = (error, req, res, next) => {
 //     });
 //   }
 // });
-
-
-// GET all memos with complete information
 
 router.post('/memos', upload.array('files'), handleMulterError, async (req, res) => {
   let uploadedFiles = req.files || [];
@@ -233,49 +305,56 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
 
     const memoId = result.insertId;
 
-    // ✅ Notification insert (inline)
     // 🔔 Notification logic
     let nextApprovers = [];
 
     try {
-      const [creator] = await db.execute(`SELECT role, department FROM users WHERE id = ?`, [created_by]);
+      // ✅ Fetch sender info
+      const [creator] = await db.execute(`SELECT name, role, department FROM users WHERE id = ?`, [created_by]);
       const sender = creator[0];
       const senderRole = sender?.role;
       const senderDept = sender?.department;
+      const senderName = sender?.name || 'Someone';
 
       if (memo_type === 'report') {
-        // Reports are for acknowledgment
+        // Reports → acknowledgment users
         if (acknowledgments.length > 0) {
-          nextApprovers = acknowledgments; // Array of user IDs
+          nextApprovers = acknowledgments;
         }
       } else {
-        // Approval flow for normal memos
-        if (senderDept === 'Finance') {
-          // Finance route: finance → gmd → chairman
-          const [gmd] = await db.execute(`SELECT id FROM users WHERE role = 'gmd' LIMIT 1`);
-          const [chairman] = await db.execute(`SELECT id FROM users WHERE role = 'chairman' LIMIT 1`);
-          if (gmd.length) nextApprovers.push(gmd[0].id);
-          if (chairman.length) nextApprovers.push(chairman[0].id);
-        } else {
-          // General route: manager → executive → finance → gmd → chairman
-          const [manager] = await db.execute(
-            `SELECT id FROM users WHERE role = 'manager' AND department = ? `,
-            [senderDept]
-          );
-          const [executive] = await db.execute(`SELECT id FROM users WHERE role = 'executive' LIMIT 1`);
-          const [finance] = await db.execute(`SELECT id FROM users WHERE role = 'finance' LIMIT 1`);
-          const [gmd] = await db.execute(`SELECT id FROM users WHERE role = 'gmd' LIMIT 1`);
-          const [chairman] = await db.execute(`SELECT id FROM users WHERE role = 'chairman' LIMIT 1`);
+        // 🧭 Normal memo approval route
+        const [executives] = await db.execute(`SELECT id FROM users WHERE role = 'executive'`);
+        const [finances] = await db.execute(`SELECT id FROM users WHERE role = 'finance'`);
+        const [gmds] = await db.execute(`SELECT id FROM users WHERE role = 'gmd'`);
+        const [chairmen] = await db.execute(`SELECT id FROM users WHERE role = 'chairman'`);
 
-          if (manager.length) nextApprovers.push(manager[0].id);
-          if (executive.length) nextApprovers.push(executive[0].id);
-          if (finance.length) nextApprovers.push(finance[0].id);
-          if (gmd.length) nextApprovers.push(gmd[0].id);
-          if (chairman.length) nextApprovers.push(chairman[0].id);
+        if (senderDept === 'Finance') {
+          // Finance → GMD → Chairman
+          nextApprovers.push(...gmds.map(u => u.id));
+          nextApprovers.push(...chairmen.map(u => u.id));
+        } else if (senderDept === 'ICT') {
+          // ICT → ICT Manager → Executive → Finance → GMD → Chairman
+          const [ictManagers] = await db.execute(
+            `SELECT id FROM users WHERE role = 'manager' AND department = 'ICT'`
+          );
+          nextApprovers.push(...ictManagers.map(u => u.id));
+          nextApprovers.push(...executives.map(u => u.id));
+          nextApprovers.push(...finances.map(u => u.id));
+          nextApprovers.push(...gmds.map(u => u.id));
+          nextApprovers.push(...chairmen.map(u => u.id));
+        } else {
+          // Other depts → Executive → Finance → GMD → Chairman
+          nextApprovers.push(...executives.map(u => u.id));
+          nextApprovers.push(...finances.map(u => u.id));
+          nextApprovers.push(...gmds.map(u => u.id));
+          nextApprovers.push(...chairmen.map(u => u.id));
         }
       }
 
-      // ✅ Insert notifications for each next approver
+      // ✅ Remove duplicates and sender
+      nextApprovers = [...new Set(nextApprovers)].filter(id => id !== parseInt(created_by));
+
+      // ✅ Insert notifications for each approver
       for (const userId of nextApprovers) {
         await db.execute(
           `INSERT INTO notifications (user_id, title, message, link, memo_id)
@@ -284,9 +363,9 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
             userId,
             memo_type === 'report' ? 'New Report Submitted' : 'New Memo Submitted',
             memo_type === 'report'
-              ? `A report titled "${title}" requires your acknowledgment.`
-              : `A memo titled "${title}" requires your approval.`,
-            `/dashboard/memos/${memoId}`, // ✅ correct link
+              ? `${senderName} (${senderDept}) submitted a report titled "${title}" for your acknowledgment.`
+              : `${senderName} (${senderDept}) submitted a memo titled "${title}" for your approval.`,
+            `/dashboard/memos/${memoId}`,
             memoId
           ]
         );
@@ -296,7 +375,6 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
     } catch (notifErr) {
       console.error('❌ Error creating notifications:', notifErr.message);
     }
-
 
     res.status(201).json({
       message: 'Memo created successfully',
@@ -322,6 +400,7 @@ router.post('/memos', upload.array('files'), handleMulterError, async (req, res)
     });
   }
 });
+
 
 // Get all notificationsc for a user
 router.get('/notifications/:userId', async (req, res) => {
