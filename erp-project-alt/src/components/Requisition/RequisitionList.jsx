@@ -226,7 +226,11 @@ const RequisitionList = () => {
   const [users, setUsers] = useState({});
   const [activeTab, setActiveTab] = useState('pending'); // Changed default tab to 'pending'
   const [financeActionedRequisitions, setFinanceActionedRequisitions] = useState([]);
-
+  // Add state for decision comments
+  const [approvalComment, setApprovalComment] = useState('');
+  const [rejectionComment, setRejectionComment] = useState('');
+  const [showApprovalComment, setShowApprovalComment] = useState(false);
+  const [showRejectionComment, setShowRejectionComment] = useState(false);
 
 
 
@@ -520,6 +524,11 @@ const handlePayRequisition = async (requisition) => {
 };
 
   const handleApprove = async (req) => {
+    if (!approvalComment.trim()) {
+      alert('Please add recommendations for approval');
+      return;
+    }
+
     try {
       const response = await axios.post(
         `${BASE_URL}/requisitions/${req.id}/approve`,
@@ -535,6 +544,20 @@ const handlePayRequisition = async (requisition) => {
       );
 
       if (response.status === 200) {
+        // Add approval comment
+        await axios.post(
+          `${BASE_URL}/requisitions/${req.id}/comments`,
+          {
+            comment: `Approval Recommendations: ${approvalComment}`,
+            user_id: user.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
         alert(`✅ Success: ${response.data.message}`);
         const updatedRequisition = {
           ...req,
@@ -545,6 +568,8 @@ const handlePayRequisition = async (requisition) => {
         
         setRequisitions(prev => prev.map(r => r.id === req.id ? updatedRequisition : r));
         setSelectedRequisition(updatedRequisition);
+        setApprovalComment('');
+        setShowApprovalComment(false);
 
         if (response.data.nextApprover) {
           alert(`Next approver: ${response.data.nextApprover}`);
@@ -557,6 +582,11 @@ const handlePayRequisition = async (requisition) => {
   };
 
   const handleReject = async (req) => {
+    if (!rejectionComment.trim()) {
+      alert('Please add remarks for rejection');
+      return;
+    }
+
     if (!req) return;
 
     try {
@@ -571,6 +601,20 @@ const handlePayRequisition = async (requisition) => {
       );
 
       if (response.data?.success) {
+        // Add rejection comment
+        await axios.post(
+          `${BASE_URL}/requisitions/${req.id}/comments`,
+          {
+            comment: `Rejection Remarks: ${rejectionComment}`,
+            user_id: user.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
         const { field } = response.data;
 
         const updatedRequisitions = requisitions.map(r =>
@@ -593,6 +637,8 @@ const handlePayRequisition = async (requisition) => {
           }));
         }
 
+        setRejectionComment('');
+        setShowRejectionComment(false);
         setError(null);
       }
     } catch (err) {
@@ -1060,30 +1106,103 @@ const handlePayRequisition = async (requisition) => {
   
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex justify-end space-x-3">
-        <button
-          onClick={() => handleReject(selectedRequisition)}
-          disabled={hasUserActed}
-          className={`px-4 py-2 border rounded-md text-sm font-medium ${
-            hasUserActed 
-              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-              : 'border-red-500 text-red-500 hover:bg-red-50'
-          }`}
-        >
-          Reject
-        </button>
-        <button
-          onClick={() => handleApprove(selectedRequisition)}
-          disabled={hasUserActed}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            hasUserActed 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-              : 'bg-primary text-white hover:bg-primary-dark'
-          }`}
-        >
-          Approve
-        </button>
-      </div>
+      {/* Approval Comment Input */}
+      {showApprovalComment && (
+        <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+          <h4 className="text-sm font-medium text-blue-800 mb-2">Approval Recommendations</h4>
+          <textarea
+            value={approvalComment}
+            onChange={(e) => setApprovalComment(e.target.value)}
+            placeholder="Enter your recommendations for approval..."
+            className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+            rows="3"
+          />
+          <div className="flex justify-end space-x-2 mt-2">
+            <button
+              onClick={() => {
+                setShowApprovalComment(false);
+                setApprovalComment('');
+              }}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleApprove(selectedRequisition)}
+              disabled={!approvalComment.trim()}
+              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              Submit Approval
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Comment Input */}
+      {showRejectionComment && (
+        <div className="bg-red-50 p-4 rounded-md border border-red-200">
+          <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Remarks</h4>
+          <textarea
+            value={rejectionComment}
+            onChange={(e) => setRejectionComment(e.target.value)}
+            placeholder="Enter your remarks for rejection..."
+            className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
+            rows="3"
+          />
+          <div className="flex justify-end space-x-2 mt-2">
+            <button
+              onClick={() => {
+                setShowRejectionComment(false);
+                setRejectionComment('');
+              }}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleReject(selectedRequisition)}
+              disabled={!rejectionComment.trim()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              Submit Rejection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      {!showApprovalComment && !showRejectionComment && (
+        <div className="flex justify-end space-x-3">
+          <button
+            onClick={() => {
+              setShowRejectionComment(true);
+              setShowApprovalComment(false);
+            }}
+            disabled={hasUserActed}
+            className={`px-4 py-2 border rounded-md text-sm font-medium ${
+              hasUserActed 
+                ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
+                : 'border-red-500 text-red-500 hover:bg-red-50'
+            }`}
+          >
+            Reject
+          </button>
+          <button
+            onClick={() => {
+              setShowApprovalComment(true);
+              setShowRejectionComment(false);
+            }}
+            disabled={hasUserActed}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              hasUserActed 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                : 'bg-primary text-white hover:bg-primary-dark'
+            }`}
+          >
+            Approve
+          </button>
+        </div>
+      )}
     </div>
   );
 })()} 

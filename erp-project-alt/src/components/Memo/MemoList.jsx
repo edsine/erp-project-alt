@@ -1116,11 +1116,11 @@ const MemoList = () => {
               console.log('Approval status:', hasUserApproved);
               console.log('Rejection status:', hasUserRejected);
 
-              // Check if user is authorized - include all executive variations
+              // Check if user is authorized 
               const isExecutive = userRole?.includes('executive') || userRole?.includes('ict');
               const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExecutive;
 
-              // Allow action if status is pending/submitted OR if it's in_review (which seems common in your data)
+              // Allow action if status is pending/submitted OR if it's in_review   
               const statusAllowsAction = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
               const canAct = !hasUserActed && statusAllowsAction;
 
