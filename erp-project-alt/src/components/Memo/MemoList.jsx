@@ -209,6 +209,11 @@ const MemoList = () => {
   const [users, setUsers] = useState({});
   const [activeTab, setActiveTab] = useState('pending'); // Changed default to 'pending'
   const [financeActionedMemos, setFinanceActionedMemos] = useState([]);
+  // Add state for decision comments
+  const [approvalComment, setApprovalComment] = useState('');
+  const [rejectionComment, setRejectionComment] = useState('');
+  const [showApprovalComment, setShowApprovalComment] = useState(false);
+  const [showRejectionComment, setShowRejectionComment] = useState(false);
 
 
   // Fetch all users when component mounts
@@ -496,6 +501,11 @@ const MemoList = () => {
   };
 
   const handleApprove = async (memo) => {
+    if (!approvalComment.trim()) {
+      alert('Please add recommendations for approval');
+      return;
+    }
+
     try {
       const response = await axios.post(
         `${BASE_URL}/memos/${memo.id}/approve`,
@@ -511,6 +521,20 @@ const MemoList = () => {
       );
 
       if (response.status === 200) {
+        // Add approval comment
+        await axios.post(
+          `${BASE_URL}/memos/${memo.id}/comments`,
+          {
+            comment: `Approval Recommendations: ${approvalComment}`,
+            user_id: user.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
         alert(`✅ Success: ${response.data.message}`);
         const updatedMemo = {
           ...memo,
@@ -525,6 +549,8 @@ const MemoList = () => {
         );
 
         setSelectedMemo(null); // Close the memo view
+        setApprovalComment('');
+        setShowApprovalComment(false);
 
         if (response.data.nextApprover) {
           alert(`Next approver: ${response.data.nextApprover}`);
@@ -539,43 +565,12 @@ const MemoList = () => {
     }
   };
 
-  // const handleReject = async (memo) => {
-  //   if (!memo) return;
-
-  //   try {
-  //     const response = await axios.post(
-  //       `${BASE_URL}/memos/${memo.id}/reject`,
-  //       { userId: user.id },
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${user.token}`,
-  //         },
-  //       }
-  //     );
-
-  //     if (response.data?.success) {
-  //       const { field } = response.data;
-
-  //       const updatedMemos = memos.map(m =>
-  //         m.id === memo.id
-  //           ? {
-  //             ...m,
-  //             status: 'rejected',
-  //             [field]: -1,
-  //           }
-  //           : m
-  //       );
-
-  //       setMemos(updatedMemos);
-  //       setSelectedMemo(null); // Close the memo view
-  //       setError(null);
-  //     }
-  //   } catch (err) {
-  //     setError(err.response?.data?.message || 'Failed to reject memo');
-  //   }
-  // };
-
   const handleReject = async (memo) => {
+    if (!rejectionComment.trim()) {
+      alert('Please add remarks for rejection');
+      return;
+    }
+
     if (!memo) return;
 
     try {
@@ -586,6 +581,20 @@ const MemoList = () => {
       );
 
       if (response.data?.success) {
+        // Add rejection comment
+        await axios.post(
+          `${BASE_URL}/memos/${memo.id}/comments`,
+          {
+            comment: `Rejection Remarks: ${rejectionComment}`,
+            user_id: user.id,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+
         const { field, rejectedBy, message } = response.data;
 
         const updatedMemos = memos.map((m) =>
@@ -601,6 +610,8 @@ const MemoList = () => {
 
         setMemos(updatedMemos);
         setSelectedMemo(null);
+        setRejectionComment('');
+        setShowRejectionComment(false);
         console.log(message);
       }
     } catch (err) {
@@ -1077,54 +1088,6 @@ const MemoList = () => {
             )}
 
             {/* Approval buttons for authorized roles */}
-            {/* {(() => {
-  const userRole = user?.role?.toLowerCase();
-  const hasUserApproved = selectedMemo[`approved_by_${userRole}`] === 1;
-  const hasUserRejected = selectedMemo[`rejected_by_${userRole}`] === 1;
-  const hasUserActed = hasUserApproved || hasUserRejected;
-  
-  // Check if user is authorized and hasn't acted yet
-  const isAuthorized = ['manager', 'executive', 'finance', 'gmd', 'chairman'].includes(userRole);
-  const statusAllowsAction = selectedMemo.status === 'pending' || selectedMemo.status === 'submitted';
-  const canAct = !hasUserActed && statusAllowsAction;
-  
-  // Special case for chairman: should be able to approve even if others have approved
-  const isChairman = userRole === 'chairman';
-  const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
-  
-  if ((!isAuthorized || !canAct) && !canChairmanApprove) {
-    return null;
-  }
-  
-  return (
-    <div className="mt-6 space-y-4">
-      <div className="flex justify-end space-x-3">
-        <button
-          onClick={() => handleReject(selectedMemo)}
-          disabled={hasUserActed && !isChairman}
-          className={`px-4 py-2 border rounded-md text-sm font-medium ${
-            (hasUserActed && !isChairman) 
-              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50' 
-              : 'border-red-500 text-red-500 hover:bg-red-50'
-          }`}
-        >
-          Reject
-        </button>
-        <button
-          onClick={() => handleApprove(selectedMemo)}
-          disabled={hasUserActed && !isChairman}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            (hasUserActed && !isChairman) 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-              : 'bg-primary text-white hover:bg-primary-dark'
-          }`}
-        >
-          Approve
-        </button>
-      </div>
-    </div>
-  );
-})()} */}
             {(() => {
               const userRole = user?.role?.toLowerCase();
 
@@ -1183,28 +1146,101 @@ const MemoList = () => {
 
               return (
                 <div className="mt-6 space-y-4">
-                  <div className="flex justify-end space-x-3">
-                    <button
-                      onClick={() => handleReject(selectedMemo)}
-                      disabled={hasUserActed && !isChairman}
-                      className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                        ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
-                        : 'border-red-500 text-red-500 hover:bg-red-50'
-                        }`}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => handleApprove(selectedMemo)}
-                      disabled={hasUserActed && !isChairman}
-                      className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-primary text-white hover:bg-primary-dark'
-                        }`}
-                    >
-                      Approve
-                    </button>
-                  </div>
+                  {/* Approval Comment Input */}
+                  {showApprovalComment && (
+                    <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                      <h4 className="text-sm font-medium text-blue-800 mb-2">Approval Recommendations</h4>
+                      <textarea
+                        value={approvalComment}
+                        onChange={(e) => setApprovalComment(e.target.value)}
+                        placeholder="Enter your recommendations for approval..."
+                        className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        rows="3"
+                      />
+                      <div className="flex justify-end space-x-2 mt-2">
+                        <button
+                          onClick={() => {
+                            setShowApprovalComment(false);
+                            setApprovalComment('');
+                          }}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleApprove(selectedMemo)}
+                          disabled={!approvalComment.trim()}
+                          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Submit Approval
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rejection Comment Input */}
+                  {showRejectionComment && (
+                    <div className="bg-red-50 p-4 rounded-md border border-red-200">
+                      <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Remarks</h4>
+                      <textarea
+                        value={rejectionComment}
+                        onChange={(e) => setRejectionComment(e.target.value)}
+                        placeholder="Enter your remarks for rejection..."
+                        className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
+                        rows="3"
+                      />
+                      <div className="flex justify-end space-x-2 mt-2">
+                        <button
+                          onClick={() => {
+                            setShowRejectionComment(false);
+                            setRejectionComment('');
+                          }}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => handleReject(selectedMemo)}
+                          disabled={!rejectionComment.trim()}
+                          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                        >
+                          Submit Rejection
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  {!showApprovalComment && !showRejectionComment && (
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        onClick={() => {
+                          setShowRejectionComment(true);
+                          setShowApprovalComment(false);
+                        }}
+                        disabled={hasUserActed && !isChairman}
+                        className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
+                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+                          : 'border-red-500 text-red-500 hover:bg-red-50'
+                          }`}
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowApprovalComment(true);
+                          setShowRejectionComment(false);
+                        }}
+                        disabled={hasUserActed && !isChairman}
+                        className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-primary text-white hover:bg-primary-dark'
+                          }`}
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
