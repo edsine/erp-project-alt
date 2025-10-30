@@ -548,7 +548,7 @@ const handlePayRequisition = async (requisition) => {
         await axios.post(
           `${BASE_URL}/requisitions/${req.id}/comments`,
           {
-            comment: `Approval Recommendations: ${approvalComment}`,
+            comment: `Recommendation: ${approvalComment}`,
             user_id: user.id,
           },
           {
@@ -605,7 +605,7 @@ const handlePayRequisition = async (requisition) => {
         await axios.post(
           `${BASE_URL}/requisitions/${req.id}/comments`,
           {
-            comment: `Rejection Remarks: ${rejectionComment}`,
+            comment: `Rejection Remark: ${rejectionComment}`,
             user_id: user.id,
           },
           {
@@ -1109,7 +1109,7 @@ const handlePayRequisition = async (requisition) => {
       {/* Approval Comment Input */}
       {showApprovalComment && (
         <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Approval Recommendations</h4>
+          <h4 className="text-sm font-medium text-blue-800 mb-2">Recommendation</h4>
           <textarea
             value={approvalComment}
             onChange={(e) => setApprovalComment(e.target.value)}
@@ -1141,7 +1141,7 @@ const handlePayRequisition = async (requisition) => {
       {/* Rejection Comment Input */}
       {showRejectionComment && (
         <div className="bg-red-50 p-4 rounded-md border border-red-200">
-          <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Remarks</h4>
+          <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Remark</h4>
           <textarea
             value={rejectionComment}
             onChange={(e) => setRejectionComment(e.target.value)}
