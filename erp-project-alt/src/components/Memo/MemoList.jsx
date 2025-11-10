@@ -500,125 +500,125 @@ const MemoList = () => {
     }
   };
 
-  const handleApprove = async (memo) => {
-    if (!approvalComment.trim()) {
-      alert('Please add recommendations for approval');
-      return;
-    }
+const handleApprove = async (memo) => {
+  if (!approvalComment.trim()) {
+    alert('Please add recommendations for approval');
+    return;
+  }
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/approve`,
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/approve`,
+      {
+        user_id: user.id,
+        role: user.role,
+      },
+      {
+        headers: {
+          Authorization: user?.token ? `Bearer ${user.token}` : '',
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      // Add approval comment
+      await axios.post(
+        `${BASE_URL}/memos/${memo.id}/comments`,
         {
+          comment: `Recommendation: ${approvalComment}`,
           user_id: user.id,
-          role: user.role,
         },
         {
           headers: {
-            Authorization: user?.token ? `Bearer ${user.token}` : '',
+            Authorization: `Bearer ${user.token}`,
           },
         }
       );
 
-      if (response.status === 200) {
-        // Add approval comment
-        await axios.post(
-          `${BASE_URL}/memos/${memo.id}/comments`,
-          {
-            comment: `Recommendation: ${approvalComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
+      alert(`✅ Success: ${response.data.message}`);
+      const updatedMemo = {
+        ...memo,
+        ...response.data.updatedFields,
+        status: response.data.updatedFields.status || memo.status,
+        [`approved_by_${user.role}`]: 1,
+        [`rejected_by_${user.role}`]: 0
+      };
 
-        alert(`✅ Success: ${response.data.message}`);
-        const updatedMemo = {
-          ...memo,
-          ...response.data.updatedFields,
-          status: response.data.updatedFields.status || memo.status,
-          [`approved_by_${user.role}`]: 1,
-          [`rejected_by_${user.role}`]: 0
-        };
-
-        setMemos(prev =>
-          prev.map(m => Number(m.id) === Number(memo.id) ? updatedMemo : m)
-        );
-
-        setSelectedMemo(null); // Close the memo view
-        setApprovalComment('');
-        setShowApprovalComment(false);
-
-        if (response.data.nextApprover) {
-          alert(`Next approver: ${response.data.nextApprover}`);
-        }
-      }
-    } catch (error) {
-      console.error('Approval failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.details
-        ? `${error.response.data.message}: ${error.response.data.details}`
-        : error.response?.data?.message || 'Approval failed';
-      alert(`❌ Error: ${errorMessage}`);
-    }
-  };
-
-  const handleReject = async (memo) => {
-    if (!rejectionComment.trim()) {
-      alert('Please add remarks for rejection');
-      return;
-    }
-
-    if (!memo) return;
-
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/reject`,
-        { userId: user.id },
-        { headers: { Authorization: `Bearer ${user.token}` } }
+      setMemos(prev =>
+        prev.map(m => Number(m.id) === Number(memo.id) ? updatedMemo : m)
       );
 
-      if (response.data?.success) {
-        // Add rejection comment
-        await axios.post(
-          `${BASE_URL}/memos/${memo.id}/comments`,
-          {
-            comment: `Rejection Remark: ${rejectionComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
+      setSelectedMemo(null); // Close the memo view
+      setApprovalComment('');
+      setShowApprovalComment(false);
 
-        const { field, rejectedBy, message } = response.data;
-
-        const updatedMemos = memos.map((m) =>
-          m.id === memo.id
-            ? {
-              ...m,
-              status: 'rejected',
-              [field]: 1,
-              rejected_by_name: rejectedBy,
-            }
-            : m
-        );
-
-        setMemos(updatedMemos);
-        setSelectedMemo(null);
-        setRejectionComment('');
-        setShowRejectionComment(false);
-        console.log(message);
+      if (response.data.nextApprover) {
+        alert(`Next approver: ${response.data.nextApprover}`);
       }
-    } catch (err) {
-      console.error('Reject error:', err);
-      setError(err.response?.data?.message || 'Failed to reject memo');
     }
-  };
+  } catch (error) {
+    console.error('Approval failed:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.details
+      ? `${error.response.data.message}: ${error.response.data.details}`
+      : error.response?.data?.message || 'Approval failed';
+    alert(`❌ Error: ${errorMessage}`);
+  }
+};
+
+const handleReject = async (memo) => {
+  if (!rejectionComment.trim()) {
+    alert('Please add remarks for rejection');
+    return;
+  }
+
+  if (!memo) return;
+
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/memos/${memo.id}/reject`,
+      { userId: user.id },
+      { headers: { Authorization: `Bearer ${user.token}` } }
+    );
+
+    if (response.data?.success) {
+      // Add rejection comment
+      await axios.post(
+        `${BASE_URL}/memos/${memo.id}/comments`,
+        {
+          comment: `Rejection Remark: ${rejectionComment}`,
+          user_id: user.id,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+
+      const { field, rejectedBy, message } = response.data;
+
+      const updatedMemos = memos.map((m) =>
+        m.id === memo.id
+          ? {
+            ...m,
+            status: 'rejected',
+            [field]: 1,
+            rejected_by_name: rejectedBy,
+          }
+          : m
+      );
+
+      setMemos(updatedMemos);
+      setSelectedMemo(null); // Close the memo view
+      setRejectionComment('');
+      setShowRejectionComment(false);
+      console.log(message);
+    }
+  } catch (err) {
+    console.error('Reject error:', err);
+    setError(err.response?.data?.message || 'Failed to reject memo');
+  }
+};
 
 
   const handleDeleteMemo = async (memoId) => {

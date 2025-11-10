@@ -523,18 +523,33 @@ const handlePayRequisition = async (requisition) => {
   }
 };
 
-  const handleApprove = async (req) => {
-    if (!approvalComment.trim()) {
-      alert('Please add recommendations for approval');
-      return;
-    }
+const handleApprove = async (req) => {
+  if (!approvalComment.trim()) {
+    alert('Please add recommendations for approval');
+    return;
+  }
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/requisitions/${req.id}/approve`,
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/requisitions/${req.id}/approve`,
+      {
+        user_id: user.id,
+        role: user.role,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    if (response.status === 200) {
+      // Add approval comment
+      await axios.post(
+        `${BASE_URL}/requisitions/${req.id}/comments`,
         {
+          comment: `Recommendation: ${approvalComment}`,
           user_id: user.id,
-          role: user.role,
         },
         {
           headers: {
@@ -543,56 +558,59 @@ const handlePayRequisition = async (requisition) => {
         }
       );
 
-      if (response.status === 200) {
-        // Add approval comment
-        await axios.post(
-          `${BASE_URL}/requisitions/${req.id}/comments`,
-          {
-            comment: `Recommendation: ${approvalComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
+      alert(`✅ Success: ${response.data.message}`);
+      const updatedRequisition = {
+        ...req,
+        ...response.data.updatedFields,
+        [`approved_by_${user.role}`]: 1,
+        [`rejected_by_${user.role}`]: 0
+      };
+      
+      setRequisitions(prev => prev.map(r => r.id === req.id ? updatedRequisition : r));
+      setSelectedRequisition(updatedRequisition);
+      setApprovalComment('');
+      setShowApprovalComment(false);
+      
+      // Close the requisition after approval
+      setSelectedRequisition(null);
 
-        alert(`✅ Success: ${response.data.message}`);
-        const updatedRequisition = {
-          ...req,
-          ...response.data.updatedFields,
-          [`approved_by_${user.role}`]: 1,
-          [`rejected_by_${user.role}`]: 0
-        };
-        
-        setRequisitions(prev => prev.map(r => r.id === req.id ? updatedRequisition : r));
-        setSelectedRequisition(updatedRequisition);
-        setApprovalComment('');
-        setShowApprovalComment(false);
-
-        if (response.data.nextApprover) {
-          alert(`Next approver: ${response.data.nextApprover}`);
-        }
+      if (response.data.nextApprover) {
+        alert(`Next approver: ${response.data.nextApprover}`);
       }
-    } catch (error) {
-      console.error('Approval failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
     }
-  };
+  } catch (error) {
+    console.error('Approval failed:', error.response?.data || error.message);
+    alert(`❌ Error: ${error.response?.data?.message || 'Approval failed'}`);
+  }
+};
 
-  const handleReject = async (req) => {
-    if (!rejectionComment.trim()) {
-      alert('Please add remarks for rejection');
-      return;
-    }
+const handleReject = async (req) => {
+  if (!rejectionComment.trim()) {
+    alert('Please add remarks for rejection');
+    return;
+  }
 
-    if (!req) return;
+  if (!req) return;
 
-    try {
-      const response = await axios.post(
-        `${BASE_URL}/requisitions/${req.id}/reject`,
-        { userId: user.id },
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/requisitions/${req.id}/reject`,
+      { userId: user.id },
+      {
+        headers: {
+          Authorization: `Bearer ${user.token}`,
+        },
+      }
+    );
+
+    if (response.data?.success) {
+      // Add rejection comment
+      await axios.post(
+        `${BASE_URL}/requisitions/${req.id}/comments`,
+        {
+          comment: `Rejection Remark: ${rejectionComment}`,
+          user_id: user.id,
+        },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -600,51 +618,39 @@ const handlePayRequisition = async (requisition) => {
         }
       );
 
-      if (response.data?.success) {
-        // Add rejection comment
-        await axios.post(
-          `${BASE_URL}/requisitions/${req.id}/comments`,
-          {
-            comment: `Rejection Remark: ${rejectionComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
+      const { field } = response.data;
 
-        const { field } = response.data;
-
-        const updatedRequisitions = requisitions.map(r =>
-          r.id === req.id
-            ? {
-              ...r,
-              status: 'rejected',
-              [field]: -1,
-            }
-            : r
-        );
-
-        setRequisitions(updatedRequisitions);
-
-        if (selectedRequisition?.id === req.id) {
-          setSelectedRequisition(prev => ({
-            ...prev,
+      const updatedRequisitions = requisitions.map(r =>
+        r.id === req.id
+          ? {
+            ...r,
             status: 'rejected',
             [field]: -1,
-          }));
-        }
+          }
+          : r
+      );
 
-        setRejectionComment('');
-        setShowRejectionComment(false);
-        setError(null);
+      setRequisitions(updatedRequisitions);
+
+      if (selectedRequisition?.id === req.id) {
+        setSelectedRequisition(prev => ({
+          ...prev,
+          status: 'rejected',
+          [field]: -1,
+        }));
+        
+        // Close the requisition after rejection
+        setSelectedRequisition(null);
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to reject requisition');
+
+      setRejectionComment('');
+      setShowRejectionComment(false);
+      setError(null);
     }
-  };
+  } catch (err) {
+    setError(err.response?.data?.message || 'Failed to reject requisition');
+  }
+};
 
   const getStatusBadge = (status) => {
     const statusLower = status.toLowerCase();
