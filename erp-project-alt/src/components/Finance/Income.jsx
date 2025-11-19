@@ -8,9 +8,9 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({
-    day: '', month: '', week: '', voucher: '', transactionDetails: '',
-    income: '', duty: '', wht: '', vat: '', grossAmount: '',
-    incomeCentre: '', type: '', stamp: '', project: ''
+    day: '', month: '', week: '', date: '', voucherCode: '', transactionDetails: '',
+    income: '', stampDuty: '', wht: '', vat: '', grossAmount: '',
+    incomeCentre: '', projectType: ''
   })
   const [loading, setLoading] = useState(false)
 
@@ -21,8 +21,8 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
     if (searchTerm) {
       filtered = filtered.filter(item =>
         item.transactionDetails?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.voucher?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.project?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.voucherCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.projectType?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -44,17 +44,16 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
       day: income.day || '',
       month: income.month || '',
       week: income.week || '',
-      voucher: income.voucher || '',
+      date: income.date || '',
+      voucherCode: income.voucherCode || '',
       transactionDetails: income.transactionDetails || '',
       income: income.income || '',
-      duty: income.duty || '',
+      stampDuty: income.stampDuty || '',
       wht: income.wht || '',
       vat: income.vat || '',
       grossAmount: income.grossAmount || '',
       incomeCentre: income.incomeCentre || '',
-      type: income.type || '',
-      stamp: income.stamp || 'No',
-      project: income.project || ''
+      projectType: income.projectType || ''
     })
   }
 
@@ -72,7 +71,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
         ...incomeToUpdate,
         ...editForm,
         income: Number(editForm.income) || 0,
-        duty: Number(editForm.duty) || 0,
+        stampDuty: Number(editForm.stampDuty) || 0,
         wht: Number(editForm.wht) || 0,
         vat: Number(editForm.vat) || 0,
         grossAmount: Number(editForm.grossAmount) || 0,
@@ -137,18 +136,16 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
       day: new Date().getDate().toString(),
       month: new Date().toLocaleString('default', { month: 'short' }).toUpperCase(),
       week: Math.ceil(new Date().getDate() / 7),
-      voucher: `INV-${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      voucherCode: `INV-${Date.now()}`,
       transactionDetails: '',
       income: 0,
-      duty: 0,
+      stampDuty: 0,
       wht: 0,
       vat: 0,
       grossAmount: 0,
       incomeCentre: '',
-      type: '',
-      stamp: 'No',
-      project: '',
-      date: new Date().toISOString().split('T')[0]
+      projectType: ''
     }
 
     try {
@@ -191,22 +188,20 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
           const worksheet = workbook.Sheets[sheetName]
           const jsonData = XLSX.utils.sheet_to_json(worksheet)
           
-          const importedData = jsonData.map((row, index) => ({
-            day: String(row.Day || row.day || ''),
-            month: String(row.Month || row.month || ''),
-            week: Number(row.Week || row.week || 1),
-            voucher: String(row.Voucher || row.voucher || ''),
-            transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
-            income: Number(row.Income || row.income || 0),
-            duty: Number(row.Duty || row.duty || 0),
-            wht: Number(row.WHT || row.wht || 0),
-            vat: Number(row.VAT || row.vat || 0),
-            grossAmount: Number(row['Gross Amount'] || row.grossAmount || 0),
-            incomeCentre: String(row['Income Centre'] || row.incomeCentre || ''),
-            type: String(row.Type || row.type || ''),
-            stamp: String(row.Stamp || row.stamp || 'No'),
-            project: String(row.Project || row.project || ''),
-            date: row.Date || row.date || new Date().toISOString().split('T')[0]
+          const importedData = jsonData.map((row) => ({
+            day: String(row['DAY'] || row.Day || row.day || ''),
+            month: String(row['MONTH'] || row.Month || row.month || ''),
+            week: Number(row['WEEK'] || row.Week || row.week || 1),
+            date: row['DATE'] || row.Date || row.date || new Date().toISOString().split('T')[0],
+            voucherCode: String(row['VOUCHER CODE'] || row['Voucher Code'] || row.voucherCode || ''),
+            transactionDetails: String(row['TRANSACTION DETAILS'] || row['Transaction Details'] || row.transactionDetails || ''),
+            income: Number(row['INCOME'] || row.Income || row.income || 0),
+            stampDuty: Number(row['STAMP DUTY'] || row['Stamp Duty'] || row.stampDuty || 0),
+            wht: Number(row['WHT'] || row.Wht || row.wht || 0),
+            vat: Number(row['VAT'] || row.Vat || row.vat || 0),
+            grossAmount: Number(row['GROSS AMOUNT'] || row['Gross Amount'] || row.grossAmount || 0),
+            incomeCentre: String(row['INCOME CENTRE'] || row['Income Centre'] || row.incomeCentre || ''),
+            projectType: String(row['PROJECT TYPE'] || row['Project Type'] || row.projectType || ''),
           }))
 
           // Save to backend
@@ -223,20 +218,21 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
             setIncomeData(prev => [...prev, ...savedData])
             refreshData() // Refresh all data
             event.target.value = ''
-            alert('Income data imported successfully!')
+            alert(`Successfully imported ${importedData.length} income records!`)
           } else {
             throw new Error('Failed to import income data')
           }
         } catch (error) {
           console.error('Error processing import file:', error)
-          alert('Error importing Excel file. Please check the format.')
+          alert('Error importing Excel file. Please check the format and column names.')
+        } finally {
+          setLoading(false)
         }
       }
       reader.readAsArrayBuffer(file)
     } catch (error) {
       console.error('Error importing income data:', error)
       alert('Error importing income data')
-    } finally {
       setLoading(false)
     }
   }
@@ -248,21 +244,19 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
     }
 
     const worksheet = XLSX.utils.json_to_sheet(incomeData.map(item => ({
-      'Day': item.day,
-      'Month': item.month,
-      'Week': item.week,
-      'Voucher': item.voucher,
-      'Transaction Details': item.transactionDetails,
-      'Income': item.income,
-      'Duty': item.duty,
+      'DAY': item.day,
+      'MONTH': item.month,
+      'WEEK': item.week,
+      'DATE': item.date,
+      'VOUCHER CODE': item.voucherCode,
+      'TRANSACTION DETAILS': item.transactionDetails,
+      'INCOME': item.income,
+      'STAMP DUTY': item.stampDuty,
       'WHT': item.wht,
       'VAT': item.vat,
-      'Gross Amount': item.grossAmount,
-      'Income Centre': item.incomeCentre,
-      'Type': item.type,
-      'Stamp': item.stamp,
-      'Project': item.project,
-      'Date': item.date
+      'GROSS AMOUNT': item.grossAmount,
+      'INCOME CENTRE': item.incomeCentre,
+      'PROJECT TYPE': item.projectType
     })))
     
     const workbook = XLSX.utils.book_new()
@@ -270,7 +264,8 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
     XLSX.writeFile(workbook, `income_data_${new Date().toISOString().split('T')[0]}.xlsx`)
   }
 
-  const totalIncome = filteredData.reduce((sum, item) => sum + (item.income || 0), 0)
+  // CORRECTED: Total Income = Income - Stamp Duty
+  const totalIncome = filteredData.reduce((sum, item) => sum + ((item.income || 0) - (item.stampDuty || 0)), 0)
   const totalGrossAmount = filteredData.reduce((sum, item) => sum + (item.grossAmount || 0), 0)
 
   return (
@@ -278,7 +273,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-2">Loading...</p>
           </div>
         </div>
@@ -290,14 +285,14 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
           <input
             type="text"
             placeholder="Search income records..."
-            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button
             onClick={handleAddNew}
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
             Add Income
           </button>
@@ -309,7 +304,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
           <input
             type="date"
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={dateRange.from}
             onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
           />
@@ -318,7 +313,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
           <input
             type="date"
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={dateRange.to}
             onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
           />
@@ -348,7 +343,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
 
       <div className="mb-6 p-4 bg-gray-50 rounded-md">
         <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold">TOTAL INCOME:</span>
+          <span className="text-lg font-semibold">TOTAL INCOME (Income - Stamp Duty):</span>
           <span className="text-xl font-bold text-green-600">₦{totalIncome.toLocaleString()}</span>
         </div>
       </div>
@@ -357,22 +352,21 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S/N</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S/NO</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DAY</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">MONTH</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">WEEK</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DATE</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">VOUCHER CODE</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">TRANSACTION DETAILS</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">INCOME</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DUTY</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">STAMP DUTY</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">WHT</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">VAT</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">GROSS AMOUNT</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">INCOME CENTRE</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">TYPE</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">STAMP</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">PROJECT</th>
-              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">PROJECT TYPE</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACTIONS</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -382,7 +376,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
                   <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                   
                   {/* Editable fields */}
-                  {['day', 'month', 'week', 'voucher', 'transactionDetails', 'income', 'duty', 'wht', 'vat', 'grossAmount', 'incomeCentre', 'type', 'stamp', 'project'].map((field) => (
+                  {['day', 'month', 'week', 'date', 'voucherCode', 'transactionDetails', 'income', 'stampDuty', 'wht', 'vat', 'grossAmount', 'incomeCentre', 'projectType'].map((field) => (
                     <td key={field} className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
                       {editingId === income.id ? (
                         field === 'month' ? (
@@ -396,17 +390,15 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
                               <option key={month} value={month}>{month}</option>
                             ))}
                           </select>
-                        ) : field === 'stamp' ? (
-                          <select
-                            name="stamp"
-                            value={editForm.stamp}
+                        ) : field === 'date' ? (
+                          <input
+                            type="date"
+                            name="date"
+                            value={editForm.date}
                             onChange={handleEditChange}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                          >
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        ) : ['income', 'duty', 'wht', 'vat', 'grossAmount'].includes(field) ? (
+                            className="w-32 px-2 py-1 border border-gray-300 rounded-md"
+                          />
+                        ) : ['income', 'stampDuty', 'wht', 'vat', 'grossAmount'].includes(field) ? (
                           <input
                             type="number"
                             name={field}
@@ -436,7 +428,8 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
                           />
                         )
                       ) : (
-                        ['income', 'duty', 'wht', 'vat', 'grossAmount'].includes(field) 
+                        field === 'date' ? income[field] || '' :
+                        ['income', 'stampDuty', 'wht', 'vat', 'grossAmount'].includes(field) 
                           ? `₦${(income[field] || 0).toLocaleString()}`
                           : income[field] || ''
                       )}
@@ -448,7 +441,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
                       <div className="space-x-2">
                         <button
                           onClick={() => handleSave(income.id)}
-                          className="text-primary hover:text-primary-dark"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           Save
                         </button>
@@ -463,7 +456,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
                       <div className="space-x-2">
                         <button
                           onClick={() => handleEdit(income)}
-                          className="text-primary hover:text-primary-dark"
+                          className="text-blue-600 hover:text-blue-900"
                         >
                           Edit
                         </button>
@@ -480,7 +473,7 @@ const IncomeModule = ({ incomeData, setIncomeData, refreshData }) => {
               ))
             ) : (
               <tr>
-                <td colSpan={16} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={15} className="px-6 py-4 text-center text-gray-500">
                   {incomeData.length === 0 ? 'No income records. Click "Add Income" to get started.' : 'No records match your search.'}
                 </td>
               </tr>
