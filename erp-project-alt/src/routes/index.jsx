@@ -57,13 +57,9 @@ const router = createBrowserRouter([
         path: 'memos/new',
         element: <NewMemo />,
       },
-      {
-        path: 'memos/:id',
-        element: <SingleMemo />,
-      },
 
       {
-        path: 'requisitions',
+        path: 'requisitions/:requisitionId?',
         element: <RequisitionList />,
       },
       {

@@ -1441,7 +1441,7 @@ router.get('/memos/counts/:userId', async (req, res) => {
             AND m.rejected_by_${userRole} IS NULL
         `;
       }
-    } 
+    }
     else {
       // ✅ Regular sender
       query = `
@@ -1712,6 +1712,33 @@ router.post('/memos/:id/approve', async (req, res) => {
       nextApprover: getNextApprover(role, isFinanceDepartment)
     };
 
+    // ✅ Send notification to memo creator when approved
+    try {
+      const [creator] = await db.execute(
+        `SELECT id, name FROM users WHERE id = ?`,
+        [memo.created_by]
+      );
+
+      const approverRole = role.toUpperCase();
+
+      await db.execute(
+        `INSERT INTO notifications (user_id, title, message, link, memo_id)
+     VALUES (?, ?, ?, ?, ?)`,
+        [
+          memo.created_by,
+          `Memo Approved (${approverRole})`,
+          `Your memo "${memo.title}" has been approved by ${approverRole}.`,
+          `/dashboard/memos/${memoId}`,
+          memoId
+        ]
+      );
+
+      console.log(`✅ Notification sent to memo creator (ID: ${memo.created_by})`);
+    } catch (notifErr) {
+      console.error('❌ Error sending approval notification:', notifErr.message);
+    }
+
+
     return res.status(200).json(response);
 
   } catch (err) {
@@ -1863,7 +1890,7 @@ router.post('/memos/:id/reject', async (req, res) => {
     const { userId } = req.body;
     const memoId = req.params.id;
 
-    // 🧠 Get user info from DB
+    // 🧠 Get rejecting user info
     const [userRows] = await db.execute(`SELECT name, role FROM users WHERE id = ?`, [userId]);
     if (!userRows.length) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -1872,22 +1899,21 @@ router.post('/memos/:id/reject', async (req, res) => {
     const user = userRows[0];
     const role = user.role?.toLowerCase();
 
-    // Valid reject fields
-    const validFields = [
-      'manager',
-      'executive',
-      'finance',
-      'gmd',
-      'chairman'
-    ];
-
+    const validFields = ['manager', 'executive', 'finance', 'gmd', 'chairman'];
     if (!validFields.includes(role)) {
       return res.status(400).json({ success: false, message: `Invalid reject role: ${role}` });
     }
 
     const field = `rejected_by_${role}`;
 
-    // 🧩 Update memo record
+    // 🧠 Get memo info (to notify creator)
+    const [memoRows] = await db.execute(`SELECT created_by, title FROM memos WHERE id = ?`, [memoId]);
+    if (!memoRows.length) {
+      return res.status(404).json({ success: false, message: 'Memo not found' });
+    }
+    const memo = memoRows[0];
+
+    // 🧩 Update memo status
     const [updateResult] = await db.execute(
       `UPDATE memos SET ${field} = 1, status = 'rejected' WHERE id = ?`,
       [memoId]
@@ -1897,7 +1923,26 @@ router.post('/memos/:id/reject', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Memo not found' });
     }
 
-    // ✅ Return response for frontend
+    // ✅ Send Notification to Memo Creator
+    try {
+      await db.execute(
+        `INSERT INTO notifications (user_id, title, message, link, memo_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          memo.created_by,
+          `Memo Rejected (${role.toUpperCase()})`,
+          `Your memo "${memo.title}" was rejected by ${user.name} (${role.toUpperCase()}).`,
+          `/dashboard/memos/${memoId}`,
+          memoId
+        ]
+      );
+
+      console.log(`🚨 Rejection notification sent to memo creator ID ${memo.created_by}`);
+    } catch (err) {
+      console.error("❌ Error sending rejection notification:", err);
+    }
+
+    // ✅ Response
     res.json({
       success: true,
       field,

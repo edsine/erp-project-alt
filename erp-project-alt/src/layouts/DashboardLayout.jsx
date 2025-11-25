@@ -16,6 +16,7 @@ const DashboardLayout = () => {
   const { user, isAuthenticated, loading, error } = useAuth()
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const [selectedMemoId, setSelectedMemoId] = useState(null);
+  const [selectedRequisitionId, setSelectedRequisitionId] = useState(null);
   const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
@@ -245,27 +246,70 @@ useEffect(() => {
 // };
 
 
+// const handleNotificationClick = async (note) => {
+//   try {
+//     // ✅ Optimistically remove the notification right away (instant UI feedback)
+//     setNotifications((prev) => prev.filter((n) => n.id !== note.id));
+//     setUnreadCount((count) => Math.max(count - 1, 0));
+//     setShowNotifications(false);
+
+//     // ✅ Mark as read in backend (no need to wait before navigating)
+//     fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" })
+//       .catch((err) => console.error("Failed to mark notification as read:", err));
+
+//     // ✅ Navigate to memo if link exists
+//     if (note.link) {
+//       const memoIdMatch = note.link.match(/(\d+)/);
+//       if (memoIdMatch) {
+//         const memoId = parseInt(memoIdMatch[1]);
+//         setSelectedMemoId(memoId);
+//         navigate(`/dashboard/memos/${memoId}`);
+//       } else {
+//         console.warn("No memo ID found in link:", note.link);
+//       }
+//     } else {
+//       console.warn("Notification has no link:", note);
+//     }
+//   } catch (err) {
+//     console.error("Error handling notification click:", err);
+//   }
+// };
+
 const handleNotificationClick = async (note) => {
   try {
-    // ✅ Optimistically remove the notification right away (instant UI feedback)
+    // ✅ Optimistic UI updates
     setNotifications((prev) => prev.filter((n) => n.id !== note.id));
     setUnreadCount((count) => Math.max(count - 1, 0));
     setShowNotifications(false);
 
-    // ✅ Mark as read in backend (no need to wait before navigating)
+    // ✅ Mark as read in backend
     fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" })
       .catch((err) => console.error("Failed to mark notification as read:", err));
 
-    // ✅ Navigate to memo if link exists
+    // ✅ Navigate based on link
     if (note.link) {
-      const memoIdMatch = note.link.match(/(\d+)/);
-      if (memoIdMatch) {
-        const memoId = parseInt(memoIdMatch[1]);
-        setSelectedMemoId(memoId);
-        navigate(`/dashboard/memos/${memoId}`);
-      } else {
-        console.warn("No memo ID found in link:", note.link);
+      if (note.link.includes("/memos/")) {
+        const memoIdMatch = note.link.match(/\/memos\/(\d+)/);
+        if (memoIdMatch) {
+          const memoId = parseInt(memoIdMatch[1]);
+          setSelectedMemoId(memoId);
+          navigate(`/dashboard/memos/${memoId}`);
+          return;
+        }
       }
+
+      if (note.link.includes("/requisitions/")) {
+        const reqIdMatch = note.link.match(/\/requisitions\/(\d+)/);
+        if (reqIdMatch) {
+          const requisitionId = parseInt(reqIdMatch[1]);
+          setSelectedRequisitionId?.(requisitionId); // optional state
+          navigate(`/dashboard/requisitions/${requisitionId}`);
+          return;
+        }
+      }
+
+      // fallback for other links
+      navigate(note.link);
     } else {
       console.warn("Notification has no link:", note);
     }
@@ -273,6 +317,7 @@ const handleNotificationClick = async (note) => {
     console.error("Error handling notification click:", err);
   }
 };
+
 
 
   return (
@@ -594,7 +639,8 @@ const handleNotificationClick = async (note) => {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
-          <Outlet context={{ selectedMemoId, setSelectedMemoId }} />
+          <Outlet context={{ selectedMemoId, setSelectedMemoId, selectedRequisitionId,
+    setSelectedRequisitionId }} />
 
         </main>
       </div>
