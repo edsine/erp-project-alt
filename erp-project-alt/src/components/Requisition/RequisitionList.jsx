@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { useParams } from 'react-router-dom';
+
 
 // Add this component near the top, after the imports
 // Update the CommentSection component with the new design
 const CommentSection = ({ requisitionId, user }) => {
+  
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
@@ -216,10 +219,11 @@ const formatFileSize = (bytes) => {
 
 const RequisitionList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
+  const { id } = useParams();
   const { user } = useAuth();
   const [requisitions, setRequisitions] = useState([]);
   const [selectedRequisition, setSelectedRequisition] = useState(null);
+  const { requisitionId } = useParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -257,6 +261,20 @@ const RequisitionList = () => {
 
     fetchUsers();
   }, [BASE_URL, user.token]);
+
+  useEffect(() => {
+  if (id && requisitions.length > 0) {
+    const req = requisitions.find(r => r.id.toString() === id);
+    if (req) setSelectedRequisition(req);
+  }
+}, [id, requisitions]);
+useEffect(() => {
+  if (requisitionId && requisitions.length > 0) {
+    const found = requisitions.find(r => r.id == requisitionId);
+    setSelectedRequisition(found);
+  }
+}, [requisitionId, requisitions]);
+
 
   useEffect(() => {
     const fetchRequisitions = async () => {

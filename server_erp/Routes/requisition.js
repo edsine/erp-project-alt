@@ -60,9 +60,6 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
       total_amount
     } = req.body;
 
-    console.log('📝 Request body:', req.body);
-    console.log('📎 Files received:', req.files);
-
     // Validate required fields
     if (!title || !created_by) {
       await connection.rollback();
@@ -71,15 +68,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
       });
     }
 
-    // Validate items
-    let parsedItems;
-    try {
-      parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
-    } catch (e) {
-      await connection.rollback();
-      return res.status(400).json({ message: 'Invalid items format' });
-    }
-
+    let parsedItems = typeof items === 'string' ? JSON.parse(items) : items;
     if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
       await connection.rollback();
       return res.status(400).json({ message: 'At least one item is required' });
@@ -87,7 +76,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
 
     // Get sender info
     const [[user]] = await connection.query(
-      'SELECT role, department FROM users WHERE id = ?',
+      'SELECT name, role, department FROM users WHERE id = ?',
       [created_by]
     );
 
@@ -98,8 +87,9 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
 
     const sender_role = user.role;
     const sender_department = user.department;
+    const sender_name = user.name;
 
-    // Insert requisition (without file_path since we're using separate table)
+    // Insert requisition
     const [result] = await connection.execute(
       `INSERT INTO requisitions 
         (title, description, priority, created_by, sender_role, sender_department, total_amount, status) 
@@ -135,8 +125,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
     }
 
     // Insert files (if any)
-    const uploadedFiles = [];
-    if (req.files && req.files.length > 0) {
+    if (req.files?.length > 0) {
       for (const file of req.files) {
         await connection.execute(
           `INSERT INTO requisition_files 
@@ -150,14 +139,44 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
             file.size
           ]
         );
-        
-        uploadedFiles.push({
-          filename: file.filename,
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size
-        });
       }
+    }
+
+    // ✅ Find next approvers (mirroring memo flow)
+    const [executives] = await connection.execute(`SELECT id FROM users WHERE role = 'executive'`);
+    const [finances] = await connection.execute(`SELECT id FROM users WHERE role = 'finance'`);
+    const [gmds] = await connection.execute(`SELECT id FROM users WHERE role = 'gmd'`);
+    const [chairmen] = await connection.execute(`SELECT id FROM users WHERE role = 'chairman'`);
+    const [managers] = await connection.execute(
+      `SELECT id FROM users WHERE role = 'manager' AND department = ?`,
+      [sender_department]
+    );
+
+    let nextApprovers = [];
+
+    if (sender_department === 'Finance') {
+      nextApprovers.push(...gmds.map(u => u.id), ...chairmen.map(u => u.id));
+    } else if (sender_department === 'ICT') {
+      nextApprovers.push(...managers.map(u => u.id), ...executives.map(u => u.id), ...finances.map(u => u.id), ...gmds.map(u => u.id), ...chairmen.map(u => u.id));
+    } else {
+      nextApprovers.push(...managers.map(u => u.id), ...executives.map(u => u.id), ...finances.map(u => u.id), ...gmds.map(u => u.id), ...chairmen.map(u => u.id));
+    }
+
+    nextApprovers = [...new Set(nextApprovers)].filter(id => id !== created_by);
+
+    // ✅ Notify next approvers
+    for (const approverId of nextApprovers) {
+      await connection.execute(
+        `INSERT INTO notifications (user_id, title, message, link, requisition_id) 
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          approverId,
+          "New Requisition Submitted",
+          `${sender_name} (${sender_department}) submitted a requisition "${title}" for your approval.`,
+          `/dashboard/requisitions/${requisitionId}`,
+          requisitionId
+        ]
+      );
     }
 
     await connection.commit();
@@ -165,8 +184,6 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
     res.status(201).json({
       message: 'Requisition created successfully',
       requisition_id: requisitionId,
-      files_uploaded: uploadedFiles.length,
-      files: uploadedFiles
     });
 
   } catch (err) {
@@ -180,6 +197,7 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
     connection.release();
   }
 });
+
 
 
 // Updated GET routes with separate files table
@@ -542,12 +560,93 @@ function getMimeTypeFromFilename(filename) {
 }
 
 // Approve requisition
+// router.post('/requisitions/:id/approve', async (req, res) => {
+//   const requisitionId = req.params.id;
+//   const { user_id, role } = req.body;
+
+//   try {
+//     // 1. Fetch requisition with creator details
+//     const [requisitions] = await db.query(`
+//       SELECT r.*, u.department as sender_department
+//       FROM requisitions r
+//       JOIN users u ON r.created_by = u.id
+//       WHERE r.id = ?
+//     `, [requisitionId]);
+
+//     if (requisitions.length === 0) {
+//       return res.status(404).json({ success: false, message: 'Requisition not found' });
+//     }
+
+//     const requisition = requisitions[0];
+//     const dept = requisition.sender_department?.trim().toLowerCase();
+
+//     let approvalRules;
+
+//     if (dept === 'ict') {
+//       // ICT department flow
+//       approvalRules = {
+//         manager: { field: 'approved_by_manager', dependsOn: null },
+//         executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
+//         finance: { field: 'approved_by_finance', dependsOn: 'approved_by_executive' },
+//         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+//         chairman: { field: 'approved_by_chairman' }
+//       };
+//     } else if (dept === 'finance') {
+//       // Finance department flow
+//       approvalRules = {
+//         finance: { field: 'approved_by_finance', dependsOn: null },
+//         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+//         chairman: { field: 'approved_by_chairman' }
+//       };
+//     } else {
+//       // All other departments
+//       approvalRules = {
+//         finance: { field: 'approved_by_finance', dependsOn: null },
+//         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
+//         chairman: { field: 'approved_by_chairman' }
+//       };
+//     }
+
+//     // 2. Validate role
+//     if (!approvalRules[role]) {
+//       return res.status(400).json({ success: false, message: 'Invalid approval role' });
+//     }
+
+//     const { field, dependsOn } = approvalRules[role];
+
+//     // 3. Check dependency
+//     if (dependsOn && requisition[dependsOn] !== 1) {
+//       return res.status(403).json({
+//         success: false,
+//         message: `Requires ${dependsOn.replace('approved_by_', '')} approval first`
+//       });
+//     }
+
+//     // 4. Update DB
+//     await db.query(`
+//       UPDATE requisitions 
+//       SET ${field} = 1,
+//           updated_at = CURRENT_TIMESTAMP
+//       WHERE id = ?
+//     `, [requisitionId]);
+
+//     return res.json({
+//       success: true,
+//       message: `${role} approval successful`
+//     });
+
+//   } catch (err) {
+//     console.error('Approval error:', err);
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+
 router.post('/requisitions/:id/approve', async (req, res) => {
   const requisitionId = req.params.id;
   const { user_id, role } = req.body;
 
   try {
-    // 1. Fetch requisition with creator details
+    // 1. Fetch requisition + creator department
     const [requisitions] = await db.query(`
       SELECT r.*, u.department as sender_department
       FROM requisitions r
@@ -562,10 +661,10 @@ router.post('/requisitions/:id/approve', async (req, res) => {
     const requisition = requisitions[0];
     const dept = requisition.sender_department?.trim().toLowerCase();
 
+    // 2. Department-based approval rules
     let approvalRules;
 
     if (dept === 'ict') {
-      // ICT department flow
       approvalRules = {
         manager: { field: 'approved_by_manager', dependsOn: null },
         executive: { field: 'approved_by_executive', dependsOn: 'approved_by_manager' },
@@ -574,14 +673,12 @@ router.post('/requisitions/:id/approve', async (req, res) => {
         chairman: { field: 'approved_by_chairman' }
       };
     } else if (dept === 'finance') {
-      // Finance department flow
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
         chairman: { field: 'approved_by_chairman' }
       };
     } else {
-      // All other departments
       approvalRules = {
         finance: { field: 'approved_by_finance', dependsOn: null },
         gmd: { field: 'approved_by_gmd', dependsOn: 'approved_by_finance' },
@@ -589,14 +686,14 @@ router.post('/requisitions/:id/approve', async (req, res) => {
       };
     }
 
-    // 2. Validate role
+    // 3. Validate role
     if (!approvalRules[role]) {
       return res.status(400).json({ success: false, message: 'Invalid approval role' });
     }
 
     const { field, dependsOn } = approvalRules[role];
 
-    // 3. Check dependency
+    // 4. Check dependency
     if (dependsOn && requisition[dependsOn] !== 1) {
       return res.status(403).json({
         success: false,
@@ -604,13 +701,39 @@ router.post('/requisitions/:id/approve', async (req, res) => {
       });
     }
 
-    // 4. Update DB
+    // 5. Update approval status
     await db.query(`
       UPDATE requisitions 
       SET ${field} = 1,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `, [requisitionId]);
+
+    // 6. 🔔 Send notification to creator
+    try {
+      const [creator] = await db.query(
+        `SELECT id, name FROM users WHERE id = ?`,
+        [requisition.created_by]
+      );
+
+      const approverRole = role.toUpperCase();
+
+      await db.query(
+        `INSERT INTO notifications (user_id, title, message, link, requisition_id)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          requisition.created_by,
+          `Requisition Approved (${approverRole})`,
+          `Your requisition "${requisition.title}" has been approved by ${approverRole}.`,
+          `/dashboard/requisitions/${requisitionId}`,
+          requisitionId
+        ]
+      );
+
+      console.log(`✅ Notification sent to requisition creator (ID: ${requisition.created_by})`);
+    } catch (notifErr) {
+      console.error("❌ Error sending approval notification:", notifErr.message);
+    }
 
     return res.json({
       success: true,
@@ -622,6 +745,7 @@ router.post('/requisitions/:id/approve', async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
 
 
 // Reject requisition
