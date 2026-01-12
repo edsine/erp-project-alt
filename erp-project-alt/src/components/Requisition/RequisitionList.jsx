@@ -5,8 +5,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useParams } from 'react-router-dom';
 
 
-// Add this component near the top, after the imports
-// Update the CommentSection component with the new design
 const CommentSection = ({ requisitionId, user }) => {
   
   const [comments, setComments] = useState([]);
@@ -542,7 +540,8 @@ const handlePayRequisition = async (requisition) => {
 };
 
 const handleApprove = async (req) => {
-  if (!approvalComment.trim()) {
+  // Chairman doesn't need recommendation/remark
+  if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) {
     alert('Please add recommendations for approval');
     return;
   }
@@ -562,19 +561,25 @@ const handleApprove = async (req) => {
     );
 
     if (response.status === 200) {
-      // Add approval comment
-      await axios.post(
-        `${BASE_URL}/requisitions/${req.id}/comments`,
-        {
-          comment: `Recommendation: ${approvalComment}`,
-          user_id: user.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
+      // Add approval comment only if not chairman or if comment exists
+      if (user.role.toLowerCase() !== 'chairman' || approvalComment.trim()) {
+        await axios.post(
+          `${BASE_URL}/requisitions/${req.id}/comments`,
+          {
+            comment: user.role.toLowerCase() === 'chairman'
+              ? approvalComment.trim()
+                ? `Chairman Approval: ${approvalComment}`
+                : 'Chairman Approval'
+              : `Recommendation: ${approvalComment}`,
+            user_id: user.id,
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+      }
 
       alert(`✅ Success: ${response.data.message}`);
       const updatedRequisition = {
@@ -603,7 +608,8 @@ const handleApprove = async (req) => {
 };
 
 const handleReject = async (req) => {
-  if (!rejectionComment.trim()) {
+  // Chairman doesn't need remark for rejection
+  if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) {
     alert('Please add remarks for rejection');
     return;
   }
@@ -622,19 +628,25 @@ const handleReject = async (req) => {
     );
 
     if (response.data?.success) {
-      // Add rejection comment
-      await axios.post(
-        `${BASE_URL}/requisitions/${req.id}/comments`,
-        {
-          comment: `Rejection Remark: ${rejectionComment}`,
-          user_id: user.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
+      // Add rejection comment only if not chairman or if comment exists
+      if (user.role.toLowerCase() !== 'chairman' || rejectionComment.trim()) {
+        await axios.post(
+          `${BASE_URL}/requisitions/${req.id}/comments`,
+          {
+            comment: user.role.toLowerCase() === 'chairman'
+              ? rejectionComment.trim()
+                ? `Chairman Rejection: ${rejectionComment}`
+                : 'Chairman Rejection'
+              : `Rejection Remark: ${rejectionComment}`,
+            user_id: user.id,
           },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
+      }
 
       const { field } = response.data;
 
@@ -1130,69 +1142,82 @@ const handleReject = async (req) => {
   
   return (
     <div className="mt-6 space-y-4">
-      {/* Approval Comment Input */}
-      {showApprovalComment && (
-        <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">Recommendation</h4>
-          <textarea
-            value={approvalComment}
-            onChange={(e) => setApprovalComment(e.target.value)}
-            placeholder="Enter your recommendations for approval..."
-            className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-            rows="3"
-          />
-          <div className="flex justify-end space-x-2 mt-2">
-            <button
-              onClick={() => {
-                setShowApprovalComment(false);
-                setApprovalComment('');
-              }}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleApprove(selectedRequisition)}
-              disabled={!approvalComment.trim()}
-              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              Submit Approval
-            </button>
-          </div>
-        </div>
-      )}
+      
+{/* Approval Comment Input */}
+{showApprovalComment && (
+  <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+    <h4 className="text-sm font-medium text-blue-800 mb-2">
+      {user.role.toLowerCase() === 'chairman' ? 'Approval (Optional)' : 'Recommendation'}
+    </h4>
+    <textarea
+      value={approvalComment}
+      onChange={(e) => setApprovalComment(e.target.value)}
+      placeholder={
+        user.role.toLowerCase() === 'chairman'
+          ? "Enter optional remarks for approval..."
+          : "Enter your recommendations for approval..."
+      }
+      className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+      rows="3"
+    />
+    <div className="flex justify-end space-x-2 mt-2">
+      <button
+        onClick={() => {
+          setShowApprovalComment(false);
+          setApprovalComment('');
+        }}
+        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={() => handleApprove(selectedRequisition)}
+        disabled={user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()}
+        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+      >
+        Submit Approval
+      </button>
+    </div>
+  </div>
+)}
 
-      {/* Rejection Comment Input */}
-      {showRejectionComment && (
-        <div className="bg-red-50 p-4 rounded-md border border-red-200">
-          <h4 className="text-sm font-medium text-red-800 mb-2">Rejection Remark</h4>
-          <textarea
-            value={rejectionComment}
-            onChange={(e) => setRejectionComment(e.target.value)}
-            placeholder="Enter your remarks for rejection..."
-            className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
-            rows="3"
-          />
-          <div className="flex justify-end space-x-2 mt-2">
-            <button
-              onClick={() => {
-                setShowRejectionComment(false);
-                setRejectionComment('');
-              }}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={() => handleReject(selectedRequisition)}
-              disabled={!rejectionComment.trim()}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-            >
-              Submit Rejection
-            </button>
-          </div>
-        </div>
-      )}
+{/* Rejection Comment Input */}
+{showRejectionComment && (
+  <div className="bg-red-50 p-4 rounded-md border border-red-200">
+    <h4 className="text-sm font-medium text-red-800 mb-2">
+      {user.role.toLowerCase() === 'chairman' ? 'Rejection (Optional)' : 'Rejection Remark'}
+    </h4>
+    <textarea
+      value={rejectionComment}
+      onChange={(e) => setRejectionComment(e.target.value)}
+      placeholder={
+        user.role.toLowerCase() === 'chairman'
+          ? "Enter optional remarks for rejection..."
+          : "Enter your remarks for rejection..."
+      }
+      className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
+      rows="3"
+    />
+    <div className="flex justify-end space-x-2 mt-2">
+      <button
+        onClick={() => {
+          setShowRejectionComment(false);
+          setRejectionComment('');
+        }}
+        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={() => handleReject(selectedRequisition)}
+        disabled={user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()}
+        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+      >
+        Submit Rejection
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Action Buttons */}
       {!showApprovalComment && !showRejectionComment && (
