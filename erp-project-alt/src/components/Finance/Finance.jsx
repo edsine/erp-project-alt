@@ -67,7 +67,7 @@ const fetchExpensesData = async () => {
 
   return (
     <div className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-9xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Financial Management</h1>
           <p className="text-gray-600">Manage your income, expenses, and view financial reports</p>
