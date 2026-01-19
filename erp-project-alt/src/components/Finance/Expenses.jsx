@@ -1,17 +1,28 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 
-const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
-  const BASE_URL = import.meta.env.VITE_BASE_URL;
+const ExpensesModule = () => {
+  // Load data from localStorage or use empty array
+  const [expensesData, setExpensesData] = useState(() => {
+    const savedData = localStorage.getItem('expensesData')
+    return savedData ? JSON.parse(savedData) : []
+  })
+  
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({
-    day: '', month: '', week: '', voucher: '', transactionDetails: '',
+    day: '', month: '', week: '', date: '', voucherCode: '', transactionDetails: '',
     spent: '', category: '', costCentre: '', subCostCentre: '', bankDebited: ''
   })
   const [loading, setLoading] = useState(false)
+  const [newRowId, setNewRowId] = useState(null) // Track newly added row for auto-edit
+
+  // Save to localStorage whenever expensesData changes
+  useEffect(() => {
+    localStorage.setItem('expensesData', JSON.stringify(expensesData))
+  }, [expensesData])
 
   // Filter data based on search and date range
   useEffect(() => {
@@ -20,7 +31,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
     if (searchTerm) {
       filtered = filtered.filter(item =>
         item.transactionDetails?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.voucher?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.voucherCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
@@ -43,7 +54,8 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
       day: expense.day || '',
       month: expense.month || '',
       week: expense.week || '',
-      voucher: expense.voucher || '',
+      date: expense.date || '',
+      voucherCode: expense.voucherCode || '',
       transactionDetails: expense.transactionDetails || '',
       spent: expense.spent || '',
       category: expense.category || '',
@@ -55,43 +67,63 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target
-    setEditForm(prev => ({ ...prev, [name]: value }))
+    
+    // Auto-calculate week based on date if date field is being edited
+    if (name === 'date' && value) {
+      const day = new Date(value).getDate()
+      const week = Math.ceil(day / 7)
+      const month = new Date(value).toLocaleString('default', { month: 'short' }).toUpperCase()
+      
+      setEditForm(prev => ({ 
+        ...prev, 
+        [name]: value,
+        day: day.toString(),
+        month: month,
+        week: week
+      }))
+    } else {
+      setEditForm(prev => ({ ...prev, [name]: value }))
+    }
   }
 
-  const handleSave = async (id) => {
+  const handleSave = (id) => {
     try {
       setLoading(true)
-      const expenseToUpdate = expensesData.find(expense => expense.id === id)
       
-      const updatedData = {
-        ...expenseToUpdate,
+      // Auto-calculate week if date is provided
+      let week = Number(editForm.week) || 1
+      let month = editForm.month || ''
+      let day = editForm.day || ''
+      
+      // If date is provided, calculate day, month, week
+      if (editForm.date) {
+        const dateObj = new Date(editForm.date)
+        day = dateObj.getDate().toString()
+        month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
+        week = Math.ceil(dateObj.getDate() / 7)
+      }
+      
+      const updatedExpense = {
         ...editForm,
+        day: day,
+        month: month,
+        week: week,
         spent: Number(editForm.spent) || 0,
-        week: Number(editForm.week) || 1
+        id: id // Ensure ID is preserved
       }
 
-      // Update in backend
-      const response = await fetch(`${BASE_URL}/finance/expenses/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedData)
+      // Update local state
+      const updatedData = expensesData.map(expense => {
+        if (expense.id === id) {
+          return updatedExpense
+        }
+        return expense
       })
-
-      if (response.ok) {
-        // Update local state
-        setExpensesData(expensesData.map(expense => {
-          if (expense.id === id) {
-            return updatedData
-          }
-          return expense
-        }))
-        setEditingId(null)
-        refreshData() // Refresh all data
-      } else {
-        throw new Error('Failed to update expense record')
-      }
+      
+      setExpensesData(updatedData)
+      setEditingId(null)
+      setNewRowId(null)
+      
     } catch (error) {
       console.error('Error updating expense:', error)
       alert('Error updating expense record')
@@ -100,21 +132,13 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Are you sure you want to delete this expense record?')) return
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/finance/expenses/${id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        setExpensesData(expensesData.filter(expense => expense.id !== id))
-        refreshData() // Refresh all data
-      } else {
-        throw new Error('Failed to delete expense record')
-      }
+      setExpensesData(expensesData.filter(expense => expense.id !== id))
+      setNewRowId(null)
     } catch (error) {
       console.error('Error deleting expense:', error)
       alert('Error deleting expense record')
@@ -123,38 +147,48 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
     }
   }
 
-  const handleAddNew = async () => {
+  const handleAddNew = () => {
+    // Create a new expense with empty fields (except auto-generated date/week)
+    const currentDate = new Date()
     const newExpense = {
-      day: new Date().getDate().toString(),
-      month: new Date().toLocaleString('default', { month: 'short' }).toUpperCase(),
-      week: Math.ceil(new Date().getDate() / 7),
-      voucher: `EXP-${Date.now()}`,
+      id: Date.now(), // Generate unique ID
+      day: currentDate.getDate().toString(),
+      month: currentDate.toLocaleString('default', { month: 'short' }).toUpperCase(),
+      week: Math.ceil(currentDate.getDate() / 7),
+      date: currentDate.toISOString().split('T')[0],
+      voucherCode: '',
       transactionDetails: '',
       spent: 0,
       category: '',
       costCentre: '',
       subCostCentre: '',
       bankDebited: 'No',
-      date: new Date().toISOString().split('T')[0]
+      createdAt: currentDate.toISOString()
     }
 
     try {
       setLoading(true)
-      const response = await fetch(`${BASE_URL}/finance/expenses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newExpense)
+      
+      // Add to expenses data
+      setExpensesData(prev => [...prev, newExpense])
+      
+      // Automatically put the new row in edit mode
+      setEditingId(newExpense.id)
+      setNewRowId(newExpense.id)
+      setEditForm({
+        day: newExpense.day,
+        month: newExpense.month,
+        week: newExpense.week,
+        date: newExpense.date,
+        voucherCode: '',
+        transactionDetails: '',
+        spent: 0,
+        category: '',
+        costCentre: '',
+        subCostCentre: '',
+        bankDebited: 'No'
       })
-
-      if (response.ok) {
-        const savedExpense = await response.json()
-        setExpensesData([...expensesData, { ...newExpense, id: savedExpense.id }])
-        refreshData() // Refresh all data
-      } else {
-        throw new Error('Failed to create expense record')
-      }
+      
     } catch (error) {
       console.error('Error creating expense:', error)
       alert('Error creating expense record')
@@ -163,14 +197,14 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
     }
   }
 
-  const handleImport = async (event) => {
+  const handleImport = (event) => {
     const file = event.target.files[0]
     if (!file) return
 
     try {
       setLoading(true)
       const reader = new FileReader()
-      reader.onload = async (e) => {
+      reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result)
           const workbook = XLSX.read(data, { type: 'array' })
@@ -178,48 +212,53 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
           const worksheet = workbook.Sheets[sheetName]
           const jsonData = XLSX.utils.sheet_to_json(worksheet)
           
-          const importedData = jsonData.map((row, index) => ({
-            day: String(row.Day || row.day || ''),
-            month: String(row.Month || row.month || ''),
-            week: Number(row.Week || row.week || 1),
-            voucher: String(row.Voucher || row.voucher || ''),
-            transactionDetails: String(row['Transaction Details'] || row.transactionDetails || ''),
-            spent: Number(row.Spent || row.spent || 0),
-            category: String(row.Category || row.category || ''),
-            costCentre: String(row['Cost Centre'] || row.costCentre || ''),
-            subCostCentre: String(row['Sub Cost Centre'] || row.subCostCentre || ''),
-            bankDebited: String(row['Bank Debited'] || row.bankDebited || 'No'),
-            date: row.Date || row.date || new Date().toISOString().split('T')[0]
-          }))
-
-          // Save to backend
-          const response = await fetch(`${BASE_URL}/finance/expenses/import`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(importedData)
+          const importedData = jsonData.map((row, index) => {
+            // Parse date and calculate week
+            const rowDate = row['DATE'] || row.Date || row.date
+            let dateObj = new Date()
+            let week = 1
+            let month = ''
+            let day = ''
+            
+            if (rowDate) {
+              dateObj = new Date(rowDate)
+              day = dateObj.getDate().toString()
+              month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
+              week = Math.ceil(dateObj.getDate() / 7)
+            }
+            
+            return {
+              id: Date.now() + index,
+              day: day || String(row['DAY'] || row.Day || row.day || ''),
+              month: month || String(row['MONTH'] || row.Month || row.month || ''),
+              week: week || Number(row['WEEK'] || row.Week || row.week || 1),
+              date: rowDate || new Date().toISOString().split('T')[0],
+              voucherCode: String(row['VOUCHER CODE'] || row['Voucher Code'] || row.voucherCode || `IMP-${Date.now()}-${index}`),
+              transactionDetails: String(row['TRANSACTION DETAILS'] || row['Transaction Details'] || row.transactionDetails || ''),
+              spent: Number(row['SPENT'] || row.Spent || row.spent || 0),
+              category: String(row['CATEGORY'] || row.Category || row.category || ''),
+              costCentre: String(row['COST CENTRE'] || row['Cost Centre'] || row.costCentre || ''),
+              subCostCentre: String(row['SUB COST CENTRE'] || row['Sub Cost Centre'] || row.subCostCentre || ''),
+              bankDebited: String(row['BANK DEBITED'] || row['Bank Debited'] || row.bankDebited || 'No'),
+              importedAt: new Date().toISOString()
+            }
           })
 
-          if (response.ok) {
-            const savedData = await response.json()
-            setExpensesData(prev => [...prev, ...savedData])
-            refreshData() // Refresh all data
-            event.target.value = ''
-            alert('Expense data imported successfully!')
-          } else {
-            throw new Error('Failed to import expense data')
-          }
+          // Add to existing data
+          setExpensesData(prev => [...prev, ...importedData])
+          event.target.value = ''
+          alert(`Successfully imported ${importedData.length} expense records!`)
         } catch (error) {
           console.error('Error processing import file:', error)
-          alert('Error importing Excel file. Please check the format.')
+          alert('Error importing Excel file. Please check the format and column names.')
+        } finally {
+          setLoading(false)
         }
       }
       reader.readAsArrayBuffer(file)
     } catch (error) {
       console.error('Error importing expense data:', error)
       alert('Error importing expense data')
-    } finally {
       setLoading(false)
     }
   }
@@ -231,22 +270,31 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
     }
 
     const worksheet = XLSX.utils.json_to_sheet(expensesData.map(item => ({
-      'Day': item.day,
-      'Month': item.month,
-      'Week': item.week,
-      'Voucher': item.voucher,
-      'Transaction Details': item.transactionDetails,
-      'Spent': item.spent,
-      'Category': item.category,
-      'Cost Centre': item.costCentre,
-      'Sub Cost Centre': item.subCostCentre,
-      'Bank Debited': item.bankDebited,
-      'Date': item.date
+      'DAY': item.day,
+      'MONTH': item.month,
+      'WEEK': item.week,
+      'DATE': item.date,
+      'VOUCHER CODE': item.voucherCode,
+      'TRANSACTION DETAILS': item.transactionDetails,
+      'SPENT': item.spent,
+      'CATEGORY': item.category,
+      'COST CENTRE': item.costCentre,
+      'SUB COST CENTRE': item.subCostCentre,
+      'BANK DEBITED': item.bankDebited
     })))
     
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses Data')
     XLSX.writeFile(workbook, `expenses_data_${new Date().toISOString().split('T')[0]}.xlsx`)
+  }
+
+  const handleClearAll = () => {
+    if (confirm('Are you sure you want to clear ALL expense records? This cannot be undone.')) {
+      setExpensesData([])
+      localStorage.removeItem('expensesData')
+      setEditingId(null)
+      setNewRowId(null)
+    }
   }
 
   const totalExpenses = filteredData.reduce((sum, item) => sum + (item.spent || 0), 0)
@@ -256,26 +304,26 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-4 rounded-lg">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-2">Processing...</p>
           </div>
         </div>
       )}
       
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold">ANNUAL EXPENSES</h2>
+        <h2 className="text-xl font-bold">ANNUAL EXPENSES </h2>
         <div className="flex items-center space-x-4">
           <input
             type="text"
             placeholder="Search expense records..."
-            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button
             onClick={handleAddNew}
             disabled={loading}
-            className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
             Add Expense
           </button>
@@ -287,7 +335,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
           <input
             type="date"
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={dateRange.from}
             onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
           />
@@ -296,7 +344,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
           <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
           <input
             type="date"
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
             value={dateRange.to}
             onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
           />
@@ -308,20 +356,24 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
             onChange={handleImport}
             className="hidden"
             id="expenses-import"
-            disabled={loading}
           />
           <label
             htmlFor="expenses-import"
-            className={`px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 cursor-pointer ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 cursor-pointer"
           >
             Import Excel
           </label>
           <button
             onClick={handleExport}
-            disabled={loading || expensesData.length === 0}
-            className={`px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 ${loading || expensesData.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
           >
             Export Excel
+          </button>
+          <button
+            onClick={handleClearAll}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+          >
+            Clear All
           </button>
         </div>
       </div>
@@ -330,6 +382,9 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
         <div className="flex justify-between items-center">
           <span className="text-lg font-semibold">TOTAL SPENT:</span>
           <span className="text-xl font-bold text-red-600">₦{totalExpenses.toLocaleString()}</span>
+          <span className="text-sm text-gray-500">
+            {expensesData.length} record(s) | {filteredData.length} filtered
+          </span>
         </div>
       </div>
 
@@ -337,103 +392,209 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Week</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">TRANSACTION DETAILS</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SPENT</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">COST CENTRE</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SUB COST CENTRE</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bank Debited</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">S/NO</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DAY</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">MONTH</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">WEEK</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DATE</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">VOUCHER CODE</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">TRANSACTION DETAILS</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SPENT</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">CATEGORY</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">COST CENTRE</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SUB COST CENTRE</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">BANK DEBITED</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACTIONS</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredData.length > 0 ? (
-              filteredData.map((expense) => (
-                <tr key={expense.id} className="hover:bg-gray-50">
-                  {['day', 'month', 'week', 'voucher', 'transactionDetails', 'spent', 'category', 'costCentre', 'subCostCentre', 'bankDebited'].map((field) => (
-                    <td key={field} className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                      {editingId === expense.id ? (
-                        field === 'month' ? (
-                          <select
-                            name="month"
-                            value={editForm.month}
-                            onChange={handleEditChange}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                            disabled={loading}
-                          >
-                            {['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].map(month => (
-                              <option key={month} value={month}>{month}</option>
-                            ))}
-                          </select>
-                        ) : field === 'bankDebited' ? (
-                          <select
-                            name="bankDebited"
-                            value={editForm.bankDebited}
-                            onChange={handleEditChange}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded-md"
-                            disabled={loading}
-                          >
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        ) : field === 'spent' ? (
-                          <input
-                            type="number"
-                            name="spent"
-                            value={editForm.spent}
-                            onChange={handleEditChange}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                            min="0"
-                            step="0.01"
-                            disabled={loading}
-                          />
-                        ) : field === 'week' ? (
-                          <input
-                            type="number"
-                            name="week"
-                            value={editForm.week}
-                            onChange={handleEditChange}
-                            className="w-12 px-2 py-1 border border-gray-300 rounded-md"
-                            min="1"
-                            max="5"
-                            disabled={loading}
-                          />
-                        ) : (
-                          <input
-                            type="text"
-                            name={field}
-                            value={editForm[field]}
-                            onChange={handleEditChange}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded-md"
-                            disabled={loading}
-                          />
-                        )
-                      ) : (
-                        field === 'spent' 
-                          ? `₦${(expense[field] || 0).toLocaleString()}`
-                          : expense[field] || ''
-                      )}
-                    </td>
-                  ))}
+              filteredData.map((expense, index) => (
+                <tr key={expense.id} className={`hover:bg-gray-50 ${newRowId === expense.id ? 'bg-blue-50' : ''}`}>
+                  {/* Serial Number - Auto-generated and not editable */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 font-medium">
+                    {index + 1}
+                  </td>
                   
-                  <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                  {/* DAY - Auto-calculated from date */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                    {expense.day || '--'}
+                  </td>
+                  
+                  {/* MONTH - Auto-calculated from date */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                    {expense.month || '--'}
+                  </td>
+                  
+                  {/* WEEK - Auto-calculated from date */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
+                    {expense.week || '--'}
+                  </td>
+                  
+                  {/* DATE Field - Editable, will auto-calculate day/month/week */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="date"
+                        name="date"
+                        value={editForm.date}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    ) : (
+                      <span className="text-gray-500">{expense.date || '--'}</span>
+                    )}
+                  </td>
+                  
+                  {/* VOUCHER CODE - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="text"
+                        name="voucherCode"
+                        value={editForm.voucherCode}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Enter voucher code"
+                      />
+                    ) : (
+                      <span className={`${!expense.voucherCode ? 'text-gray-400 italic' : 'text-gray-500'}`}>
+                        {expense.voucherCode || 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* TRANSACTION DETAILS - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="text"
+                        name="transactionDetails"
+                        value={editForm.transactionDetails}
+                        onChange={handleEditChange}
+                        className="w-64 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Enter transaction details"
+                      />
+                    ) : (
+                      <span className={`${!expense.transactionDetails ? 'text-gray-400 italic' : 'text-gray-500'}`}>
+                        {expense.transactionDetails || 'No details'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* SPENT AMOUNT - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="number"
+                        name="spent"
+                        value={editForm.spent}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    ) : (
+                      <span className="text-gray-500">
+                        ₦{(expense.spent || 0).toLocaleString()}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* CATEGORY - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="text"
+                        name="category"
+                        value={editForm.category}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Enter category"
+                      />
+                    ) : (
+                      <span className={`${!expense.category ? 'text-gray-400 italic' : 'text-gray-500'}`}>
+                        {expense.category || 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* COST CENTRE - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="text"
+                        name="costCentre"
+                        value={editForm.costCentre}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Enter cost centre"
+                      />
+                    ) : (
+                      <span className={`${!expense.costCentre ? 'text-gray-400 italic' : 'text-gray-500'}`}>
+                        {expense.costCentre || 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* SUB COST CENTRE - Manually input */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <input
+                        type="text"
+                        name="subCostCentre"
+                        value={editForm.subCostCentre}
+                        onChange={handleEditChange}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Enter sub cost centre"
+                      />
+                    ) : (
+                      <span className={`${!expense.subCostCentre ? 'text-gray-400 italic' : 'text-gray-500'}`}>
+                        {expense.subCostCentre || 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* BANK DEBITED - Dropdown selection */}
+                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+                    {editingId === expense.id ? (
+                      <select
+                        name="bankDebited"
+                        value={editForm.bankDebited}
+                        onChange={handleEditChange}
+                        className="w-24 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    ) : (
+                      <span className={`font-medium ${expense.bankDebited === 'Yes' ? 'text-green-600' : 'text-red-600'}`}>
+                        {expense.bankDebited || 'No'}
+                      </span>
+                    )}
+                  </td>
+                  
+                  {/* ACTIONS */}
+                  <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
                     {editingId === expense.id ? (
                       <div className="space-x-2">
                         <button
                           onClick={() => handleSave(expense.id)}
-                          disabled={loading}
-                          className="text-primary hover:text-primary-dark disabled:opacity-50"
+                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
                         >
                           Save
                         </button>
                         <button
-                          onClick={() => setEditingId(null)}
-                          disabled={loading}
-                          className="text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                          onClick={() => {
+                            setEditingId(null)
+                            setNewRowId(null)
+                            // If this was a new row being edited and cancelled, remove it
+                            if (newRowId === expense.id) {
+                              handleDelete(expense.id)
+                            }
+                          }}
+                          className="px-3 py-1 bg-gray-500 text-white rounded-md hover:bg-gray-600"
                         >
                           Cancel
                         </button>
@@ -442,15 +603,13 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
                       <div className="space-x-2">
                         <button
                           onClick={() => handleEdit(expense)}
-                          disabled={loading}
-                          className="text-primary hover:text-primary-dark disabled:opacity-50"
+                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDelete(expense.id)}
-                          disabled={loading}
-                          className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
                         >
                           Delete
                         </button>
@@ -461,7 +620,7 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
               ))
             ) : (
               <tr>
-                <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
                   {expensesData.length === 0 ? 'No expense records. Click "Add Expense" to get started.' : 'No records match your search.'}
                 </td>
               </tr>
@@ -469,6 +628,8 @@ const ExpensesModule = ({ expensesData, setExpensesData, refreshData }) => {
           </tbody>
         </table>
       </div>
+
+
     </div>
   )
 }
