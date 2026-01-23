@@ -69,10 +69,10 @@ const upload = multer({
   }
 });
 
-// Middleware to check if user has executive, gmd, or finance role
-const checkSenderRole = async (req, res, next) => {
+// Middleware to check if chairman is in recipients (only for non-executive/gmd/finance users)
+const checkChairmanRecipient = async (req, res, next) => {
   try {
-    const { created_by } = req.body;
+    const { created_by, recipients } = req.body;
     
     if (!created_by) {
       return res.status(400).json({ message: 'User ID (created_by) is required' });
@@ -90,22 +90,41 @@ const checkSenderRole = async (req, res, next) => {
     
     const userRole = users[0].role?.toLowerCase();
     
-    // Check if user has the required role
-    if (!userRole || !['executive', 'gmd', 'finance'].includes(userRole)) {
+    // If user is executive, gmd, or finance, they can send to anyone including chairman
+    if (['executive', 'gmd', 'finance'].includes(userRole)) {
+      return next();
+    }
+    
+    // For other roles, check if chairman is in recipients
+    const recipientsArray = JSON.parse(recipients);
+    
+    // Get chairman user IDs
+    const [chairmen] = await db.execute(
+      "SELECT id FROM users WHERE LOWER(role) = 'chairman'"
+    );
+    
+    const chairmanIds = chairmen.map(c => c.id);
+    
+    // Check if any chairman is in recipients
+    const hasChairmanInRecipients = recipientsArray.some(recipientId => 
+      chairmanIds.includes(recipientId)
+    );
+    
+    if (hasChairmanInRecipients) {
       return res.status(403).json({ 
-        message: 'Only executive, GMD, and finance roles can send direct memos' 
+        message: 'Only executive, GMD, and finance roles can send Task Reports directly to the chairman. You can add the chairman to CC instead.' 
       });
     }
     
     next();
   } catch (error) {
-    console.error('Error checking sender role:', error);
-    res.status(500).json({ message: 'Failed to verify user role', error: error.message });
+    console.error('Error checking chairman recipient:', error);
+    res.status(500).json({ message: 'Failed to verify recipients', error: error.message });
   }
 };
 
-// Create a new direct memo (only for executive, gmd, finance roles)
-router.post('/', upload.array('files'), checkSenderRole, async (req, res) => {
+// Create a new task report
+router.post('/', upload.array('files'), checkChairmanRecipient, async (req, res) => {
   try {
     const { title, content, created_by, priority, recipients, cc } = req.body;
     
@@ -133,12 +152,12 @@ router.post('/', upload.array('files'), checkSenderRole, async (req, res) => {
     );
     
     res.status(201).json({
-      message: 'Direct memo created successfully',
+      message: 'Task report created successfully',
       memoId: result.insertId
     });
   } catch (error) {
-    console.error('Error creating direct memo:', error);
-    res.status(500).json({ message: 'Failed to create direct memo', error: error.message });
+    console.error('Error creating task report:', error);
+    res.status(500).json({ message: 'Failed to create task report', error: error.message });
   }
 });
 
@@ -164,12 +183,12 @@ router.get('/user/:userId', async (req, res) => {
     
     res.json(parsedMemos);
   } catch (error) {
-    console.error('Error fetching direct memos:', error);
-    res.status(500).json({ message: 'Failed to fetch direct memos', error: error.message });
+    console.error('Error fetching Task Reports:', error);
+    res.status(500).json({ message: 'Failed to fetch Task Reports', error: error.message });
   }
 });
 
-// Get a specific direct memo
+// Get a specific Task Report
 router.get('/:memoId', async (req, res) => {
   try {
     const memoId = req.params.memoId;
@@ -206,12 +225,12 @@ router.get('/:memoId', async (req, res) => {
     
     res.json(memo);
   } catch (error) {
-    console.error('Error fetching direct memo:', error);
-    res.status(500).json({ message: 'Failed to fetch direct memo', error: error.message });
+    console.error('Error fetching Task Report:', error);
+    res.status(500).json({ message: 'Failed to fetch Task Report', error: error.message });
   }
 });
 
-// Mark a direct memo as read
+// Mark a Task Report as read
 router.post('/:memoId/read', async (req, res) => {
   try {
     const memoId = req.params.memoId;
@@ -285,7 +304,7 @@ router.post('/:memoId/read', async (req, res) => {
   }
 });
 
-// Add comment to direct memo
+// Add comment to Task Report
 router.post('/:memoId/comments', async (req, res) => {
   try {
     const memoId = req.params.memoId;
@@ -318,7 +337,7 @@ router.post('/:memoId/comments', async (req, res) => {
 });
 
 
-// Get comments for a direct memo
+// Get comments for a Task Report 
 router.get('/:memoId/comments', async (req, res) => {
   try {
     const memoId = req.params.memoId;
@@ -484,7 +503,7 @@ router.get('/:memoId/approvals', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch approval status', error: error.message });
   }
 });
-// Get direct memo count for a user
+// Get Task Report count for a user
 router.get('/count/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId;
@@ -511,13 +530,13 @@ router.get('/count/user/:userId', async (req, res) => {
       count: unreadCount[0].count
     });
   } catch (error) {
-    console.error('Error fetching unread direct memo count:', error);
+    console.error('Error fetching unread Task Report count:', error);
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to fetch unread direct memo count', 
+      message: 'Failed to fetch unread Task Report count', 
       error: error.message 
     });
   }
 });
 
-module.exports = router;
+module.exports = router;  

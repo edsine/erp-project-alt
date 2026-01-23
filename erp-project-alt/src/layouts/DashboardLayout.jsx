@@ -393,7 +393,7 @@ const handleNotificationClick = async (note) => {
               >
                 <Mail className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
                 {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Direct Memos</span>
+                  <span className="ml-3">Task Reports</span>
                 )}
               </Link>
             </li>
