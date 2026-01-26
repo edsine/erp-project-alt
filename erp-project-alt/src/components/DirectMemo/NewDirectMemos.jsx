@@ -436,7 +436,7 @@ const NewDirectMemos = () => {
           />
           {!['executive', 'gmd', 'finance'].includes(user.role?.toLowerCase()) && (
             <p className="mt-1 text-xs text-gray-500">
-              Note: Chairman can only be added to CC. Direct recipients for Chairman role require Executive, GMD, or Finance role.
+              {/* Note: Chairman can only be added to CC. Direct recipients for Chairman role require Executive, GMD, or Finance role. */}
             </p>
           )}
         </div>
