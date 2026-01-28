@@ -318,11 +318,11 @@ const handleAddNew = async () => {
       'DATE': item.date,
       'VOUCHER CODE': item.voucherCode,
       'TRANSACTION DETAILS': item.transactionDetails,
-      'SPENT': item.spent,
+      'COST': item.cost,
       'CATEGORY': item.category,
-      'COST CENTRE': item.costCentre,
-      'SUB COST CENTRE': item.subCostCentre,
-      'BANK DEBITED': item.bankDebited
+      // 'COST CENTRE': item.costCentre,
+      // 'SUB COST CENTRE': item.subCostCentre,
+      // 'BANK DEBITED': item.bankDebited
     })))
     
     const workbook = XLSX.utils.book_new()
@@ -362,13 +362,13 @@ const handleAddNew = async () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <button
+          {/* <button
             onClick={handleAddNew}
             disabled={loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
             Add Expense
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -422,7 +422,7 @@ const handleAddNew = async () => {
 
       <div className="mb-6 p-4 bg-gray-50 rounded-md">
         <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold">TOTAL SPENT:</span>
+          <span className="text-lg font-semibold">TOTAL COST:</span>
           <span className="text-xl font-bold text-red-600">₦{totalExpenses.toLocaleString()}</span>
           <span className="text-sm text-gray-500">
             {expensesData.length} record(s) | {filteredData.length} filtered
@@ -441,11 +441,11 @@ const handleAddNew = async () => {
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">DATE</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">VOUCHER CODE</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">TRANSACTION DETAILS</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SPENT</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">COST</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">CATEGORY</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">COST CENTRE</th>
+              {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">COST CENTRE</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">SUB COST CENTRE</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">BANK DEBITED</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">BANK DEBITED</th> */}
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">ACTIONS</th>
             </tr>
           </thead>

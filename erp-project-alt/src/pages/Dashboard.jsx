@@ -54,7 +54,7 @@ const Dashboard = () => {
         const data = await res.json();
         setDirectMemoCount(data.count || 0);
       } catch (err) {
-        console.error("Error fetching direct memo count:", err);
+        console.error("Error fetching task report count:", err);
       }
     };
 
@@ -264,7 +264,7 @@ const QuickAction = ({ icon: Icon, title, description, link, color }) => (
         />
         <StatCard 
           icon={FileText} 
-          title="Direct Memos" 
+          title="Task Reports" 
           value={directMemoCount} 
           color="blue" 
           link="/dashboard/direct-memos" 

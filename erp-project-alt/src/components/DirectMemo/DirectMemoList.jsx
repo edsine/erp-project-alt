@@ -309,8 +309,8 @@ const [approvalComment, setApprovalComment] = useState('');
         console.log('Transformed memos:', transformedMemos); // Debug log
         setMemos(transformedMemos);
       } catch (err) {
-        console.error('Failed to fetch direct memos:', err);
-        setError(err.response?.data?.message || 'Failed to fetch direct memos');
+        console.error('Failed to fetch task reports:', err);
+        setError(err.response?.data?.message || 'Failed to fetch task reports');
       } finally {
         setLoading(false);
       }
@@ -552,7 +552,7 @@ const submitApproval = () => {
     }
   };
 
-  if (loading) return <p className="text-center py-4">Loading direct memos...</p>;
+  if (loading) return <p className="text-center py-4">Loading Task Reports...</p>;
   if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
 
   return (
@@ -603,12 +603,12 @@ const submitApproval = () => {
       <div className={`${selectedMemo ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Direct Memos</h2>
+            <h2 className="text-lg font-semibold">Task Reports</h2>
             <Link
               to="/dashboard/direct-memos/new"
               className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
             >
-              New Direct Memo
+              New Task Report
             </Link>
           </div>
           
@@ -619,7 +619,7 @@ const submitApproval = () => {
               onChange={(e) => setFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              <option value="all">All Memos</option>
+              <option value="all">All Reports</option>
               <option value="unread">Unread</option>
               <option value="read">Read</option>
             </select>
@@ -629,7 +629,7 @@ const submitApproval = () => {
           <div className="mb-4">
             <input
               type="text"
-              placeholder="Search direct memos..."
+              placeholder="Search Task Reports..."
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -657,7 +657,7 @@ const submitApproval = () => {
               >
                 Sent ({memos.filter(m => m.isSender).length})
               </button>
-              <button
+              {/* <button
                 onClick={() => setActiveTab('approved')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'approved'
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -665,8 +665,8 @@ const submitApproval = () => {
                   }`}
               >
                 Approved ({memos.filter(m => m.approval_status === 'approved').length})
-              </button>
-              <button
+              </button> */}
+              {/* <button
                 onClick={() => setActiveTab('rejected')}
                 className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
                   ? 'bg-white text-gray-900 shadow-sm'
@@ -674,7 +674,7 @@ const submitApproval = () => {
                   }`}
               >
                 Rejected ({memos.filter(m => m.approval_status === 'rejected').length})
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -727,7 +727,7 @@ const submitApproval = () => {
               ))
             ) : (
               <p className="text-center text-gray-500 py-4">
-                {`No ${activeTab} direct memos found`}
+                {`No ${activeTab} Task Reports found`}
               </p>
             )}
           </div>
@@ -850,7 +850,7 @@ const submitApproval = () => {
             )}
             
             {/* Approval Section */}
-            {selectedMemo && (selectedMemo.isRecipient || selectedMemo.isSender) && (
+            {/* {selectedMemo && (selectedMemo.isRecipient || selectedMemo.isSender) && (
               <div className="mt-6 border-t pt-4">
                 <h3 className="text-lg font-semibold text-gray-500 mb-4">Approval Status</h3>
                 
@@ -872,10 +872,10 @@ const submitApproval = () => {
       </button>
     </div>
   </div>
-)}
+)} */}
                 
                 {/* Display approval status for all recipients */}
-                <div className="space-y-3">
+                {/* <div className="space-y-3">
                   {selectedMemo.approvals && selectedMemo.approvals.map(approval => (
                     <div key={approval.user_id} className="bg-gray-50 p-3 rounded-md">
                       <div className="flex justify-between items-center">
@@ -905,7 +905,7 @@ const submitApproval = () => {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       )}

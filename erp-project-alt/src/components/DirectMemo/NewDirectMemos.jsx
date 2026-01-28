@@ -152,7 +152,8 @@ const NewDirectMemos = () => {
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [filteredRecipients, setFilteredRecipients] = useState([]);
+  const [filteredCC, setFilteredCC] = useState([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -174,21 +175,25 @@ const NewDirectMemos = () => {
         const usersData = response.data;
         setAllUsers(usersData);
         
-        // Filter users based on sender's role
-        const filtered = usersData.filter(u => {
+        // Filter users for recipients based on sender's role
+        const recipientsFiltered = usersData.filter(u => {
           // Always exclude current user
           if (u.id === user.id) return false;
           
-          // If sender is executive, gmd, or finance, show all users including chairman
+          // If sender is executive, gmd, or finance, show all users
           if (['executive', 'gmd', 'finance'].includes(user.role?.toLowerCase())) {
             return true;
           }
           
-          // For other roles, exclude chairman
+          // For other roles, exclude chairman from recipients
           return u.role?.toLowerCase() !== 'chairman';
         });
         
-        setFilteredUsers(filtered);
+        // For CC, all users except current user can be shown
+        const ccFiltered = usersData.filter(u => u.id !== user.id);
+        
+        setFilteredRecipients(recipientsFiltered);
+        setFilteredCC(ccFiltered);
       } catch (err) {
         console.error('Failed to fetch users:', err);
         setError('Failed to load users');
@@ -288,7 +293,7 @@ const NewDirectMemos = () => {
       submitFormData.append('title', formData.title);
       submitFormData.append('content', formData.content);
       submitFormData.append('priority', formData.priority);
-      submitFormData.append('created_by', user.id); // This is crucial
+      submitFormData.append('created_by', user.id);
       submitFormData.append('recipients', JSON.stringify(formData.recipients));
       submitFormData.append('cc', JSON.stringify(formData.cc));
 
@@ -308,7 +313,7 @@ const NewDirectMemos = () => {
         navigate('/dashboard/direct-memos');
       }
     } catch (err) {
-      console.error('Error creating direct memo:', err);
+      console.error('Error creating task report:', err);
       setError(err.response?.data?.message || 'Failed to create memo');
     } finally {
       setLoading(false);
@@ -372,7 +377,7 @@ const NewDirectMemos = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 max-w-3xl mx-auto">
-      <h2 className="text-xl font-bold mb-6">Send Direct Memo</h2>
+      <h2 className="text-xl font-bold mb-6">Send Task Report</h2>
 
       {error && (
         <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4">
@@ -423,18 +428,23 @@ const NewDirectMemos = () => {
         <div className="mb-4">
           <SearchableDropdown
             label="Recipients"
-            users={filteredUsers}
+            users={filteredRecipients}
             selectedUsers={formData.recipients}
             onSelectionChange={handleRecipientsChange}
             required={true}
             placeholder="Search and select recipients..."
           />
+          {!['executive', 'gmd', 'finance'].includes(user.role?.toLowerCase()) && (
+            <p className="mt-1 text-xs text-gray-500">
+              Note: All Weekly Task reports must be submitted before 12 pm on Monday.
+            </p>
+          )}
         </div>
 
         <div className="mb-4">
           <SearchableDropdown
             label="CC (Optional)"
-            users={filteredUsers}
+            users={filteredCC}
             selectedUsers={formData.cc}
             onSelectionChange={handleCCChange}
             excludeUsers={formData.recipients}
@@ -556,7 +566,7 @@ const NewDirectMemos = () => {
             disabled={loading}
             className={`px-4 py-2 bg-primary text-white rounded-md text-sm font-medium hover:bg-primary-dark ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
           >
-            {loading ? 'Sending...' : 'Send Direct Memo'}
+            {loading ? 'Sending...' : 'Send Task Report'}
           </button>
         </div>
       </form>
