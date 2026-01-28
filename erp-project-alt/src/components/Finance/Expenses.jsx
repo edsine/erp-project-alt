@@ -3,10 +3,8 @@ import * as XLSX from 'xlsx'
 
 const ExpensesModule = () => {
   // Load data from localStorage or use empty array
-  const [expensesData, setExpensesData] = useState(() => {
-    const savedData = localStorage.getItem('expensesData')
-    return savedData ? JSON.parse(savedData) : []
-  })
+  const BASE_URL = import.meta.env.VITE_BASE_URL
+
   
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -18,11 +16,50 @@ const ExpensesModule = () => {
   })
   const [loading, setLoading] = useState(false)
   const [newRowId, setNewRowId] = useState(null) // Track newly added row for auto-edit
+  const [expensesData, setExpensesData] = useState([])
 
-  // Save to localStorage whenever expensesData changes
-  useEffect(() => {
-    localStorage.setItem('expensesData', JSON.stringify(expensesData))
-  }, [expensesData])
+useEffect(() => {
+  const loadExpenses = async () => {
+    try {
+      setLoading(true)
+
+      const res = await fetch(`${BASE_URL}/finance/expense`)
+      if (!res.ok) throw new Error('Failed to fetch expenses')
+
+      const data = await res.json()
+
+      const mapped = data.map(item => {
+        const d = new Date(item.transaction_date)
+
+        return {
+          id: item.id,
+          day: d.getDate().toString(),
+          month: d.toLocaleString('default', { month: 'short' }).toUpperCase(),
+          week: Math.ceil(d.getDate() / 7),
+          date: item.transaction_date,
+          voucherCode: item.voucher_no,
+          transactionDetails: item.transaction_details,
+          spent: Number(item.spent),
+          category: item.category,
+          costCentre: item.cost_centre,
+          subCostCentre: item.sub_cost_centre,
+          bankDebited: item.bank_debited
+        }
+      })
+
+      setExpensesData(mapped)
+      setFilteredData(mapped)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to load expenses')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  loadExpenses()
+}, [])
+
 
   // Filter data based on search and date range
   useEffect(() => {
@@ -86,116 +123,121 @@ const ExpensesModule = () => {
     }
   }
 
-  const handleSave = (id) => {
-    try {
-      setLoading(true)
-      
-      // Auto-calculate week if date is provided
-      let week = Number(editForm.week) || 1
-      let month = editForm.month || ''
-      let day = editForm.day || ''
-      
-      // If date is provided, calculate day, month, week
-      if (editForm.date) {
-        const dateObj = new Date(editForm.date)
-        day = dateObj.getDate().toString()
-        month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
-        week = Math.ceil(dateObj.getDate() / 7)
-      }
-      
-      const updatedExpense = {
-        ...editForm,
-        day: day,
-        month: month,
-        week: week,
+const handleSave = async (id) => {
+  try {
+    setLoading(true)
+
+    const res = await fetch(`${BASE_URL}/finance/expense/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactionDate: editForm.date,
+        voucherNo: editForm.voucherCode,
+        transactionDetails: editForm.transactionDetails,
         spent: Number(editForm.spent) || 0,
-        id: id // Ensure ID is preserved
-      }
-
-      // Update local state
-      const updatedData = expensesData.map(expense => {
-        if (expense.id === id) {
-          return updatedExpense
-        }
-        return expense
+        category: editForm.category,
+        costCentre: editForm.costCentre,
+        subCostCentre: editForm.subCostCentre,
+        bankDebited: editForm.bankDebited
       })
-      
-      setExpensesData(updatedData)
-      setEditingId(null)
-      setNewRowId(null)
-      
-    } catch (error) {
-      console.error('Error updating expense:', error)
-      alert('Error updating expense record')
-    } finally {
-      setLoading(false)
-    }
+    })
+
+    if (!res.ok) throw new Error('Update failed')
+
+    const updated = await res.json()
+
+    setExpensesData(prev =>
+      prev.map(e => (e.id === id ? { ...e, ...editForm, spent: Number(editForm.spent) } : e))
+    )
+
+    setEditingId(null)
+    setNewRowId(null)
+  } catch (err) {
+    console.error(err)
+    alert('Failed to update expense')
+  } finally {
+    setLoading(false)
   }
+}
 
-  const handleDelete = (id) => {
-    if (!confirm('Are you sure you want to delete this expense record?')) return
 
-    try {
-      setLoading(true)
-      setExpensesData(expensesData.filter(expense => expense.id !== id))
-      setNewRowId(null)
-    } catch (error) {
-      console.error('Error deleting expense:', error)
-      alert('Error deleting expense record')
-    } finally {
-      setLoading(false)
-    }
+const handleDelete = async (id) => {
+  if (!confirm('Are you sure you want to delete this expense?')) return
+
+  try {
+    setLoading(true)
+
+    const res = await fetch(`${BASE_URL}/finance/expense/${id}`, {
+      method: 'DELETE'
+    })
+
+    if (!res.ok) throw new Error('Delete failed')
+
+    setExpensesData(prev => prev.filter(e => e.id !== id))
+  } catch (err) {
+    console.error(err)
+    alert('Failed to delete expense')
+  } finally {
+    setLoading(false)
   }
+}
 
-  const handleAddNew = () => {
-    // Create a new expense with empty fields (except auto-generated date/week)
-    const currentDate = new Date()
-    const newExpense = {
-      id: Date.now(), // Generate unique ID
-      day: currentDate.getDate().toString(),
-      month: currentDate.toLocaleString('default', { month: 'short' }).toUpperCase(),
-      week: Math.ceil(currentDate.getDate() / 7),
-      date: currentDate.toISOString().split('T')[0],
-      voucherCode: '',
-      transactionDetails: '',
-      spent: 0,
-      category: '',
-      costCentre: '',
-      subCostCentre: '',
-      bankDebited: 'No',
-      createdAt: currentDate.toISOString()
-    }
 
-    try {
-      setLoading(true)
-      
-      // Add to expenses data
-      setExpensesData(prev => [...prev, newExpense])
-      
-      // Automatically put the new row in edit mode
-      setEditingId(newExpense.id)
-      setNewRowId(newExpense.id)
-      setEditForm({
-        day: newExpense.day,
-        month: newExpense.month,
-        week: newExpense.week,
-        date: newExpense.date,
-        voucherCode: '',
+
+const handleAddNew = async () => {
+  try {
+    setLoading(true)
+
+    const today = new Date().toISOString().split('T')[0]
+
+    const res = await fetch(`${BASE_URL}/finance/expense`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactionDate: today,
+        voucherNo: '',
         transactionDetails: '',
         spent: 0,
         category: '',
         costCentre: '',
-        subCostCentre: '',
-        bankDebited: 'No'
+        subCostCentre: null,
+        bankDebited: 'No',
+        createdBy: 1
       })
-      
-    } catch (error) {
-      console.error('Error creating expense:', error)
-      alert('Error creating expense record')
-    } finally {
-      setLoading(false)
+    })
+
+    if (!res.ok) throw new Error('Create failed')
+
+    const saved = await res.json()
+    const d = new Date(saved.transaction_date)
+
+    const newRow = {
+      id: saved.id,
+      day: d.getDate().toString(),
+      month: d.toLocaleString('default', { month: 'short' }).toUpperCase(),
+      week: Math.ceil(d.getDate() / 7),
+      date: saved.transaction_date,
+      voucherCode: saved.voucher_no,
+      transactionDetails: saved.transaction_details,
+      spent: Number(saved.spent),
+      category: saved.category,
+      costCentre: saved.cost_centre,
+      subCostCentre: saved.sub_cost_centre,
+      bankDebited: saved.bank_debited
     }
+
+    setExpensesData(prev => [newRow, ...prev])
+    setEditingId(newRow.id)
+    setNewRowId(newRow.id)
+    setEditForm(newRow)
+  } catch (err) {
+    console.error(err)
+    alert('Failed to create expense')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   const handleImport = (event) => {
     const file = event.target.files[0]

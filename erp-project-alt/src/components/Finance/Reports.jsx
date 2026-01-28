@@ -1,272 +1,194 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import * as XLSX from 'xlsx'
 
-const ReportsModule = ({ incomeData, expensesData }) => {
-  const [dateRange, setDateRange] = useState({
-    from: '',
-    to: ''
-  })
+const ReportsModule = () => {
+  const [dateRange, setDateRange] = useState({ from: '', to: '' })
+  const [loading, setLoading] = useState(false)
+
   const [reportData, setReportData] = useState({
     totalIncome: 0,
     totalExpenses: 0,
-    netProfit: 0,
+    netProfitLoss: 0,
     incomeByMonth: [],
     expensesByMonth: [],
-    incomeByCategory: [],
-    expensesByCategory: []
+    monthlyComparison: []
   })
 
   useEffect(() => {
-    calculateReportData()
-  }, [incomeData, expensesData, dateRange])
+    fetchReport()
+  }, [dateRange])
 
-  const calculateReportData = () => {
-    let filteredIncome = incomeData
-    let filteredExpenses = expensesData
+  const fetchReport = async () => {
+    try {
+      setLoading(true)
 
-    if (dateRange.from && dateRange.to) {
-      filteredIncome = filteredIncome.filter(item => {
-        const itemDate = new Date(item.date)
-        const fromDate = new Date(dateRange.from)
-        const toDate = new Date(dateRange.to)
-        return itemDate >= fromDate && itemDate <= toDate
+      const params = new URLSearchParams()
+      if (dateRange.from) params.append('from', dateRange.from)
+      if (dateRange.to) params.append('to', dateRange.to)
+
+      const res = await fetch(
+        `http://localhost:7000/api/finance/report?${params.toString()}`
+      )
+      const data = await res.json()
+
+      // ✅ normalize backend string numbers
+      setReportData({
+        totalIncome: Number(data.totalIncome),
+        totalExpenses: Number(data.totalExpenses),
+        netProfitLoss: Number(data.netProfitLoss),
+        incomeByMonth: data.incomeByMonth.map(i => ({
+          ...i,
+          income: Number(i.income)
+        })),
+        expensesByMonth: data.expensesByMonth.map(e => ({
+          ...e,
+          expenses: Number(e.expenses)
+        })),
+        monthlyComparison: data.monthlyComparison.map(m => ({
+          ...m,
+          income: Number(m.income),
+          expenses: Number(m.expenses),
+          profitLoss: Number(m.profitLoss)
+        }))
       })
-
-      filteredExpenses = filteredExpenses.filter(item => {
-        const itemDate = new Date(item.date)
-        const fromDate = new Date(dateRange.from)
-        const toDate = new Date(dateRange.to)
-        return itemDate >= fromDate && itemDate <= toDate
-      })
+    } catch (err) {
+      console.error('Failed to load report', err)
+    } finally {
+      setLoading(false)
     }
-
-    const totalIncome = filteredIncome.reduce((sum, item) => sum + item.income, 0)
-    const totalExpenses = filteredExpenses.reduce((sum, item) => sum + item.spent, 0)
-    const netProfit = totalIncome - totalExpenses
-
-    // Calculate by month
-    const incomeByMonth = calculateByMonth(filteredIncome, 'income')
-    const expensesByMonth = calculateByMonth(filteredExpenses, 'spent')
-
-    // Calculate by category
-    const incomeByCategory = calculateByCategory(filteredIncome, 'income')
-    const expensesByCategory = calculateByCategory(filteredExpenses, 'spent')
-
-    setReportData({
-      totalIncome,
-      totalExpenses,
-      netProfit,
-      incomeByMonth,
-      expensesByMonth,
-      incomeByCategory,
-      expensesByCategory
-    })
-  }
-
-  const calculateByMonth = (data, amountField) => {
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-    const result = months.map(month => ({
-      month,
-      amount: data.filter(item => item.month === month).reduce((sum, item) => sum + item[amountField], 0)
-    }))
-    return result.filter(item => item.amount > 0)
-  }
-
-  const calculateByCategory = (data, amountField) => {
-    const categories = {}
-    data.forEach(item => {
-      if (item.category) {
-        categories[item.category] = (categories[item.category] || 0) + item[amountField]
-      }
-    })
-    return Object.entries(categories).map(([category, amount]) => ({
-      category,
-      amount
-    })).sort((a, b) => b.amount - a.amount)
   }
 
   const exportReport = () => {
-    const report = {
-      dateRange,
-      summary: {
-        totalIncome: reportData.totalIncome,
-        totalExpenses: reportData.totalExpenses,
-        netProfit: reportData.netProfit
-      },
-      incomeByMonth: reportData.incomeByMonth,
-      expensesByMonth: reportData.expensesByMonth,
-      incomeByCategory: reportData.incomeByCategory,
-      expensesByCategory: reportData.expensesByCategory
-    }
-
     const worksheet = XLSX.utils.json_to_sheet([
       {
         'Report Type': 'Financial Summary',
         'Total Income': `₦${reportData.totalIncome.toLocaleString()}`,
         'Total Expenses': `₦${reportData.totalExpenses.toLocaleString()}`,
-        'Net Profit/Loss': `₦${reportData.netProfit.toLocaleString()}`
+        'Net Profit/Loss': `₦${reportData.netProfitLoss.toLocaleString()}`
       },
       {},
-      ...reportData.incomeByMonth.map(item => ({
-        'Month': item.month,
-        'Income': `₦${item.amount.toLocaleString()}`,
-        'Expenses': `₦${reportData.expensesByMonth.find(e => e.month === item.month)?.amount.toLocaleString() || '0'}`,
-        'Profit/Loss': `₦${(item.amount - (reportData.expensesByMonth.find(e => e.month === item.month)?.amount || 0)).toLocaleString()}`
+      ...reportData.monthlyComparison.map(item => ({
+        Month: item.month,
+        Income: `₦${item.income.toLocaleString()}`,
+        Expenses: `₦${item.expenses.toLocaleString()}`,
+        'Profit/Loss': `₦${item.profitLoss.toLocaleString()}`
       }))
     ])
-    
+
     const workbook = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Financial Report')
-    XLSX.writeFile(workbook, `financial_report_${new Date().toISOString().split('T')[0]}.xlsx`)
+    XLSX.writeFile(
+      workbook,
+      `financial_report_${new Date().toISOString().split('T')[0]}.xlsx`
+    )
+  }
+
+  if (loading) {
+    return <div className="p-6 text-center">Loading report…</div>
   }
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6">
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">Financial Reports</h2>
+
         <div className="flex space-x-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
-            <input
-              type="date"
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              value={dateRange.from}
-              onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
-            <input
-              type="date"
-              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              value={dateRange.to}
-              onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={exportReport}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-            >
-              Export Excel Report
-            </button>
-          </div>
+          <input
+            type="date"
+            value={dateRange.from}
+            onChange={e => setDateRange(p => ({ ...p, from: e.target.value }))}
+            className="border px-3 py-2 rounded"
+          />
+          <input
+            type="date"
+            value={dateRange.to}
+            onChange={e => setDateRange(p => ({ ...p, to: e.target.value }))}
+            className="border px-3 py-2 rounded"
+          />
+          <button
+            onClick={exportReport}
+            className="px-4 py-2 bg-green-600 text-white rounded"
+          >
+            Export Excel
+          </button>
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-          <h3 className="text-lg font-semibold text-green-800 mb-2">Total Income</h3>
-          <p className="text-3xl font-bold text-green-600">₦{reportData.totalIncome.toLocaleString()}</p>
-        </div>
-        <div className="bg-red-50 p-6 rounded-lg border border-red-200">
-          <h3 className="text-lg font-semibold text-red-800 mb-2">Total Expenses</h3>
-          <p className="text-3xl font-bold text-red-600">₦{reportData.totalExpenses.toLocaleString()}</p>
-        </div>
-        <div className={`p-6 rounded-lg border ${
-          reportData.netProfit >= 0 
-            ? 'bg-blue-50 border-blue-200' 
-            : 'bg-orange-50 border-orange-200'
-        }`}>
-          <h3 className={`text-lg font-semibold mb-2 ${
-            reportData.netProfit >= 0 ? 'text-blue-800' : 'text-orange-800'
-          }`}>
-            Net Profit/Loss
-          </h3>
-          <p className={`text-3xl font-bold ${
-            reportData.netProfit >= 0 ? 'text-blue-600' : 'text-orange-600'
-          }`}>
-            ₦{reportData.netProfit.toLocaleString()}
-          </p>
-        </div>
-      </div>
-
-      {/* Charts and Detailed Breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Income by Month */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Income by Month</h3>
-          <div className="space-y-3">
-            {reportData.incomeByMonth.map((item, index) => (
-              <div key={item.month} className="flex items-center justify-between">
-                <span className="text-sm font-medium">{item.month}</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-600 h-2 rounded-full"
-                      style={{
-                        width: `${(item.amount / Math.max(...reportData.incomeByMonth.map(i => i.amount), 1)) * 100}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium">₦{item.amount.toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Expenses by Month */}
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-semibold mb-4">Expenses by Month</h3>
-          <div className="space-y-3">
-            {reportData.expensesByMonth.map((item, index) => (
-              <div key={item.month} className="flex items-center justify-between">
-                <span className="text-sm font-medium">{item.month}</span>
-                <div className="flex items-center space-x-2">
-                  <div className="w-32 bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-red-600 h-2 rounded-full"
-                      style={{
-                        width: `${(item.amount / Math.max(...reportData.expensesByMonth.map(i => i.amount), 1)) * 100}%`
-                      }}
-                    ></div>
-                  </div>
-                  <span className="text-sm font-medium">₦{item.amount.toLocaleString()}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        <SummaryCard title="Total Income" value={reportData.totalIncome} color="green" />
+        <SummaryCard title="Total Expenses" value={reportData.totalExpenses} color="red" />
+        <SummaryCard title="Net Profit/Loss" value={reportData.netProfitLoss} color="blue" />
       </div>
 
       {/* Monthly Comparison */}
-      <div className="mt-8 bg-gray-50 p-6 rounded-lg">
-        <h3 className="text-lg font-semibold mb-4">Monthly Comparison</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Month</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Income</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expenses</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Profit/Loss</th>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-4 py-2 text-left">Month</th>
+              <th className="px-4 py-2 text-left">Income</th>
+              <th className="px-4 py-2 text-left">Expenses</th>
+              <th className="px-4 py-2 text-left">Profit/Loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reportData.monthlyComparison.map(row => (
+              <tr key={row.month} className="border-b">
+                <td className="px-4 py-2">{row.month}</td>
+                <td className="px-4 py-2 text-green-600">
+                  ₦{row.income.toLocaleString()}
+                </td>
+                <td className="px-4 py-2 text-red-600">
+                  ₦{row.expenses.toLocaleString()}
+                </td>
+                <td
+                  className={`px-4 py-2 font-medium ${
+                    row.profitLoss >= 0 ? 'text-blue-600' : 'text-orange-600'
+                  }`}
+                >
+                  ₦{row.profitLoss.toLocaleString()}
+                </td>
               </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {reportData.incomeByMonth.map((incomeItem) => {
-                const expenseItem = reportData.expensesByMonth.find(e => e.month === incomeItem.month)
-                const expenses = expenseItem ? expenseItem.amount : 0
-                const profitLoss = incomeItem.amount - expenses
-                
-                return (
-                  <tr key={incomeItem.month}>
-                    <td className="px-4 py-3 text-sm font-medium">{incomeItem.month}</td>
-                    <td className="px-4 py-3 text-sm text-green-600">₦{incomeItem.amount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-red-600">₦{expenses.toLocaleString()}</td>
-                    <td className={`px-4 py-3 text-sm font-medium ${
-                      profitLoss >= 0 ? 'text-blue-600' : 'text-orange-600'
-                    }`}>
-                      ₦{profitLoss.toLocaleString()}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
+    </div>
+  )
+}
+
+/* ✅ Tailwind-safe color mapping */
+const colorMap = {
+  green: {
+    bg: 'bg-green-50 border-green-200',
+    text: 'text-green-600',
+    title: 'text-green-800'
+  },
+  red: {
+    bg: 'bg-red-50 border-red-200',
+    text: 'text-red-600',
+    title: 'text-red-800'
+  },
+  blue: {
+    bg: 'bg-blue-50 border-blue-200',
+    text: 'text-blue-600',
+    title: 'text-blue-800'
+  }
+}
+
+const SummaryCard = ({ title, value, color }) => {
+  const styles = colorMap[color]
+
+  return (
+    <div className={`p-6 rounded-lg border ${styles.bg}`}>
+      <h3 className={`text-lg font-semibold mb-2 ${styles.title}`}>
+        {title}
+      </h3>
+      <p className={`text-3xl font-bold ${styles.text}`}>
+        ₦{value.toLocaleString()}
+      </p>
     </div>
   )
 }

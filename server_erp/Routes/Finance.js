@@ -1,9 +1,91 @@
 const express = require('express');
 const multer = require('multer');
+const XLSX = require('xlsx')
+const fs = require('fs')
+const path = require('path')
+
 const router = express.Router();
 const db = require('../db');
-const ExcelJS = require('exceljs');
-const upload = multer({ storage: multer.memoryStorage() });
+
+
+// ================= HELPERS ================= 
+// const normalize = (row, keys) => {
+//   if (!row || !keys) return null
+
+//   const keyList = Array.isArray(keys) ? keys : [keys]
+
+//   const foundKey = Object.keys(row).find(k =>
+//     keyList.some(
+//       alias => k.toLowerCase().trim() === alias.toLowerCase().trim()
+//     )
+//   )
+
+//   return foundKey ? row[foundKey] : null
+// }
+
+
+const normalize = (row, keys) => {
+  if (!row || !keys) return null
+  const list = Array.isArray(keys) ? keys : [keys]
+
+  const foundKey = Object.keys(row).find(k => {
+    const cleaned = k
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/[\r\n]/g, '')
+      .trim()
+
+    return list.some(
+      alias => cleaned === alias.toLowerCase().trim()
+    )
+  })
+
+  return foundKey ? row[foundKey] : null
+}
+
+
+const safeText = (val, fallback = '') => {
+  if (val === undefined || val === null) return fallback
+  const str = String(val).trim()
+  return str.length ? str : fallback
+}
+
+const safeNumber = (val, fallback = 0) => {
+  const num = Number(val)
+  return isNaN(num) ? fallback : num
+}
+
+const safeTransactionDate = (row) => {
+  const raw = normalize(row, 'DATE')
+
+  if (!raw) return new Date()
+
+  // Excel serial date
+  if (typeof raw === 'number') {
+    const excelEpoch = new Date(1899, 11, 30)
+    return new Date(excelEpoch.getTime() + raw * 86400000)
+  }
+
+  const parsed = new Date(raw)
+  return isNaN(parsed) ? new Date() : parsed
+}
+
+// ================= MULTER =================
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.resolve(process.cwd(), 'uploads/income')
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    cb(null, uploadDir)
+  },
+  filename: (req, file, cb) => {
+    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
+    cb(null, unique + path.extname(file.originalname))
+  }
+})
+
+const upload = multer({ storage })
 
 
 router.post('/income', async (req, res) => {
@@ -13,289 +95,434 @@ router.post('/income', async (req, res) => {
       voucherNo,
       transactionDetails,
       income,
-      duty,
+      stamp,
       wht,
       vat,
       incomeCentre,
-      type,
-      stamp,
+      projectType,
       project,
       createdBy
     } = req.body
 
+    // ✅ SAFETY DEFAULTS (critical)
+    const safeValues = {
+      transactionDate: transactionDate || new Date().toISOString().split('T')[0],
+      voucherNo: voucherNo?.trim() || 'AUTO',
+      transactionDetails: transactionDetails?.trim() || 'New income entry',
+      income: Number(income) || 0,
+      stamp: Number(stamp) || 0,
+      wht: Number(wht) || 0,
+      vat: Number(vat) || 0,
+      incomeCentre: incomeCentre?.trim() || 'GENERAL',
+      projectType: projectType?.trim() || 'GENERAL',
+      project: project || null,
+      createdBy: createdBy || 1
+    }
+
     const query = `
       INSERT INTO income_records
-      (transaction_date, voucher_no, transaction_details, income, duty, wht, vat,
-       income_centre, type, stamp, project, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `
-
-    const [result] = await db.execute(query, [
-      transactionDate,
-      voucherNo,
-      transactionDetails,
-      income,
-      duty,
-      wht,
-      vat,
-      incomeCentre,
-      type,
-      stamp,
-      project,
-      createdBy
-    ])
-
-    const [record] = await db.execute(
-      'SELECT * FROM income_records WHERE id = ?',
-      [result.insertId]
-    )
-
-    res.json(record[0])
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to create income record' })
-  }
-});
-
-router.post('/income/import-excel', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No Excel file uploaded' });
-    }
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(req.file.buffer);
-
-    const sheet = workbook.worksheets[0];
-    const rows = [];
-
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
-
-      rows.push({
-        transactionDate: row.getCell(1).value,
-        voucherNo: row.getCell(2).value,
-        transactionDetails: row.getCell(3).value,
-        income: row.getCell(4).value || 0,
-        duty: row.getCell(5).value || 0,
-        wht: row.getCell(6).value || 0,
-        vat: row.getCell(7).value || 0,
-        incomeCentre: row.getCell(8).value,
-        type: row.getCell(9).value,
-        stamp: row.getCell(10).value,
-        project: row.getCell(11).value
-      });
-    });
-
-    const insertQuery = `
-      INSERT INTO income_records
-      (transaction_date, voucher_no, transaction_details,
-       income, duty, wht, vat,
-       income_centre, type, stamp, project, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    for (const r of rows) {
-      await db.execute(insertQuery, [
-        r.transactionDate,
-        r.voucherNo,
-        r.transactionDetails,
-        r.income,
-        r.duty,
-        r.wht,
-        r.vat,
-        r.incomeCentre,
-        r.type,
-        r.stamp,
-        r.project,
-        1 // createdBy (Finance user)
-      ]);
-    }
-
-    res.json({
-      message: 'Excel income import successful',
-      recordsInserted: rows.length
-    });
-  } catch (err) {
-    console.error('❌ EXCEL IMPORT ERROR:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-
-router.get('/income/export', async (req, res) => {
-  try {
-    const { from, to } = req.query;
-
-    let where = '';
-    const params = [];
-
-    if (from && to) {
-      where = 'WHERE transaction_date BETWEEN ? AND ?';
-      params.push(from, to);
-    }
-
-    const [rows] = await db.execute(
-      `
-      SELECT
+      (
         transaction_date,
         voucher_no,
         transaction_details,
         income,
-        duty,
+        stamp,
         wht,
         vat,
-        gross_amount,
         income_centre,
-        type,
-        stamp,
-        project
-      FROM income_records
-      ${where}
-      ORDER BY transaction_date ASC
-      `,
-      params
-    );
+        project_type,
+        project,
+        created_by
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `
 
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Income');
+    const values = [
+      safeValues.transactionDate,
+      safeValues.voucherNo,
+      safeValues.transactionDetails,
+      safeValues.income,
+      safeValues.stamp,
+      safeValues.wht,
+      safeValues.vat,
+      safeValues.incomeCentre,
+      safeValues.projectType,
+      safeValues.project,
+      safeValues.createdBy
+    ]
 
-    sheet.columns = [
-      { header: 'Date', key: 'transaction_date', width: 15 },
-      { header: 'Voucher', key: 'voucher_no', width: 15 },
-      { header: 'Transaction Details', key: 'transaction_details', width: 40 },
-      { header: 'Income', key: 'income', width: 15 },
-      { header: 'Duty', key: 'duty', width: 15 },
-      { header: 'WHT', key: 'wht', width: 15 },
-      { header: 'VAT', key: 'vat', width: 15 },
-      { header: 'Gross Amount', key: 'gross_amount', width: 18 },
-      { header: 'Income Centre', key: 'income_centre', width: 20 },
-      { header: 'Type', key: 'type', width: 12 },
-      { header: 'Stamp', key: 'stamp', width: 15 },
-      { header: 'Project', key: 'project', width: 20 }
-    ];
+    // 🔍 TEMP LOG (remove later)
+    console.log('CREATE INCOME VALUES:', values)
 
-    rows.forEach(row => {
-      sheet.addRow({
-        ...row,
-        transaction_date: row.transaction_date
-          .toISOString()
-          .split('T')[0]
-      });
-    });
+    const [result] = await db.execute(query, values)
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    );
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename=income.xlsx'
-    );
+    const [rows] = await db.execute(
+      'SELECT * FROM income_records WHERE id = ?',
+      [result.insertId]
+    )
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.status(201).json(rows[0])
   } catch (err) {
-    console.error('❌ INCOME EXPORT ERROR:', err);
-    res.status(500).json({ error: err.message });
+    console.error('CREATE INCOME ERROR:', err)
+    res.status(500).json({
+      error: 'Failed to create income record',
+      message: err.message
+    })
   }
-});
+})
+
+
+
+// router.post('/income', async (req, res) => {
+//   try {
+//     const {
+//       transactionDate,
+//       voucherNo,
+//       transactionDetails,
+//       income,
+//       stamp,
+//       wht,
+//       vat,
+//       incomeCentre,
+//       type,
+//       project,
+//       createdBy
+//     } = req.body
+
+//     const query = `
+//       INSERT INTO income_records
+//       (transaction_date, voucher_no, transaction_details,
+//        income, stamp, wht, vat,
+//        income_centre, type, project, created_by)
+//       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+//     `
+
+//     const values = [
+//       transactionDate ?? null,
+//       voucherNo ?? null,
+//       transactionDetails ?? null,
+//       income ?? 0,
+//       stamp ?? 0,
+//       wht ?? 0,
+//       vat ?? 0,
+//       incomeCentre ?? null,
+//       type ?? null,
+//       project ?? null,
+//       createdBy ?? null
+//     ]
+
+//     const [result] = await db.execute(query, values)
+
+
+//     const [record] = await db.execute(
+//       'SELECT * FROM income_records WHERE id = ?',
+//       [result.insertId]
+//     )
+
+//     res.json(record[0])
+//   } catch (err) {
+//     console.error(err)
+//     res.status(500).json({ error: 'Failed to create income record' })
+//   }
+// })
+
+
+// GET /api/finance/income
+// router.get('/income', async (req, res) => {
+//   try {
+//     const [records] = await db.execute(`
+//       SELECT *
+//       FROM income_records
+//       ORDER BY transaction_date DESC, created_at DESC
+//     `)
+
+//     res.json(records)
+//   } catch (err) {
+//     console.error(err)
+//     res.status(500).json({ error: 'Failed to fetch income records' })
+//   }
+// })
+
+
+
+// DELETE /api/finance/income/:id
+// router.delete('/income/:id', async (req, res) => {
+//   try {
+//     const { id } = req.params
+
+//     const [result] = await db.execute(
+//       'DELETE FROM income_records WHERE id = ?',
+//       [id]
+//     )
+
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ error: 'Income record not found' })
+//     }
+
+//     res.json({ message: 'Income record deleted successfully' })
+//   } catch (err) {
+//     console.error(err)
+//     res.status(500).json({ error: 'Failed to delete income record' })
+//   }
+// })
 
 
 
 
-router.get('/income', async (req, res) => {
+
+// ================= ROUTE =================
+router.post('/income/import', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No Excel file uploaded' })
+  }
+
+  try {
+    const workbook = XLSX.readFile(req.file.path)
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+
+    // 1️⃣ Read sheet as raw rows
+    const rows = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: null,
+      raw: false
+    })
+
+    // 2️⃣ Find header row
+    const headerIndex = rows.findIndex(row =>
+      row.some(
+        cell =>
+          typeof cell === 'string' &&
+          cell.toLowerCase().includes('date')
+      )
+    )
+
+    if (headerIndex === -1) {
+      return res.status(400).json({ error: 'Header row not found in Excel file' })
+    }
+
+    const headers = rows[headerIndex].map(h =>
+      String(h).toLowerCase().trim()
+    )
+
+    // 3️⃣ Column mapping
+    const col = {
+      date: headers.indexOf('date'),
+      voucher: headers.findIndex(h => h.includes('code')),
+      details: headers.findIndex(h => h.includes('details')),
+      income: headers.findIndex(h => h.includes('income')),
+      stamp: headers.findIndex(h => h.includes('stamp')),
+      wht: headers.findIndex(h => h.includes('wht')),
+      vat: headers.findIndex(h => h.includes('vat')),
+      centre: headers.findIndex(h => h.includes('centre')),
+      projectType: headers.findIndex(h => h.includes('project'))
+    }
+
+    const dataRows = rows.slice(headerIndex + 1)
+
+    let inserted = 0
+    let skipped = 0
+
+    // 4️⃣ Insert rows
+    for (const r of dataRows) {
+      const date = r[col.date]
+      const voucher = r[col.voucher]
+      const income = r[col.income]
+
+      if (!date || !voucher || !income) {
+        skipped++
+        continue
+      }
+
+      // ✅ Safe Excel date handling
+      const parsedDate =
+        typeof date === 'number'
+          ? new Date(Math.round((date - 25569) * 86400 * 1000))
+          : new Date(date)
+
+      await db.execute(
+        `
+        INSERT INTO income_records
+        (
+          transaction_date,
+          voucher_no,
+          transaction_details,
+          income,
+          stamp,
+          wht,
+          vat,
+          income_centre,
+          project_type,
+          created_by
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          parsedDate,
+          voucher,
+          r[col.details] || 'Imported record',
+          Number(income) || 0,
+          Number(r[col.stamp]) || 0,
+          Number(r[col.wht]) || 0,
+          Number(r[col.vat]) || 0,
+          r[col.centre] || 'GENERAL',
+          r[col.projectType] || 'GENERAL',
+          1
+        ]
+      )
+
+      inserted++
+    }
+
+    fs.unlinkSync(req.file.path)
+
+    res.json({
+      message: 'Excel import completed',
+      inserted,
+      skipped,
+      total: dataRows.length
+    })
+  } catch (err) {
+    console.error('IMPORT ERROR:', err)
+    res.status(500).json({ error: 'Failed to import Excel file' })
+  }
+})
+
+
+// GET /api/finance/income/table
+router.get('/income/table', async (req, res) => {
   try {
     const [rows] = await db.execute(`
       SELECT
         id,
-        DAY(transaction_date) AS day,
-        MONTHNAME(transaction_date) AS month,
-        WEEK(transaction_date) AS week,
+        transaction_date,
         voucher_no,
         transaction_details,
         income,
-        duty,
+        stamp,
         wht,
         vat,
-        gross_amount,
         income_centre,
-        type,
-        stamp,
-        project,
-        transaction_date
+        project_type
       FROM income_records
       ORDER BY transaction_date DESC
     `)
 
     res.json(rows)
   } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to fetch income records' })
+    console.error('INCOME TABLE ERROR:', err)
+    res.status(500).json({ error: 'Failed to fetch income table data' })
   }
 })
+
+router.get('/income/download', async (req, res) => {
+  try {
+    const [rows] = await db.execute(`
+      SELECT
+        transaction_date AS DATE,
+        voucher_no AS "VOUCHER CODE",
+        transaction_details AS "TRANSACTION DETAILS",
+        income AS INCOME,
+        stamp AS "STAMP DUTY",
+        wht AS WHT,
+        vat AS VAT,
+        gross_amount AS "GROSS AMOUNT",
+        income_centre AS "INCOME CENTRE",
+        project_type AS "PROJECT TYPE"
+      FROM income_records
+      ORDER BY transaction_date DESC
+    `)
+
+    if (!rows.length) {
+      return res.status(404).json({ error: 'No income records found' })
+    }
+
+    // Create worksheet & workbook
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Income Records')
+
+    // Set headers for download
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=income_records.xlsx'
+    )
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+    // Send file
+    const buffer = XLSX.write(workbook, {
+      type: 'buffer',
+      bookType: 'xlsx'
+    })
+
+    res.send(buffer)
+  } catch (err) {
+    console.error('DOWNLOAD ERROR:', err)
+    res.status(500).json({ error: 'Failed to download income records' })
+  }
+})
+
 
 
 
 router.put('/income/:id', async (req, res) => {
   try {
     const { id } = req.params
+
     const {
       transactionDate,
       voucherNo,
       transactionDetails,
       income,
-      duty,
-      wht,
-      vat,
-      incomeCentre,
-      type,
       stamp,
+      vat,
+      wht,
+      incomeCentre,
+      projectType,
       project
     } = req.body
 
     const query = `
-      UPDATE income_records
-      SET
+      UPDATE income_records SET
         transaction_date = ?,
         voucher_no = ?,
         transaction_details = ?,
         income = ?,
-        duty = ?,
-        wht = ?,
-        vat = ?,
-        income_centre = ?,
-        type = ?,
         stamp = ?,
-        project = ?,
-        updated_at = CURRENT_TIMESTAMP
+        vat = ?,
+        wht = ?,
+        income_centre = ?,
+        project_type = ?,
+        project = ?
       WHERE id = ?
     `
 
-    await db.execute(query, [
+    const values = [
       transactionDate,
       voucherNo,
       transactionDetails,
-      income,
-      duty,
-      wht,
-      vat,
+      income ?? 0,
+      stamp ?? 0,
+      vat ?? 0,
+      wht ?? 0,
       incomeCentre,
-      type,
-      stamp,
-      project,
+      projectType,
+      project ?? null,
       id
-    ])
+    ]
 
-    const [updated] = await db.execute(
+    await db.execute(query, values)
+
+    const [rows] = await db.execute(
       'SELECT * FROM income_records WHERE id = ?',
       [id]
     )
 
-    res.json(updated[0])
+    res.json(rows[0])
   } catch (err) {
-    console.error(err)
+    console.error('UPDATE INCOME ERROR:', err)
     res.status(500).json({ error: 'Failed to update income record' })
   }
 })
@@ -311,44 +538,13 @@ router.delete('/income/:id', async (req, res) => {
 })
 
 
-router.post('/income/import', async (req, res) => {
-  try {
-    const records = req.body
-
-    for (const r of records) {
-      await db.execute(
-        `
-        INSERT INTO income_records
-        (transaction_date, voucher_no, transaction_details, income, duty, wht, vat,
-         income_centre, type, stamp, project, created_by)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        [
-          r.transactionDate,
-          r.voucherNo,
-          r.transactionDetails,
-          r.income,
-          r.duty,
-          r.wht,
-          r.vat,
-          r.incomeCentre,
-          r.type,
-          r.stamp,
-          r.project,
-          r.createdBy
-        ]
-      )
-    }
-
-    res.json({ message: 'Income records imported successfully' })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Failed to import income records' })
-  }
-})
 
 
-router.post('/expenses', async (req, res) => {
+
+
+
+
+router.post('/expense', async (req, res) => {
   try {
     const {
       transactionDate,
@@ -362,66 +558,220 @@ router.post('/expenses', async (req, res) => {
       createdBy
     } = req.body
 
-    const [result] = await db.execute(
-      `
+    const query = `
       INSERT INTO expense_records
-      (transaction_date, voucher_no, transaction_details, spent,
-       category, cost_centre, sub_cost_centre, bank_debited, created_by)
+      (transaction_date, voucher_no, transaction_details,
+       spent, category, cost_centre, sub_cost_centre,
+       bank_debited, created_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        transactionDate,
-        voucherNo,
-        transactionDetails,
-        spent,
-        category,
-        costCentre,
-        subCostCentre,
-        bankDebited,
-        createdBy
-      ]
-    )
+    `
 
-    const [record] = await db.execute(
+    const values = [
+      transactionDate ?? null,
+      voucherNo ?? null,
+      transactionDetails ?? '',
+      spent ?? 0,
+      category ?? '',
+      costCentre ?? '',
+      subCostCentre ?? null,
+      bankDebited ?? null,
+      createdBy ?? null
+    ]
+
+    const [result] = await db.execute(query, values)
+
+    const [rows] = await db.execute(
       'SELECT * FROM expense_records WHERE id = ?',
       [result.insertId]
     )
 
-    res.json(record[0])
+    res.json(rows[0])
   } catch (err) {
-    console.error('❌ EXPENSE ERROR:', err)
-    res.status(500).json({ error: err.message })
+    console.error('CREATE EXPENSE ERROR:', err)
+    res.status(500).json({ error: 'Failed to create expense record' })
+  }
+})
+
+router.get('/expense', async (req, res) => {
+  try {
+    const [rows] = await db.execute(`
+      SELECT *
+      FROM expense_records
+      ORDER BY transaction_date DESC, id DESC
+    `)
+
+    res.json(rows)
+  } catch (err) {
+    console.error('GET EXPENSES ERROR:', err)
+    res.status(500).json({ error: 'Failed to fetch expenses' })
+  }
+})
+
+router.get('/expense/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const [rows] = await db.execute(
+      'SELECT * FROM expense_records WHERE id = ?',
+      [id]
+    )
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Expense not found' })
+    }
+
+    res.json(rows[0])
+  } catch (err) {
+    console.error('GET EXPENSE BY ID ERROR:', err)
+    res.status(500).json({ error: 'Failed to fetch expense' })
+  }
+})
+
+router.delete('/expense/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const [result] = await db.execute(
+      'DELETE FROM expense_records WHERE id = ?',
+      [id]
+    )
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Expense not found' })
+    }
+
+    res.json({ message: 'Expense deleted successfully' })
+  } catch (err) {
+    console.error('DELETE EXPENSE ERROR:', err)
+    res.status(500).json({ error: 'Failed to delete expense' })
   }
 })
 
 
 
-router.get('/expenses', async (req, res) => {
-  const [rows] = await db.execute(`
-    SELECT
-      id,
-      DAY(transaction_date) AS day,
-      MONTHNAME(transaction_date) AS month,
-      WEEK(transaction_date) AS week,
-      voucher_no,
-      transaction_details,
+
+router.put('/expense/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const {
+      transactionDate,
+      voucherNo,
+      transactionDetails,
       spent,
       category,
-      cost_centre,
-      sub_cost_centre,
-      bank_debited,
-      transaction_date
-    FROM expense_records
-    ORDER BY transaction_date DESC
-  `)
+      costCentre,
+      subCostCentre,
+      bankDebited
+    } = req.body
 
-  res.json(rows)
+    const query = `
+      UPDATE expense_records SET
+        transaction_date = ?,
+        voucher_no = ?,
+        transaction_details = ?,
+        spent = ?,
+        category = ?,
+        cost_centre = ?,
+        sub_cost_centre = ?,
+        bank_debited = ?
+      WHERE id = ?
+    `
+
+    const values = [
+      transactionDate ?? null,
+      voucherNo ?? null,
+      transactionDetails ?? '',
+      spent ?? 0,
+      category ?? '',
+      costCentre ?? '',
+      subCostCentre ?? null,
+      bankDebited ?? null,
+      id
+    ]
+
+    await db.execute(query, values)
+
+    const [rows] = await db.execute(
+      'SELECT * FROM expense_records WHERE id = ?',
+      [id]
+    )
+
+    res.json(rows[0])
+  } catch (err) {
+    console.error('UPDATE EXPENSE ERROR:', err)
+    res.status(500).json({ error: 'Failed to update expense record' })
+  }
 })
 
 
+router.get('/report', async (req, res) => {
+  try {
+    /** TOTAL INCOME */
+    const [[incomeTotal]] = await db.execute(`
+      SELECT 
+        COALESCE(SUM(income + vat + stamp - wht), 0) AS total_income
+      FROM income_records
+    `)
 
+    /** TOTAL EXPENSES */
+    const [[expenseTotal]] = await db.execute(`
+      SELECT 
+        COALESCE(SUM(spent), 0) AS total_expenses
+      FROM expense_records
+    `)
 
+    /** INCOME BY MONTH */
+    const [incomeByMonth] = await db.execute(`
+      SELECT 
+        DATE_FORMAT(transaction_date, '%Y-%m') AS month,
+        SUM(income + vat + stamp - wht) AS income
+      FROM income_records
+      GROUP BY month
+      ORDER BY month
+    `)
 
+    /** EXPENSES BY MONTH */
+    const [expensesByMonth] = await db.execute(`
+      SELECT 
+        DATE_FORMAT(transaction_date, '%Y-%m') AS month,
+        SUM(spent) AS expenses
+      FROM expense_records
+      GROUP BY month
+      ORDER BY month
+    `)
+
+    /** MERGE MONTHLY COMPARISON */
+    const months = new Set([
+      ...incomeByMonth.map(i => i.month),
+      ...expensesByMonth.map(e => e.month)
+    ])
+
+    const monthlyComparison = Array.from(months).map(month => {
+      const income = incomeByMonth.find(i => i.month === month)?.income || 0
+      const expenses = expensesByMonth.find(e => e.month === month)?.expenses || 0
+
+      return {
+        month,
+        income,
+        expenses,
+        profitLoss: income - expenses
+      }
+    }).sort((a, b) => a.month.localeCompare(b.month))
+
+    res.json({
+      totalIncome: incomeTotal.total_income,
+      totalExpenses: expenseTotal.total_expenses,
+      netProfitLoss: incomeTotal.total_income - expenseTotal.total_expenses,
+      incomeByMonth,
+      expensesByMonth,
+      monthlyComparison
+    })
+  } catch (err) {
+    console.error('FINANCIAL REPORT ERROR:', err)
+    res.status(500).json({ error: 'Failed to generate financial report' })
+  }
+})
 
 
 
