@@ -382,6 +382,7 @@ const TaskList = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-1">Due Date</h4>
               <input
                 type="date"
                 name="dueDate"
@@ -391,6 +392,7 @@ const TaskList = () => {
               />
             </div>
             <div>
+              <h4 className="text-sm font-medium text-gray-700 mb-1">Priority</h4>
               <select
                 name="priority"
                 value={newTask.priority}
@@ -403,6 +405,7 @@ const TaskList = () => {
               </select>
             </div>
             <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">File Attachment (optional)</h4>
               <label className="flex items-center justify-center w-full px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50">
                 <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
