@@ -1,9 +1,53 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db'); // your mysql connection
 
-router.post('/tasks', async (req, res) => {
-  const { title, dueDate, priority = 'medium', status = 'pending', assignedTo, createdBy } = req.body;
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = 'uploads/tasks';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'image/jpeg',
+      'image/png',
+      'image/gif'
+    ];
+    
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'), false);
+    }
+  }
+});
+
+router.post('/tasks', upload.single('file'), async (req, res) => {
+  const { title, description, dueDate, priority = 'medium', status = 'pending', assignedTo, createdBy } = req.body;
 
   if (!title || !createdBy) {
     return res.status(400).json({ message: 'Title and createdBy are required.' });
@@ -22,12 +66,20 @@ router.post('/tasks', async (req, res) => {
 
   const task = {
     title,
+    description: description || null,
     due_date: dueDate || null,
     priority,
     status,
     created_by: createdBy,
     assigned_to: assignedTo || null,
   };
+
+  // Add file attachment info if file was uploaded
+  if (req.file) {
+    task.attachment = req.file.filename;
+    task.attachment_original_name = req.file.originalname;
+    task.attachment_path = req.file.path;
+  }
 
   try {
     let checkQuery;
@@ -69,6 +121,7 @@ router.get('/tasks', async (req, res) => {
       SELECT 
         t.id,
         t.title,
+        t.description,
         t.due_date,
         t.priority,
         t.status,
@@ -77,7 +130,10 @@ router.get('/tasks', async (req, res) => {
         t.created_by,
         creator.name AS created_by_name,
         t.assigned_to,
-        assignee.name AS assigned_to_name
+        assignee.name AS assigned_to_name,
+        t.attachment,
+        t.attachment_original_name,
+        t.attachment_path
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
@@ -99,6 +155,7 @@ router.get('/tasks/:id', async (req, res) => {
       SELECT 
         t.id,
         t.title,
+        t.description,
         t.due_date,
         t.priority,
         t.status,
@@ -107,7 +164,10 @@ router.get('/tasks/:id', async (req, res) => {
         t.created_by,
         creator.name AS created_by_name,
         t.assigned_to,
-        assignee.name AS assigned_to_name
+        assignee.name AS assigned_to_name,
+        t.attachment,
+        t.attachment_original_name,
+        t.attachment_path
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
@@ -318,8 +378,23 @@ router.put('/tasks/:taskId', async (req, res) => {
 router.delete('/tasks/:id', async (req, res) => {
   try {
     const taskId = req.params.id;
+    
+    // First, get the task to delete its file if it exists
+    const [tasks] = await db.query('SELECT attachment_path FROM tasks WHERE id = ?', [taskId]);
+    
+    if (tasks.length > 0 && tasks[0].attachment_path) {
+      // Delete the file if it exists
+      try {
+        if (fs.existsSync(tasks[0].attachment_path)) {
+          fs.unlinkSync(tasks[0].attachment_path);
+        }
+      } catch (fileErr) {
+        console.error('Error deleting file:', fileErr);
+        // Continue with task deletion even if file deletion fails
+      }
+    }
+    
     const query = 'DELETE FROM tasks WHERE id = ?';
-
     const [result] = await db.query(query, [taskId]);
     
     if (result.affectedRows === 0) {
@@ -332,6 +407,7 @@ router.delete('/tasks/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete task', error: err.message });
   }
 });
+
 // Get task count
 router.get('/count', async (req, res) => {
   try {
@@ -340,6 +416,38 @@ router.get('/count', async (req, res) => {
   } catch (err) {
     console.error('Error fetching task count:', err);
     res.status(500).json({ message: 'Database error' });
+  }
+});
+
+// Download task attachment
+router.get('/tasks/download/:taskId/:filename', async (req, res) => {
+  try {
+    const taskId = req.params.taskId;
+    const filename = req.params.filename;
+    const userId = req.query.userId;
+    
+    // Check if user has access to this task
+    const [tasks] = await db.query(`
+      SELECT attachment_path, attachment_original_name 
+      FROM tasks 
+      WHERE id = ? AND attachment = ? AND (created_by = ? OR assigned_to = ?)
+    `, [taskId, filename, parseInt(userId), parseInt(userId)]);
+    
+    if (tasks.length === 0) {
+      return res.status(404).json({ message: 'Task or file not found, or access denied' });
+    }
+    
+    const filePath = tasks[0].attachment_path;
+    const originalName = tasks[0].attachment_original_name;
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found on server' });
+    }
+    
+    res.download(filePath, originalName);
+  } catch (err) {
+    console.error('Error downloading file:', err);
+    res.status(500).json({ message: 'Failed to download file', error: err.message });
   }
 });
 

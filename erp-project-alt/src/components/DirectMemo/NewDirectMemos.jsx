@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 
@@ -142,11 +142,17 @@ const NewDirectMemos = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
+  
+  // Check if we're coming from a task request/submission
+  const taskInfo = location.state || {};
+  const isTaskReport = taskInfo.taskId !== undefined;
+  
   const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    recipients: [],
+    title: taskInfo.taskTitle ? `Task Report: ${taskInfo.taskTitle}` : '',
+    content: taskInfo.taskTitle ? `This is a task report for: ${taskInfo.taskTitle}\n\n` : '',
+    recipients: taskInfo.recipientId ? [taskInfo.recipientId] : [],
     cc: [],
     priority: 'medium',
   });
@@ -159,7 +165,7 @@ const NewDirectMemos = () => {
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   // Fetch all users when component mounts
-  React.useEffect(() => {
+  useEffect(() => {
     const fetchUsers = async () => {
       setIsLoadingUsers(true);
       try {
@@ -296,6 +302,11 @@ const NewDirectMemos = () => {
       submitFormData.append('created_by', user.id);
       submitFormData.append('recipients', JSON.stringify(formData.recipients));
       submitFormData.append('cc', JSON.stringify(formData.cc));
+      
+      // Add task reference if this is a task report
+      if (taskInfo.taskId) {
+        submitFormData.append('task_id', taskInfo.taskId);
+      }
 
       // Add files
       selectedFiles.forEach((file) => {
@@ -377,7 +388,16 @@ const NewDirectMemos = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 max-w-3xl mx-auto">
-      <h2 className="text-xl font-bold mb-6">Send Task Report</h2>
+      <div className="mb-6">
+        <h2 className="text-xl font-bold">
+          {isTaskReport ? 'Submit Task Report' : 'Send Task Report'}
+        </h2>
+        {isTaskReport && taskInfo.taskTitle && (
+          <p className="text-sm text-gray-600 mt-1">
+            For task: <span className="font-medium">{taskInfo.taskTitle}</span>
+          </p>
+        )}
+      </div>
 
       {error && (
         <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-4">

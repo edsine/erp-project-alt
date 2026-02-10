@@ -19,6 +19,7 @@ const storage = multer.diskStorage({
     cb(null, uniqueSuffix + path.extname(file.originalname));
   }
 });
+
 const safeParseJSON = (data, defaultValue = []) => {
   if (!data) return defaultValue;
   
@@ -126,7 +127,7 @@ const checkChairmanRecipient = async (req, res, next) => {
 // Create a new task report
 router.post('/', upload.array('files'), checkChairmanRecipient, async (req, res) => {
   try {
-    const { title, content, created_by, priority, recipients, cc } = req.body;
+    const { title, content, created_by, priority, recipients, cc, task_id } = req.body;
     
     // Parse recipients and CC
     const recipientsArray = JSON.parse(recipients);
@@ -145,11 +146,17 @@ router.post('/', upload.array('files'), checkChairmanRecipient, async (req, res)
     }
     
     // Insert memo into database
-    const [result] = await db.execute(
-      `INSERT INTO direct_memos (title, content, created_by, recipients, cc, priority, attachments) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [title, content, created_by, JSON.stringify(recipientsArray), JSON.stringify(ccArray), priority, JSON.stringify(attachments)]
-    );
+    const insertQuery = task_id 
+      ? `INSERT INTO direct_memos (title, content, created_by, recipients, cc, priority, attachments, task_id) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      : `INSERT INTO direct_memos (title, content, created_by, recipients, cc, priority, attachments) 
+         VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    
+    const params = task_id
+      ? [title, content, created_by, JSON.stringify(recipientsArray), JSON.stringify(ccArray), priority, JSON.stringify(attachments), task_id]
+      : [title, content, created_by, JSON.stringify(recipientsArray), JSON.stringify(ccArray), priority, JSON.stringify(attachments)];
+    
+    const [result] = await db.execute(insertQuery, params);
     
     res.status(201).json({
       message: 'Task report created successfully',
@@ -166,9 +173,11 @@ router.get('/user/:userId', async (req, res) => {
     const userId = req.params.userId;
     
     const [memos] = await db.execute(`
-      SELECT dm.*, u.name as sender_name, u.department as sender_department
+      SELECT dm.*, u.name as sender_name, u.department as sender_department,
+             t.title as task_title
       FROM direct_memos dm
       LEFT JOIN users u ON dm.created_by = u.id
+      LEFT JOIN tasks t ON dm.task_id = t.id
       WHERE JSON_CONTAINS(dm.recipients, ?) OR JSON_CONTAINS(dm.cc, ?) OR dm.created_by = ?
       ORDER BY dm.created_at DESC
     `, [JSON.stringify(parseInt(userId)), JSON.stringify(parseInt(userId)), parseInt(userId)]);
@@ -195,9 +204,11 @@ router.get('/:memoId', async (req, res) => {
     const userId = req.query.userId;
     
     const [memos] = await db.execute(`
-      SELECT dm.*, u.name as sender_name, u.department as sender_department
+      SELECT dm.*, u.name as sender_name, u.department as sender_department,
+             t.title as task_title, t.description as task_description
       FROM direct_memos dm
       LEFT JOIN users u ON dm.created_by = u.id
+      LEFT JOIN tasks t ON dm.task_id = t.id
       WHERE dm.id = ? AND (JSON_CONTAINS(dm.recipients, ?) OR JSON_CONTAINS(dm.cc, ?) OR dm.created_by = ?)
     `, [memoId, JSON.stringify(parseInt(userId)), JSON.stringify(parseInt(userId)), parseInt(userId)]);
     
@@ -336,12 +347,11 @@ router.post('/:memoId/comments', async (req, res) => {
   }
 });
 
-
 // Get comments for a Task Report 
 router.get('/:memoId/comments', async (req, res) => {
   try {
     const memoId = req.params.memoId;
-    const userId = parseInt(req.query.userId); // ensure it's an integer
+    const userId = parseInt(req.query.userId);
 
     // Check if user has access to this memo
     const [memos] = await db.execute(`
@@ -368,7 +378,6 @@ router.get('/:memoId/comments', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch comments', error: error.message });
   }
 });
-
 
 // Download attachment
 router.get('/download/:memoId/:filename', async (req, res) => {
@@ -401,6 +410,7 @@ router.get('/download/:memoId/:filename', async (req, res) => {
     res.status(500).json({ message: 'Failed to download file', error: error.message });
   }
 });
+
 router.post('/:memoId/approve', async (req, res) => {
   try {
     const memoId = req.params.memoId;
@@ -503,6 +513,7 @@ router.get('/:memoId/approvals', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch approval status', error: error.message });
   }
 });
+
 // Get Task Report count for a user
 router.get('/count/user/:userId', async (req, res) => {
   try {
@@ -539,4 +550,4 @@ router.get('/count/user/:userId', async (req, res) => {
   }
 });
 
-module.exports = router;  
+module.exports = router;
