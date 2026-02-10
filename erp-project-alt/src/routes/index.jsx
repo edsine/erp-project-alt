@@ -26,7 +26,7 @@ import ExpensesModule from '../components/Finance/Expenses'
 import ReportsModule from '../components/Finance/Reports'
 import FinancialDashboard from '../components/Finance/Finance'
 import ChangePassword from '../components/Settings/ChangePassword'
-// import ProtectedRoute from '../components/Auth/ProtectedRoute'
+// import SingleMemo from '../components/Memo/Singlememo'
 
 const router = createBrowserRouter([
   {
@@ -70,87 +70,33 @@ const router = createBrowserRouter([
         path: 'tasks',
         element: <TaskList />,
       },
-      // Client File Routes - Protected for Chairman, GMD, Finance roles AND Admin Department
       {
         path: 'files/new-client',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <NewClient />
-          </ProtectedRoute>
-        ),
+        element: <NewClient />,
       },
       {
         path: 'files',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <FileList />
-          </ProtectedRoute>
-        ),
+        element: <FileList />,
       },
       {
         path: 'files/:clientId',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <ClientFileList />
-          </ProtectedRoute>
-        ),
+        element: <ClientFileList />,
       },
       {
         path: 'files/:clientId/upload',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <UploadFile />
-          </ProtectedRoute>
-        ),
+        element: <UploadFile />,
       },
       {
         path: 'files/:clientId/:fileId',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <FileDetails />
-          </ProtectedRoute>
-        ),
+        element: <FileDetails />,
       },
       {
         path: 'files/edit-client/:clientId',
-        element: (
-          <ProtectedRoute 
-            allowedRoles={['chairman', 'gmd', 'finance']}
-            allowedDepartments={['Admin']}
-            requireAllConditions={true}
-          >
-            <EditClient />
-          </ProtectedRoute>
-        ),
+        element: <EditClient />,
       },
- // UserList Route - Protected for Chairman, HR, and Admin roles
       {
         path: 'users',
-        element: (
-          <ProtectedRoute allowedRoles={['chairman', 'hr', 'admin']}>
-            <UserList />
-          </ProtectedRoute>
-        ),
+        element: <UserList />,
       },
       {
         path: 'leaves',
@@ -201,9 +147,3 @@ const router = createBrowserRouter([
 ])
 
 export default router
-
-// Don't forget to update your DashboardLayout navigation links:
-// - Change to="/dashboard" to to=""
-// - Change to="/memos" to to="memos"
-// - Change to="/requisitions" to to="requisitions"
-// - etc. 
