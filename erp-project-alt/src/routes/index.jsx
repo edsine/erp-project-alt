@@ -26,7 +26,7 @@ import ExpensesModule from '../components/Finance/Expenses'
 import ReportsModule from '../components/Finance/Reports'
 import FinancialDashboard from '../components/Finance/Finance'
 import ChangePassword from '../components/Settings/ChangePassword'
-import SingleMemo from '../components/Memo/Singlememo'
+// import ProtectedRoute from '../components/Auth/ProtectedRoute'
 
 const router = createBrowserRouter([
   {
@@ -70,33 +70,87 @@ const router = createBrowserRouter([
         path: 'tasks',
         element: <TaskList />,
       },
+      // Client File Routes - Protected for Chairman, GMD, Finance roles AND Admin Department
       {
         path: 'files/new-client',
-        element: <NewClient />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <NewClient />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'files',
-        element: <FileList />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <FileList />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'files/:clientId',
-        element: <ClientFileList />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <ClientFileList />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'files/:clientId/upload',
-        element: <UploadFile />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <UploadFile />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'files/:clientId/:fileId',
-        element: <FileDetails />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <FileDetails />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'files/edit-client/:clientId',
-        element: <EditClient />,
+        element: (
+          <ProtectedRoute 
+            allowedRoles={['chairman', 'gmd', 'finance']}
+            allowedDepartments={['Admin']}
+            requireAllConditions={true}
+          >
+            <EditClient />
+          </ProtectedRoute>
+        ),
       },
+ // UserList Route - Protected for Chairman, HR, and Admin roles
       {
         path: 'users',
-        element: <UserList />,
+        element: (
+          <ProtectedRoute allowedRoles={['chairman', 'hr', 'admin']}>
+            <UserList />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'leaves',
