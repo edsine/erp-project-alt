@@ -232,15 +232,30 @@ const TaskList = () => {
     }
   };
 
-  const handleRequestTaskReport = (task) => {
-    // Navigate to create task report with pre-filled task info
-    navigate('/dashboard/direct-memos/new', {
-      state: {
-        taskId: task.id,
-        taskTitle: task.title,
-        recipientId: task.assigned_to
+  const handleRequestTaskReport = async (task) => {
+    try {
+      // Mark the task as having a report requested
+      const response = await fetch(`${BASE_URL}/tasks/${task.id}/request-report`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to request task report');
       }
-    });
+
+      // Update local state
+      setTasks(tasks.map(t =>
+        t.id === task.id ? { ...t, report_requested: true } : t
+      ));
+
+
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const handleSubmitTaskReport = (task) => {
@@ -249,7 +264,8 @@ const TaskList = () => {
       state: {
         taskId: task.id,
         taskTitle: task.title,
-        recipientId: task.created_by
+        recipientId: task.created_by,
+        clearReportRequest: true
       }
     });
   };
@@ -514,19 +530,31 @@ const TaskList = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                      {isAssignee ? (
+                        <select
+                          value={task.status}
+                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border cursor-pointer ${
+                            task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                            task.status === 'in progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                            'bg-yellow-100 text-yellow-800 border-yellow-200'
+                          }`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="in progress">In Progress</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      ) : (
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
                           task.status === 'completed' ? 'bg-green-100 text-green-800 border-green-200' :
                           task.status === 'in progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                           'bg-yellow-100 text-yellow-800 border-yellow-200'
-                        }`}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                        }`}>
+                          {task.status === 'pending' ? 'Pending' :
+                           task.status === 'in progress' ? 'In Progress' :
+                           'Completed'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
@@ -540,13 +568,33 @@ const TaskList = () => {
                           </button>
                         )}
                         {isAssignee && (
-                          <button
-                            onClick={() => handleSubmitTaskReport(task)}
-                            className="text-green-600 hover:text-green-900"
-                            title="Submit Task Report"
-                          >
-                            Task Report
-                          </button>
+                          <div className="relative group">
+                            <button
+                              onClick={() => handleSubmitTaskReport(task)}
+                              className={`font-medium transition-all duration-300 ${
+                                task.report_requested
+                                  ? 'text-red-600 hover:text-red-900 animate-pulse'
+                                  : 'text-green-600 hover:text-green-900'
+                              }`}
+                              title={task.report_requested ? "Task Report Requested" : "Submit Task Report"}
+                              style={task.report_requested ? {
+                                textShadow: '0 0 8px rgba(220, 38, 38, 0.8), 0 0 12px rgba(220, 38, 38, 0.6)',
+                                fontWeight: '600'
+                              } : {}}
+                            >
+                              Task Report
+                            </button>
+                            {task.report_requested && (
+                              <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-10">
+                                <div className="bg-red-600 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                                  Task Report Requested
+                                  <div className="absolute top-full right-4 -mt-1">
+                                    <div className="border-4 border-transparent border-t-red-600"></div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                         <button
                           onClick={() => handleDeleteTask(task.id)}
@@ -569,6 +617,20 @@ const TaskList = () => {
           </tbody>
         </table>
       </div>
+
+      <style jsx>{`
+        @keyframes glow-pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+        .animate-pulse {
+          animation: glow-pulse 2s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 };

@@ -72,6 +72,7 @@ router.post('/tasks', upload.single('file'), async (req, res) => {
     status,
     created_by: createdBy,
     assigned_to: assignedTo || null,
+    report_requested: false,
   };
 
   // Add file attachment info if file was uploaded
@@ -133,7 +134,8 @@ router.get('/tasks', async (req, res) => {
         assignee.name AS assigned_to_name,
         t.attachment,
         t.attachment_original_name,
-        t.attachment_path
+        t.attachment_path,
+        t.report_requested
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
@@ -167,7 +169,8 @@ router.get('/tasks/:id', async (req, res) => {
         assignee.name AS assigned_to_name,
         t.attachment,
         t.attachment_original_name,
-        t.attachment_path
+        t.attachment_path,
+        t.report_requested
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
@@ -351,7 +354,7 @@ router.put('/tasks/:taskId', async (req, res) => {
       return res.status(400).json({ message: 'Invalid status value.' });
     }
 
-    // Step 1: Verify the user is assigned_to or created_by for this task
+    // Step 1: Verify the user is assigned_to (ONLY assignee can update status)
     const checkTaskQuery = 'SELECT created_by, assigned_to FROM tasks WHERE id = ?';
     const [results] = await db.query(checkTaskQuery, [taskId]);
     
@@ -360,8 +363,10 @@ router.put('/tasks/:taskId', async (req, res) => {
     }
 
     const task = results[0];
-    if (task.created_by !== userId && task.assigned_to !== userId) {
-      return res.status(403).json({ message: 'Not authorized to update this task' });
+    
+    // Only the assigned user can update the status
+    if (task.assigned_to !== userId) {
+      return res.status(403).json({ message: 'Only the assigned user can update the task status' });
     }
 
     // Step 2: Update status
@@ -372,6 +377,76 @@ router.put('/tasks/:taskId', async (req, res) => {
   } catch (err) {
     console.error('Error updating task:', err);
     res.status(500).json({ message: 'Failed to update task', error: err.message });
+  }
+});
+
+// Request task report
+router.post('/tasks/:taskId/request-report', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.taskId, 10);
+    const { userId } = req.body;
+
+    if (!taskId || !userId) {
+      return res.status(400).json({ message: 'taskId and userId are required.' });
+    }
+
+    // Verify the user is the creator of the task
+    const checkTaskQuery = 'SELECT created_by, assigned_to FROM tasks WHERE id = ?';
+    const [results] = await db.query(checkTaskQuery, [taskId]);
+    
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const task = results[0];
+    
+    if (task.created_by !== userId) {
+      return res.status(403).json({ message: 'Only the task creator can request a report' });
+    }
+
+    // Update task to mark report as requested
+    const updateQuery = 'UPDATE tasks SET report_requested = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    await db.query(updateQuery, [taskId]);
+    
+    res.json({ message: 'Task report requested successfully' });
+  } catch (err) {
+    console.error('Error requesting task report:', err);
+    res.status(500).json({ message: 'Failed to request task report', error: err.message });
+  }
+});
+
+// Clear task report request (called when assignee submits the report)
+router.post('/tasks/:taskId/clear-report-request', async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.taskId, 10);
+    const { userId } = req.body;
+
+    if (!taskId || !userId) {
+      return res.status(400).json({ message: 'taskId and userId are required.' });
+    }
+
+    // Verify the user is the assignee of the task
+    const checkTaskQuery = 'SELECT assigned_to FROM tasks WHERE id = ?';
+    const [results] = await db.query(checkTaskQuery, [taskId]);
+    
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const task = results[0];
+    
+    if (task.assigned_to !== userId) {
+      return res.status(403).json({ message: 'Only the task assignee can clear the report request' });
+    }
+
+    // Update task to clear report requested flag
+    const updateQuery = 'UPDATE tasks SET report_requested = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ?';
+    await db.query(updateQuery, [taskId]);
+    
+    res.json({ message: 'Task report request cleared successfully' });
+  } catch (err) {
+    console.error('Error clearing task report request:', err);
+    res.status(500).json({ message: 'Failed to clear task report request', error: err.message });
   }
 });
 

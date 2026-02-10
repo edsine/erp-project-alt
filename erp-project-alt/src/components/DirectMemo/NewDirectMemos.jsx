@@ -148,10 +148,11 @@ const NewDirectMemos = () => {
   // Check if we're coming from a task request/submission
   const taskInfo = location.state || {};
   const isTaskReport = taskInfo.taskId !== undefined;
+  const shouldClearRequest = taskInfo.clearReportRequest || false;
   
   const [formData, setFormData] = useState({
-    title: taskInfo.taskTitle ? `Task Report: ${taskInfo.taskTitle}` : '',
-    content: taskInfo.taskTitle ? `This is a task report for: ${taskInfo.taskTitle}\n\n` : '',
+    title: taskInfo.taskTitle ? `Update on ${taskInfo.taskTitle}` : '',
+    content: taskInfo.taskTitle ? `` : '',
     recipients: taskInfo.recipientId ? [taskInfo.recipientId] : [],
     cc: [],
     priority: 'medium',
@@ -321,6 +322,25 @@ const NewDirectMemos = () => {
       });
 
       if (response.status === 201) {
+        // If this was a response to a report request, clear the request flag
+        if (shouldClearRequest && taskInfo.taskId) {
+          try {
+            await axios.post(
+              `${BASE_URL}/tasks/${taskInfo.taskId}/clear-report-request`,
+              { userId: user.id },
+              {
+                headers: {
+                  Authorization: `Bearer ${user.token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+          } catch (clearErr) {
+            console.error('Error clearing report request:', clearErr);
+            // Don't fail the whole operation if clearing fails
+          }
+        }
+        
         navigate('/dashboard/direct-memos');
       }
     } catch (err) {
