@@ -501,7 +501,7 @@ const MemoList = () => {
   };
 
 const handleApprove = async (memo) => {
-  // Chairman doesn't need recommendation/remark
+  // Only non-Chairman roles need recommendations
   if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) {
     alert('Please add recommendations for approval');
     return;
@@ -522,15 +522,13 @@ const handleApprove = async (memo) => {
     );
 
     if (response.status === 200) {
-      // Add approval comment only if not chairman or if comment exists
-      if (user.role.toLowerCase() !== 'chairman' || approvalComment.trim()) {
+      // Add approval comment only if comment exists
+      if (approvalComment.trim()) {
         await axios.post(
           `${BASE_URL}/memos/${memo.id}/comments`,
           {
             comment: user.role.toLowerCase() === 'chairman' 
-              ? approvalComment.trim() 
-                ? `Chairman Approval: ${approvalComment}`
-                : 'Chairman Approval'
+              ? `Chairman Approval: ${approvalComment}`
               : `Recommendation: ${approvalComment}`,
             user_id: user.id,
           },
@@ -573,7 +571,7 @@ const handleApprove = async (memo) => {
 };
 
 const handleReject = async (memo) => {
-  // Chairman doesn't need remark for rejection
+  // Only non-Chairman roles need remarks for rejection
   if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) {
     alert('Please add remarks for rejection');
     return;
@@ -589,15 +587,13 @@ const handleReject = async (memo) => {
     );
 
     if (response.data?.success) {
-      // Add rejection comment only if not chairman or if comment exists
-      if (user.role.toLowerCase() !== 'chairman' || rejectionComment.trim()) {
+      // Add rejection comment only if comment exists
+      if (rejectionComment.trim()) {
         await axios.post(
           `${BASE_URL}/memos/${memo.id}/comments`,
           {
             comment: user.role.toLowerCase() === 'chairman'
-              ? rejectionComment.trim()
-                ? `Chairman Rejection: ${rejectionComment}`
-                : 'Chairman Rejection'
+              ? `Chairman Rejection: ${rejectionComment}`
               : `Rejection Remark: ${rejectionComment}`,
             user_id: user.id,
           },
@@ -1160,21 +1156,16 @@ const handleReject = async (memo) => {
 
               return (
                 <div className="mt-6 space-y-4">
-                  {/* Approval Comment Input */}
-{/* Approval Comment Input */}
-{showApprovalComment && (
+                  {/* Approval Comment Input - only show for non-Chairman */}
+{showApprovalComment && user.role.toLowerCase() !== 'chairman' && (
   <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
     <h4 className="text-sm font-medium text-blue-800 mb-2">
-      {user.role.toLowerCase() === 'chairman' ? 'Approval (Optional)' : 'Recommendation'}
+      Recommendation
     </h4>
     <textarea
       value={approvalComment}
       onChange={(e) => setApprovalComment(e.target.value)}
-      placeholder={
-        user.role.toLowerCase() === 'chairman' 
-          ? "Enter optional remarks for approval..."
-          : "Enter your recommendations for approval..."
-      }
+      placeholder="Enter your recommendations for approval..."
       className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
       rows="3"
     />
@@ -1190,7 +1181,7 @@ const handleReject = async (memo) => {
       </button>
       <button
         onClick={() => handleApprove(selectedMemo)}
-        disabled={user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()}
+        disabled={!approvalComment.trim()}
         className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
       >
         Submit Approval
@@ -1199,20 +1190,16 @@ const handleReject = async (memo) => {
   </div>
 )}
 
-{/* Rejection Comment Input */}
-{showRejectionComment && (
+{/* Rejection Comment Input - only show for non-Chairman */}
+{showRejectionComment && user.role.toLowerCase() !== 'chairman' && (
   <div className="bg-red-50 p-4 rounded-md border border-red-200">
     <h4 className="text-sm font-medium text-red-800 mb-2">
-      {user.role.toLowerCase() === 'chairman' ? 'Rejection (Optional)' : 'Rejection Remark'}
+      Rejection Remark
     </h4>
     <textarea
       value={rejectionComment}
       onChange={(e) => setRejectionComment(e.target.value)}
-      placeholder={
-        user.role.toLowerCase() === 'chairman'
-          ? "Enter optional remarks for rejection..."
-          : "Enter your remarks for rejection..."
-      }
+      placeholder="Enter your remarks for rejection..."
       className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
       rows="3"
     />
@@ -1228,7 +1215,7 @@ const handleReject = async (memo) => {
       </button>
       <button
         onClick={() => handleReject(selectedMemo)}
-        disabled={user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()}
+        disabled={!rejectionComment.trim()}
         className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
       >
         Submit Rejection
@@ -1242,8 +1229,13 @@ const handleReject = async (memo) => {
                     <div className="flex justify-end space-x-3">
                       <button
                         onClick={() => {
-                          setShowRejectionComment(true);
-                          setShowApprovalComment(false);
+                          // Chairman rejects directly, others show comment input
+                          if (user.role.toLowerCase() === 'chairman') {
+                            handleReject(selectedMemo);
+                          } else {
+                            setShowRejectionComment(true);
+                            setShowApprovalComment(false);
+                          }
                         }}
                         disabled={hasUserActed && !isChairman}
                         className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
@@ -1255,8 +1247,13 @@ const handleReject = async (memo) => {
                       </button>
                       <button
                         onClick={() => {
-                          setShowApprovalComment(true);
-                          setShowRejectionComment(false);
+                          // Chairman approves directly, others show comment input
+                          if (user.role.toLowerCase() === 'chairman') {
+                            handleApprove(selectedMemo);
+                          } else {
+                            setShowApprovalComment(true);
+                            setShowRejectionComment(false);
+                          }
                         }}
                         disabled={hasUserActed && !isChairman}
                         className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
