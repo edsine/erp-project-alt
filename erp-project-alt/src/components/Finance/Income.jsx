@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx';
+
+
+
+
+
 
 const IncomeModule = () => {
-  // Load data from localStorage or use empty array
-  const [incomeData, setIncomeData] = useState(() => {
-    const savedData = localStorage.getItem('incomeData')
-    return savedData ? JSON.parse(savedData) : []
-  })
-  
+  const BASE_URL = import.meta.env.VITE_BASE_URL
   const [filteredData, setFilteredData] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [dateRange, setDateRange] = useState({ from: '', to: '' })
@@ -19,11 +19,57 @@ const IncomeModule = () => {
   })
   const [loading, setLoading] = useState(false)
   const [newRowId, setNewRowId] = useState(null)
+  const [incomeData, setIncomeData] = useState([])
 
   // Save to localStorage whenever incomeData changes
+
+
+
+  const loadIncome = async () => {
+    try {
+      setLoading(true)
+
+      // const res = await fetch(`${BASE_URL}/finance/income`)
+      const res = await fetch(`${BASE_URL}/finance/income/table`)
+      if (!res.ok) throw new Error('Fetch failed')
+
+      const data = await res.json()
+
+      const mapped = data.map(item => {
+        const dateObj = new Date(item.transaction_date)
+        return {
+          id: item.id,
+          day: dateObj.getDate().toString(),
+          month: dateObj.toLocaleString('default', { month: 'short' }).toUpperCase(),
+          week: Math.ceil(dateObj.getDate() / 7),
+          date: item.transaction_date.split('T')[0],
+          voucherCode: item.voucher_no,
+          transactionDetails: item.transaction_details,
+          income: Number(item.income),
+          stampDuty: Number(item.stamp),
+          wht: Number(item.wht),
+          vat: Number(item.vat),
+          grossAmount: Number(item.gross_amount),
+          incomeCentre: item.income_centre,
+          projectType: item.project_type
+        }
+      })
+
+      setIncomeData(mapped)
+      setFilteredData(mapped)
+    } catch (err) {
+      console.error('LOAD INCOME ERROR:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
-    localStorage.setItem('incomeData', JSON.stringify(incomeData))
-  }, [incomeData])
+    loadIncome()
+  }, [])
+
+
+
 
   // Filter data based on search and date range
   useEffect(() => {
@@ -70,15 +116,15 @@ const IncomeModule = () => {
 
   const handleEditChange = (e) => {
     const { name, value } = e.target
-    
+
     // Auto-calculate week based on date if date field is being edited
     if (name === 'date' && value) {
       const day = new Date(value).getDate()
       const week = Math.ceil(day / 7)
       const month = new Date(value).toLocaleString('default', { month: 'short' }).toUpperCase()
-      
-      setEditForm(prev => ({ 
-        ...prev, 
+
+      setEditForm(prev => ({
+        ...prev,
         [name]: value,
         day: day.toString(),
         month: month,
@@ -89,225 +135,213 @@ const IncomeModule = () => {
     }
   }
 
-  const handleSave = (id) => {
-    try {
-      setLoading(true)
-      
-      // Auto-calculate week if date is provided
-      let week = Number(editForm.week) || 1
-      let month = editForm.month || ''
-      let day = editForm.day || ''
-      
-      // If date is provided, calculate day, month, week
-      if (editForm.date) {
-        const dateObj = new Date(editForm.date)
-        day = dateObj.getDate().toString()
-        month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
-        week = Math.ceil(dateObj.getDate() / 7)
-      }
-      
-      const updatedIncome = {
-        ...editForm,
-        day: day,
-        month: month,
-        week: week,
-        income: Number(editForm.income) || 0,
-        stampDuty: Number(editForm.stampDuty) || 0,
-        wht: Number(editForm.wht) || 0,
-        vat: Number(editForm.vat) || 0,
-        grossAmount: Number(editForm.grossAmount) || 0,
-        id: id // Ensure ID is preserved
-      }
+//   const handleSave = async (id) => {
+//   try {
+//     setLoading(true)
 
-      // Update local state
-      const updatedData = incomeData.map(income => {
-        if (income.id === id) {
-          return updatedIncome
-        }
-        return income
-      })
-      
-      setIncomeData(updatedData)
-      setEditingId(null)
-      setNewRowId(null)
-      
-    } catch (error) {
-      console.error('Error updating income:', error)
-      alert('Error updating income record')
-    } finally {
-      setLoading(false)
+//     const payload = {
+//       transactionDate: editForm.date,
+//       voucherNo: editForm.voucherCode,
+//       transactionDetails: editForm.transactionDetails,
+//       income: Number(editForm.income) || 0,
+//       stamp: Number(editForm.stampDuty) || 0,
+//       wht: Number(editForm.wht) || 0,
+//       vat: Number(editForm.vat) || 0,
+//       incomeCentre: editForm.incomeCentre,
+//       projectType: editForm.projectType,
+//       project: '',
+//       createdBy: 1,
+//     }
+
+//     const isNew = id === '__new__'
+
+//     const res = await fetch(
+//       isNew
+//         ? `${BASE_URL}/finance/income`
+//         : `${BASE_URL}/finance/income/${id}`,
+//       {
+//         method: isNew ? 'POST' : 'PUT',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(payload),
+//       }
+//     )
+
+//     if (!res.ok) {
+//       throw new Error(`${isNew ? 'POST' : 'PUT'} failed`)
+//     }
+
+//     // 🔁 Always reload from DB (authoritative source)
+//     await loadIncome()
+
+//     setEditingId(null)
+//     setNewRowId(null)
+
+//   } catch (err) {
+//     console.error('SAVE ERROR:', err)
+//     alert('Failed to save income')
+//   } finally {
+//     setLoading(false)
+//   }
+// }
+
+const handleSave = async (id) => {
+  try {
+    setLoading(true)
+
+    const isNew = id === '__new__'
+
+    const payload = {
+      transactionDate: editForm.date,
+      voucherNo: editForm.voucherCode,
+      transactionDetails: editForm.transactionDetails,
+      income: Number(editForm.income) || 0,
+      stamp: Number(editForm.stampDuty) || 0,
+      wht: Number(editForm.wht) || 0,
+      vat: Number(editForm.vat) || 0,
+      incomeCentre: editForm.incomeCentre,
+      projectType: editForm.projectType,
+      project: '',
+      ...(isNew && { createdBy: 1 })   // ✅ ONLY for POST
     }
-  }
 
-  const handleDelete = (id) => {
+    const res = await fetch(
+      isNew
+        ? `${BASE_URL}/finance/income`
+        : `${BASE_URL}/finance/income/${id}`,
+      {
+        method: isNew ? 'POST' : 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    )
+
+    if (!res.ok) {
+      const msg = await res.text()
+      throw new Error(msg)
+    }
+
+    await loadIncome()
+    setEditingId(null)
+
+  } catch (err) {
+    console.error('SAVE ERROR:', err)
+    alert('Failed to save income')
+  } finally {
+    setLoading(false)
+  }
+}
+
+
+
+
+
+  const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this income record?')) return
 
     try {
       setLoading(true)
-      setIncomeData(incomeData.filter(income => income.id !== id))
-      setNewRowId(null)
-    } catch (error) {
-      console.error('Error deleting income:', error)
-      alert('Error deleting income record')
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handleAddNew = () => {
-    const currentDate = new Date()
-    const newIncome = {
-      id: Date.now(),
-      day: currentDate.getDate().toString(),
-      month: currentDate.toLocaleString('default', { month: 'short' }).toUpperCase(),
-      week: Math.ceil(currentDate.getDate() / 7),
-      date: currentDate.toISOString().split('T')[0],
-      voucherCode: '',
-      transactionDetails: '',
-      income: 0,
-      stampDuty: 0,
-      wht: 0,
-      vat: 0,
-      grossAmount: 0,
-      incomeCentre: '',
-      projectType: '',
-      createdAt: currentDate.toISOString()
-    }
-
-    try {
-      setLoading(true)
-      
-      setIncomeData(prev => [...prev, newIncome])
-      
-      // Automatically put the new row in edit mode
-      setEditingId(newIncome.id)
-      setNewRowId(newIncome.id)
-      setEditForm({
-        day: newIncome.day,
-        month: newIncome.month,
-        week: newIncome.week,
-        date: newIncome.date,
-        voucherCode: '',
-        transactionDetails: '',
-        income: 0,
-        stampDuty: 0,
-        wht: 0,
-        vat: 0,
-        grossAmount: 0,
-        incomeCentre: '',
-        projectType: ''
+      const res = await fetch(`${BASE_URL}/finance/income/${id}`, {
+        method: 'DELETE',
       })
-      
-    } catch (error) {
-      console.error('Error creating income:', error)
-      alert('Error creating income record')
+
+      if (!res.ok) {
+        throw new Error(`DELETE failed: ${res.status}`)
+      }
+
+      setIncomeData(prev => prev.filter(row => row.id !== id))
+      setFilteredData(prev => prev.filter(row => row.id !== id))
+
+      setEditingId(null)
+      setNewRowId(null)
+
+    } catch (err) {
+      console.error('DELETE ERROR:', err)
+      alert('Failed to delete income')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleImport = (event) => {
+
+const handleAddNew = () => {
+  if (editingId) return   // prevent multiple new rows
+
+  const today = new Date().toISOString().split('T')[0]
+  const dateObj = new Date(today)
+
+  const newRow = {
+    id: '__new__',                 // temp ID
+    day: dateObj.getDate().toString(),
+    month: dateObj.toLocaleString('default', { month: 'short' }).toUpperCase(),
+    week: Math.ceil(dateObj.getDate() / 7),
+    date: today,
+    voucherCode: '',
+    transactionDetails: '',
+    income: 0,
+    stampDuty: 0,
+    wht: 0,
+    vat: 0,
+    grossAmount: 0,                // display-only
+    incomeCentre: '',
+    projectType: '',
+  }
+
+  setIncomeData(prev => [newRow, ...prev])
+  setFilteredData(prev => [newRow, ...prev])
+  setEditForm(newRow)
+  setEditingId('__new__')
+}
+
+
+
+
+  const handleImport = async (event) => {
     const file = event.target.files[0]
+    event.target.value = ''   // 🔥 reset immediately
     if (!file) return
 
     try {
       setLoading(true)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
-          
-          const importedData = jsonData.map((row, index) => {
-            // Parse date and calculate week
-            const rowDate = row['DATE'] || row.Date || row.date
-            let dateObj = new Date()
-            let week = 1
-            let month = ''
-            let day = ''
-            
-            if (rowDate) {
-              dateObj = new Date(rowDate)
-              day = dateObj.getDate().toString()
-              month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
-              week = Math.ceil(dateObj.getDate() / 7)
-            }
-            
-            return {
-              id: Date.now() + index,
-              day: day || String(row['DAY'] || row.Day || row.day || ''),
-              month: month || String(row['MONTH'] || row.Month || row.month || ''),
-              week: week || Number(row['WEEK'] || row.Week || row.week || 1),
-              date: rowDate || new Date().toISOString().split('T')[0],
-              voucherCode: String(row['VOUCHER CODE'] || row['Voucher Code'] || row.voucherCode || `IMP-${Date.now()}-${index}`),
-              transactionDetails: String(row['TRANSACTION DETAILS'] || row['Transaction Details'] || row.transactionDetails || ''),
-              income: Number(row['INCOME'] || row.Income || row.income || 0),
-              stampDuty: Number(row['STAMP DUTY'] || row['Stamp Duty'] || row.stampDuty || 0),
-              wht: Number(row['WHT'] || row.Wht || row.wht || 0),
-              vat: Number(row['VAT'] || row.Vat || row.vat || 0),
-              grossAmount: Number(row['GROSS AMOUNT'] || row['Gross Amount'] || row.grossAmount || 0),
-              incomeCentre: String(row['INCOME CENTRE'] || row['Income Centre'] || row.incomeCentre || ''),
-              projectType: String(row['PROJECT TYPE'] || row['Project Type'] || row.projectType || ''),
-              importedAt: new Date().toISOString()
-            }
-          })
 
-          setIncomeData(prev => [...prev, ...importedData])
-          event.target.value = ''
-          alert(`Successfully imported ${importedData.length} income records!`)
-        } catch (error) {
-          console.error('Error processing import file:', error)
-          alert('Error importing Excel file. Please check the format and column names.')
-        } finally {
-          setLoading(false)
-        }
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(`${BASE_URL}/finance/income/import`, {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText)
       }
-      reader.readAsArrayBuffer(file)
-    } catch (error) {
-      console.error('Error importing income data:', error)
-      alert('Error importing income data')
+
+      const result = await res.json()
+      alert(`Imported ${result.inserted} record(s)`)
+
+      // 🔁 reload table without full refresh
+      await loadIncome()
+    } catch (err) {
+      console.error('IMPORT ERROR:', err)
+      alert('Failed to import Excel file')
+    } finally {
       setLoading(false)
     }
   }
 
-  const handleExport = () => {
-    if (incomeData.length === 0) {
-      alert('No data to export')
-      return
-    }
 
-    const worksheet = XLSX.utils.json_to_sheet(incomeData.map(item => ({
-      'DAY': item.day,
-      'MONTH': item.month,
-      'WEEK': item.week,
-      'DATE': item.date,
-      'VOUCHER CODE': item.voucherCode,
-      'TRANSACTION DETAILS': item.transactionDetails,
-      'INCOME': item.income,
-      'STAMP DUTY': item.stampDuty,
-      'WHT': item.wht,
-      'VAT': item.vat,
-      'GROSS AMOUNT': item.grossAmount,
-      'INCOME CENTRE': item.incomeCentre,
-      'PROJECT TYPE': item.projectType
-    })))
-    
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Income Data')
-    XLSX.writeFile(workbook, `income_data_${new Date().toISOString().split('T')[0]}.xlsx`)
+
+  const handleExport = () => {
+    window.location.href = `${BASE_URL}/finance/income/download`
   }
+
 
   const handleClearAll = () => {
-    if (confirm('Are you sure you want to clear ALL income records? This cannot be undone.')) {
-      setIncomeData([])
-      localStorage.removeItem('incomeData')
-      setEditingId(null)
-      setNewRowId(null)
-    }
+    setSearchTerm('')
+    setDateRange({ from: '', to: '' })
   }
+
 
   const totalIncome = filteredData.reduce((sum, item) => sum + ((item.income || 0) - (item.stampDuty || 0)), 0)
   const totalGrossAmount = filteredData.reduce((sum, item) => sum + (item.grossAmount || 0), 0)
@@ -322,7 +356,7 @@ const IncomeModule = () => {
           </div>
         </div>
       )}
-      
+
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-bold">ANNUAL INCOME</h2>
         <div className="flex items-center space-x-4">
@@ -334,12 +368,14 @@ const IncomeModule = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button
+            type="button"   // ✅ IMPORTANT
             onClick={handleAddNew}
             disabled={loading}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
           >
             Add Income
           </button>
+
         </div>
       </div>
 
@@ -423,267 +459,79 @@ const IncomeModule = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredData.length > 0 ? (
-              filteredData.map((income, index) => (
-                <tr key={income.id} className={`hover:bg-gray-50 ${newRowId === income.id ? 'bg-blue-50' : ''}`}>
-                  {/* Serial Number - Auto-generated */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500 font-medium">
-                    {index + 1}
-                  </td>
-                  
-                  {/* DAY - Auto-calculated from date */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {income.day || '--'}
-                  </td>
-                  
-                  {/* MONTH - Auto-calculated from date */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {income.month || '--'}
-                  </td>
-                  
-                  {/* WEEK - Auto-calculated from date */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {income.week || '--'}
-                  </td>
-                  
-                  {/* DATE Field - Editable */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
+            {filteredData.map((income, index) => (
+              <tr key={income.id} className="hover:bg-gray-50">
+                <td className="px-3 py-3 text-sm">{index + 1}</td>
+
+                {[
+                  'day',
+                  'month',
+                  'week',
+                  'date',
+                  'voucherCode',
+                  'transactionDetails',
+                  'income',
+                  'stampDuty',
+                  'wht',
+                  'vat',
+                  'grossAmount',
+                  'incomeCentre',
+                  'projectType'
+                ].map(field => (
+                  <td key={field} className="px-3 py-3 text-sm">
                     {editingId === income.id ? (
                       <input
-                        type="date"
-                        name="date"
-                        value={editForm.date}
+                        type={['income', 'stampDuty', 'wht', 'vat'].includes(field) ? 'number' : 'text'}
+                        name={field}
+                        value={editForm[field]}
                         onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full px-2 py-1 border rounded"
                       />
                     ) : (
-                      <span className="text-gray-500">{income.date || '--'}</span>
+                      ['income', 'stampDuty', 'wht', 'vat', 'grossAmount'].includes(field)
+                        ? `₦${(income[field] || 0).toLocaleString()}`
+                        : income[field]
                     )}
                   </td>
-                  
-                  {/* VOUCHER CODE - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="voucherCode"
-                        value={editForm.voucherCode}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Enter voucher code"
-                      />
-                    ) : (
-                      <span className={`${!income.voucherCode ? 'text-gray-400 italic' : 'text-gray-500'}`}>
-                        {income.voucherCode || 'Not set'}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* TRANSACTION DETAILS - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <textarea
-                        name="transactionDetails"
-                        value={editForm.transactionDetails}
-                        onChange={handleEditChange}
-                        className="w-64 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Enter transaction details"
-                        rows="1"
-                      />
-                    ) : (
-                      <span className={`${!income.transactionDetails ? 'text-gray-400 italic' : 'text-gray-500'}`}>
-                        {income.transactionDetails || 'No details'}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* INCOME AMOUNT - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="income"
-                        value={editForm.income}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    ) : (
-                      <span className="text-gray-500">
-                        ₦{(income.income || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* STAMP DUTY - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="stampDuty"
-                        value={editForm.stampDuty}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    ) : (
-                      <span className="text-gray-500">
-                        ₦{(income.stampDuty || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* WHT - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="wht"
-                        value={editForm.wht}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    ) : (
-                      <span className="text-gray-500">
-                        ₦{(income.wht || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* VAT - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="vat"
-                        value={editForm.vat}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    ) : (
-                      <span className="text-gray-500">
-                        ₦{(income.vat || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* GROSS AMOUNT - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="number"
-                        name="grossAmount"
-                        value={editForm.grossAmount}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                      />
-                    ) : (
-                      <span className="text-gray-500">
-                        ₦{(income.grossAmount || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* INCOME CENTRE - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="incomeCentre"
-                        value={editForm.incomeCentre}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Enter income centre"
-                      />
-                    ) : (
-                      <span className={`${!income.incomeCentre ? 'text-gray-400 italic' : 'text-gray-500'}`}>
-                        {income.incomeCentre || 'Not set'}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* PROJECT TYPE - Manually input */}
-                  <td className="px-3 py-3 whitespace-nowrap text-sm">
-                    {editingId === income.id ? (
-                      <input
-                        type="text"
-                        name="projectType"
-                        value={editForm.projectType}
-                        onChange={handleEditChange}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Enter project type"
-                      />
-                    ) : (
-                      <span className={`${!income.projectType ? 'text-gray-400 italic' : 'text-gray-500'}`}>
-                        {income.projectType || 'Not set'}
-                      </span>
-                    )}
-                  </td>
-                  
-                  {/* ACTIONS */}
-                  <td className="px-3 py-3 whitespace-nowrap text-right text-sm font-medium">
-                    {editingId === income.id ? (
-                      <div className="space-x-2">
-                        <button
-                          onClick={() => handleSave(income.id)}
-                          className="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingId(null)
-                            setNewRowId(null)
-                            // If this was a new row being edited and cancelled, remove it
-                            if (newRowId === income.id) {
-                              handleDelete(income.id)
-                            }
-                          }}
-                          className="px-3 py-1 bg-gray-500 text-white rounded-md hover:bg-gray-600"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-x-2">
-                        <button
-                          onClick={() => handleEdit(income)}
-                          className="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(income.id)}
-                          className="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={15} className="px-6 py-4 text-center text-gray-500">
-                  {incomeData.length === 0 ? 'No income records. Click "Add Income" to get started.' : 'No records match your search.'}
+                ))}
+
+                <td className="px-3 py-3 text-right">
+                  {editingId === income.id ? (
+                    <>
+                      <button
+                        onClick={() => handleSave(income.id)}
+                        className="px-3 py-1 bg-green-600 text-white rounded mr-2"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="px-3 py-1 bg-gray-500 text-white rounded"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleEdit(income)}
+                        className="px-3 py-1 bg-blue-600 text-white rounded mr-2"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(income.id)}
+                        className="px-3 py-1 bg-red-600 text-white rounded"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
+
         </table>
       </div>
 
