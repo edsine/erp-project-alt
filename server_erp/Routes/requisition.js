@@ -198,6 +198,23 @@ router.post('/requisitions', upload.array('files', 10), async (req, res) => {
   }
 });
 
+router.get('/requisitions', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT r.*, u.name as creator_name
+      FROM requisitions r
+      JOIN users u ON r.created_by = u.id
+      ORDER BY r.created_at DESC
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching requisitions' });
+  }
+});
+
+
 
 
 // Updated GET routes with separate files table
@@ -864,46 +881,147 @@ function getApprovalFlow(isFinanceDepartment) {
     : ['manager', 'executive', 'finance', 'gmd', 'chairman'];
 }
 // Pay endpoint for finance
+// router.post('/requisitions/:id/pay', async (req, res) => {
+//   try {
+//     const requisitionId = req.params.id;
+//     const { user_id } = req.body;
+
+//     // Verify user is finance
+//     const [userRows] = await db.query(
+//       'SELECT role FROM users WHERE id = ?',
+//       [user_id]
+//     );
+    
+//     if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
+//       return res.status(403).json({ message: 'Only finance users can process payments' });
+//     }
+
+//     // Verify requisition exists and is approved by chairman
+//     const [reqRows] = await db.query(
+//       'SELECT * FROM requisitions WHERE id = ? AND approved_by_chairman = 1',
+//       [requisitionId]
+//     );
+    
+//     if (reqRows.length === 0) {
+//       return res.status(404).json({ message: 'Requisition not found or not approved by chairman' });
+//     }
+
+//     // Update status to completed
+//     await db.query(
+//       'UPDATE requisitions SET status = "completed" WHERE id = ?',
+//       [requisitionId]
+//     );
+
+//     res.status(200).json({ 
+//       success: true, 
+//       message: 'Payment processed successfully' 
+//     });
+//   } catch (err) {
+//     console.error('Payment processing error:', err);
+//     res.status(500).json({ message: 'Error processing payment' });
+//   }
+// });
+
+
+
 router.post('/requisitions/:id/pay', async (req, res) => {
+  const connection = await db.getConnection();
+  console.log("PAY ROUTE HIT for requisition:", req.params.id);
+
   try {
     const requisitionId = req.params.id;
-    const { user_id } = req.body;
+    const { user_id, bankDebited, category, costCentre, subCostCentre, voucher } = req.body;
 
-    // Verify user is finance
-    const [userRows] = await db.query(
+    await connection.beginTransaction();
+
+    // 1. Verify finance user
+    const [userRows] = await connection.query(
       'SELECT role FROM users WHERE id = ?',
       [user_id]
     );
-    
+
     if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
       return res.status(403).json({ message: 'Only finance users can process payments' });
     }
 
-    // Verify requisition exists and is approved by chairman
-    const [reqRows] = await db.query(
-      'SELECT * FROM requisitions WHERE id = ? AND approved_by_chairman = 1',
+    // 2. Get requisition
+    const [reqRows] = await connection.query(
+      'SELECT * FROM requisitions WHERE id = ?',
       [requisitionId]
     );
-    
+
     if (reqRows.length === 0) {
-      return res.status(404).json({ message: 'Requisition not found or not approved by chairman' });
+      return res.status(404).json({ message: 'Requisition not found' });
     }
 
-    // Update status to completed
-    await db.query(
-      'UPDATE requisitions SET status = "completed" WHERE id = ?',
+    const requisition = reqRows[0];
+
+    if (requisition.approved_by_chairman !== 1) {
+      return res.status(400).json({ message: "Chairman approval required" });
+    }
+
+    // 3. Mark as paid if not already
+    if (requisition.paid_by_finance !== 1) {
+      await connection.query(
+        `UPDATE requisitions 
+         SET status = "completed", paid_by_finance = 1 
+         WHERE id = ?`,
+        [requisitionId]
+      );
+    }
+
+    // 4. Check if expense already exists
+    const [existingExpense] = await connection.query(
+      `SELECT id FROM expense_records WHERE requisition_id = ?`,
       [requisitionId]
     );
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'Payment processed successfully' 
+    let expenseId = null;
+
+    // 5. Create expense only if none exists
+    if (existingExpense.length === 0) {
+      const safeCategory = category || 'Uncategorized';
+      const safeCostCentre = costCentre || requisition.sender_department || 'General';
+
+      const [result] = await connection.query(
+        `INSERT INTO expense_records
+        (transaction_date, voucher_no, transaction_details, spent, category, cost_centre, sub_cost_centre, bank_debited, created_by, requisition_id)
+        VALUES (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          voucher || null,
+          requisition.title,
+          requisition.total_amount,
+          safeCategory,
+          safeCostCentre,
+          subCostCentre || null,
+          bankDebited || null,
+          user_id,
+          requisitionId
+        ]
+      );
+
+      expenseId = result.insertId;
+    } else {
+      expenseId = existingExpense[0].id;
+    }
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: 'Payment processed and expense created/verified',
+      expense_id: expenseId
     });
+
   } catch (err) {
-    console.error('Payment processing error:', err);
+    await connection.rollback();
+    console.error("PAY ROUTE ERROR:", err);
     res.status(500).json({ message: 'Error processing payment' });
+  } finally {
+    connection.release();
   }
 });
+
 
 // GET comments for a requisition
 router.get('/requisitions/:id/comments', async (req, res) => {
@@ -1104,34 +1222,130 @@ router.post('/requisitions/:id/pay', async (req, res) => {
 });
 
 // Mark requisition as paid by finance
+// router.post('/requisitions/:id/mark-paid', async (req, res) => {
+//   try {
+//     const requisitionId = req.params.id;
+//     const { user_id } = req.body;
+
+//     // Verify user is finance
+//     const [userRows] = await db.query(
+//       'SELECT role FROM users WHERE id = ?',
+//       [user_id]
+//     );
+    
+//     if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
+//       return res.status(403).json({ message: 'Only finance users can mark requisitions as paid' });
+//     }
+
+//     // Update paid_by_finance flag
+//     await db.query(
+//       'UPDATE requisitions SET paid_by_finance = 1 WHERE id = ?',
+//       [requisitionId]
+//     );
+
+//     res.status(200).json({ 
+//       success: true, 
+//       message: 'Requisition marked as paid successfully' 
+//     });
+//   } catch (err) {
+//     console.error('Error marking requisition as paid:', err);
+//     res.status(500).json({ message: 'Error marking requisition as paid' });
+//   }
+// });
+
+
 router.post('/requisitions/:id/mark-paid', async (req, res) => {
+  const connection = await db.getConnection();
+
   try {
     const requisitionId = req.params.id;
-    const { user_id } = req.body;
+    const { user_id, bankDebited, category, costCentre, subCostCentre, voucher } = req.body;
 
-    // Verify user is finance
-    const [userRows] = await db.query(
+    await connection.beginTransaction();
+
+    // Verify finance user
+    const [userRows] = await connection.query(
       'SELECT role FROM users WHERE id = ?',
       [user_id]
     );
-    
+
     if (userRows.length === 0 || userRows[0].role.toLowerCase() !== 'finance') {
       return res.status(403).json({ message: 'Only finance users can mark requisitions as paid' });
     }
 
-    // Update paid_by_finance flag
-    await db.query(
-      'UPDATE requisitions SET paid_by_finance = 1 WHERE id = ?',
+    // Get requisition
+    const [reqRows] = await connection.query(
+      'SELECT * FROM requisitions WHERE id = ?',
       [requisitionId]
     );
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'Requisition marked as paid successfully' 
+    if (reqRows.length === 0) {
+      return res.status(404).json({ message: 'Requisition not found' });
+    }
+
+    const requisition = reqRows[0];
+
+    if (requisition.approved_by_chairman !== 1) {
+      return res.status(400).json({ message: 'Chairman approval required' });
+    }
+
+    // Mark as paid
+    await connection.query(
+      'UPDATE requisitions SET paid_by_finance = 1, status="completed" WHERE id = ?',
+      [requisitionId]
+    );
+
+    // Check if expense already exists
+    const [existingExpense] = await connection.query(
+      'SELECT id FROM expense_records WHERE requisition_id = ?',
+      [requisitionId]
+    );
+
+    let expenseId = null;
+
+    // Create expense if none exists
+    if (existingExpense.length === 0) {
+
+      const safeCategory = category || 'Uncategorized';
+      const safeCostCentre = costCentre || requisition.sender_department || 'General';
+
+      const [result] = await connection.query(
+        `INSERT INTO expense_records
+        (transaction_date, voucher_no, transaction_details, spent, category, cost_centre, sub_cost_centre, bank_debited, created_by, requisition_id)
+        VALUES (CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          voucher || null,
+          requisition.title,
+          requisition.total_amount,
+          safeCategory,
+          safeCostCentre,
+          subCostCentre || null,
+          bankDebited || null,
+          user_id,
+          requisitionId
+        ]
+      );
+
+      expenseId = result.insertId;
+    } else {
+      expenseId = existingExpense[0].id;
+    }
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: 'Requisition paid and expense created',
+      expense_id: expenseId
     });
+
   } catch (err) {
-    console.error('Error marking requisition as paid:', err);
+    await connection.rollback();
+    console.error(err);
     res.status(500).json({ message: 'Error marking requisition as paid' });
+  } finally {
+    connection.release();
   }
 });
+
 module.exports = router;
