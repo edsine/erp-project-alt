@@ -29,13 +29,16 @@ const Dashboard = () => {
   const [directMemoCount, setDirectMemoCount] = useState(0);
 
   // Check if user has access to finance features
-  const hasFinanceAccess = () => {
-    return user && (
-      user.role === 'finance' || 
-      user.role === 'chairman' || 
-      user.department === 'finance' 
-    )
-  }
+ const hasFinanceAccess = () => {
+  if (!user) return false;
+
+  return (
+    user.role?.toLowerCase() === 'finance' ||
+    user.role?.toLowerCase() === 'chairman' ||
+    user.department?.toLowerCase() === 'finance'
+  );
+};
+
 
   useEffect(() => {
     const fetchTaskCount = async () => {
@@ -160,6 +163,18 @@ const Dashboard = () => {
       return () => clearInterval(interval);
     }
   }, [user, BASE_URL]);
+
+  
+  useEffect(() => {
+  console.log("DASHBOARD USER:", JSON.stringify(user, null, 2));
+}, [user]);
+
+console.log(
+  "CHECK:",
+  user.department,
+  user.department?.trim().toLowerCase() === "finance"
+);
+
 
   const getFirstName = () => user?.name?.split(' ')[0] || 'User';
 

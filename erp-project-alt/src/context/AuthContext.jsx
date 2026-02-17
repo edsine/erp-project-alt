@@ -44,6 +44,8 @@ export function AuthProvider({ children }) {
 
       const data = await res.json()
 
+      console.log("LOGIN RESPONSE FULL:", JSON.stringify(data, null, 2))
+
       // Assuming backend returns user info and token like { user: {...}, token: "..." }
       setUser(data.user)
       localStorage.setItem('user', JSON.stringify(data.user))

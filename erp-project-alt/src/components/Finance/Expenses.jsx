@@ -239,96 +239,149 @@ const handleAddNew = async () => {
 }
 
 
-  const handleImport = (event) => {
-    const file = event.target.files[0]
-    if (!file) return
+  // const handleImport = (event) => {
+  //   const file = event.target.files[0]
+  //   if (!file) return
 
-    try {
-      setLoading(true)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const sheetName = workbook.SheetNames[0]
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet)
+  //   try {
+  //     setLoading(true)
+  //     const reader = new FileReader()
+  //     reader.onload = (e) => {
+  //       try {
+  //         const data = new Uint8Array(e.target.result)
+  //         const workbook = XLSX.read(data, { type: 'array' })
+  //         const sheetName = workbook.SheetNames[0]
+  //         const worksheet = workbook.Sheets[sheetName]
+  //         const jsonData = XLSX.utils.sheet_to_json(worksheet)
           
-          const importedData = jsonData.map((row, index) => {
-            // Parse date and calculate week
-            const rowDate = row['DATE'] || row.Date || row.date
-            let dateObj = new Date()
-            let week = 1
-            let month = ''
-            let day = ''
+  //         const importedData = jsonData.map((row, index) => {
+  //           // Parse date and calculate week
+  //           const rowDate = row['DATE'] || row.Date || row.date
+  //           let dateObj = new Date()
+  //           let week = 1
+  //           let month = ''
+  //           let day = ''
             
-            if (rowDate) {
-              dateObj = new Date(rowDate)
-              day = dateObj.getDate().toString()
-              month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
-              week = Math.ceil(dateObj.getDate() / 7)
-            }
+  //           if (rowDate) {
+  //             dateObj = new Date(rowDate)
+  //             day = dateObj.getDate().toString()
+  //             month = dateObj.toLocaleString('default', { month: 'short' }).toUpperCase()
+  //             week = Math.ceil(dateObj.getDate() / 7)
+  //           }
             
-            return {
-              id: Date.now() + index,
-              day: day || String(row['DAY'] || row.Day || row.day || ''),
-              month: month || String(row['MONTH'] || row.Month || row.month || ''),
-              week: week || Number(row['WEEK'] || row.Week || row.week || 1),
-              date: rowDate || new Date().toISOString().split('T')[0],
-              voucherCode: String(row['VOUCHER CODE'] || row['Voucher Code'] || row.voucherCode || `IMP-${Date.now()}-${index}`),
-              transactionDetails: String(row['TRANSACTION DETAILS'] || row['Transaction Details'] || row.transactionDetails || ''),
-              spent: Number(row['SPENT'] || row.Spent || row.spent || 0),
-              category: String(row['CATEGORY'] || row.Category || row.category || ''),
-              costCentre: String(row['COST CENTRE'] || row['Cost Centre'] || row.costCentre || ''),
-              subCostCentre: String(row['SUB COST CENTRE'] || row['Sub Cost Centre'] || row.subCostCentre || ''),
-              bankDebited: String(row['BANK DEBITED'] || row['Bank Debited'] || row.bankDebited || 'No'),
-              importedAt: new Date().toISOString()
-            }
-          })
+  //           return {
+  //             id: Date.now() + index,
+  //             day: day || String(row['DAY'] || row.Day || row.day || ''),
+  //             month: month || String(row['MONTH'] || row.Month || row.month || ''),
+  //             week: week || Number(row['WEEK'] || row.Week || row.week || 1),
+  //             date: rowDate || new Date().toISOString().split('T')[0],
+  //             voucherCode: String(row['VOUCHER CODE'] || row['Voucher Code'] || row.voucherCode || `IMP-${Date.now()}-${index}`),
+  //             transactionDetails: String(row['TRANSACTION DETAILS'] || row['Transaction Details'] || row.transactionDetails || ''),
+  //             spent: Number(row['SPENT'] || row.Spent || row.spent || 0),
+  //             category: String(row['CATEGORY'] || row.Category || row.category || ''),
+  //             costCentre: String(row['COST CENTRE'] || row['Cost Centre'] || row.costCentre || ''),
+  //             subCostCentre: String(row['SUB COST CENTRE'] || row['Sub Cost Centre'] || row.subCostCentre || ''),
+  //             bankDebited: String(row['BANK DEBITED'] || row['Bank Debited'] || row.bankDebited || 'No'),
+  //             importedAt: new Date().toISOString()
+  //           }
+  //         })
 
-          // Add to existing data
-          setExpensesData(prev => [...prev, ...importedData])
-          event.target.value = ''
-          alert(`Successfully imported ${importedData.length} expense records!`)
-        } catch (error) {
-          console.error('Error processing import file:', error)
-          alert('Error importing Excel file. Please check the format and column names.')
-        } finally {
-          setLoading(false)
-        }
+  //         // Add to existing data
+  //         setExpensesData(prev => [...prev, ...importedData])
+  //         event.target.value = ''
+  //         alert(`Successfully imported ${importedData.length} expense records!`)
+  //       } catch (error) {
+  //         console.error('Error processing import file:', error)
+  //         alert('Error importing Excel file. Please check the format and column names.')
+  //       } finally {
+  //         setLoading(false)
+  //       }
+  //     }
+  //     reader.readAsArrayBuffer(file)
+  //   } catch (error) {
+  //     console.error('Error importing expense data:', error)
+  //     alert('Error importing expense data')
+  //     setLoading(false)
+  //   }
+  // }
+
+  const handleImport = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  try {
+    setLoading(true)
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(
+      `${import.meta.env.VITE_BASE_URL}/finance/import-excel`,
+      {
+        method: 'POST',
+        body: formData
       }
-      reader.readAsArrayBuffer(file)
-    } catch (error) {
-      console.error('Error importing expense data:', error)
-      alert('Error importing expense data')
-      setLoading(false)
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Import failed')
     }
+
+    alert(result.message || 'Import successful')
+
+  } catch (error) {
+    console.error(error)
+    alert(error.message)
+  } finally {
+    setLoading(false)
+    event.target.value = ''
   }
+}
 
-  const handleExport = () => {
-    if (expensesData.length === 0) {
-      alert('No data to export')
-      return
-    }
 
-    const worksheet = XLSX.utils.json_to_sheet(expensesData.map(item => ({
-      'DAY': item.day,
-      'MONTH': item.month,
-      'WEEK': item.week,
-      'DATE': item.date,
-      'VOUCHER CODE': item.voucherCode,
-      'TRANSACTION DETAILS': item.transactionDetails,
-      'COST': item.cost,
-      'CATEGORY': item.category,
-      // 'COST CENTRE': item.costCentre,
-      // 'SUB COST CENTRE': item.subCostCentre,
-      // 'BANK DEBITED': item.bankDebited
-    })))
+  // const handleExport = () => {
+  //   if (expensesData.length === 0) {
+  //     alert('No data to export')
+  //     return
+  //   }
+
+  //   const worksheet = XLSX.utils.json_to_sheet(expensesData.map(item => ({
+  //     'DAY': item.day,
+  //     'MONTH': item.month,
+  //     'WEEK': item.week,
+  //     'DATE': item.date,
+  //     'VOUCHER CODE': item.voucherCode,
+  //     'TRANSACTION DETAILS': item.transactionDetails,
+  //     'COST': item.cost,
+  //     'CATEGORY': item.category,
+  //     // 'COST CENTRE': item.costCentre,
+  //     // 'SUB COST CENTRE': item.subCostCentre,
+  //     // 'BANK DEBITED': item.bankDebited
+  //   })))
     
-    const workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses Data')
-    XLSX.writeFile(workbook, `expenses_data_${new Date().toISOString().split('T')[0]}.xlsx`)
-  }
+  //   const workbook = XLSX.utils.book_new()
+  //   XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses Data')
+  //   XLSX.writeFile(workbook, `expenses_data_${new Date().toISOString().split('T')[0]}.xlsx`)
+  // }
+
+  const handleExport = async () => {
+  const response = await fetch(
+    `${import.meta.env.VITE_BASE_URL}/finance/expense/export`
+  )
+
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "expenses.xlsx"
+  a.click()
+
+  window.URL.revokeObjectURL(url)
+}
+
 
   const handleClearAll = () => {
     if (confirm('Are you sure you want to clear ALL expense records? This cannot be undone.')) {

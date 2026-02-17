@@ -1,7 +1,15 @@
 // routes/expenses.js
 const express = require('express')
 const router = express.Router()
+const multer = require('multer')
+const XLSX = require('xlsx')
+const db = require('../config/db')
 const db = require('../db')
+
+
+// Configure multer (store in memory)
+const upload = multer({ storage: multer.memoryStorage() })
+
 
 // Get all expense records
 router.get('/', async (req, res) => {
@@ -171,6 +179,54 @@ router.delete('/:id', async (req, res) => {
     await db.execute('DELETE FROM expenses WHERE id = ?', [id])
     res.json({ message: 'Expense record deleted successfully' })
   } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
+
+
+
+
+router.post('/import-excel', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    // Read Excel file
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' })
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+
+    const data = XLSX.utils.sheet_to_json(sheet)
+
+    if (!data.length) {
+      return res.status(400).json({ error: 'Excel file is empty' })
+    }
+
+    const values = data.map(row => [
+      row['DAY'],
+      row['MONTH'],
+      row['WEEK'],
+      row['VOUCHER CODE'],
+      row['TRANSACTION DETAILS'],
+      row['COST'],
+      row['CATEGORY'],
+      row['DATE']
+    ])
+
+    const query = `
+      INSERT INTO expenses 
+      (day, month, week, voucher, transaction_details, amount, category, date)
+      VALUES ?
+    `
+
+    await db.query(query, [values])
+
+    res.json({ message: 'Excel data imported successfully' })
+
+  } catch (error) {
+    console.error(error)
     res.status(500).json({ error: error.message })
   }
 })

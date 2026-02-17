@@ -28,6 +28,7 @@ app.use('/api', ReportRoutes);
 // app.use('/api', activityRoutes);
 app.use('/api/direct-memos', directMemosRoutes);
 app.use('/api/finance', financeRoutes); 
+console.log("Finance routes file loaded")
 
 
 
