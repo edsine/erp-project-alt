@@ -184,7 +184,7 @@ useEffect(() => {
       user.role === 'finance' ||
       user.role === 'chairman' ||
       user.department === 'finance' ||
-      user.role === 'admin' // Add admin if they should also have access
+      user.role === 'admin' 
     )
   }
 
