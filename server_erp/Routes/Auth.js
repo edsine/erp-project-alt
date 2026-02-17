@@ -15,7 +15,7 @@ router.post('/register', async (req, res) => {
                  VALUES (?, ?, ?, ?, ?, ?)`;
 
     const [result] = await db.query(sql, [name, email, hashedPassword, role, department, is_admin || 0]);
-    
+
     res.status(201).json({
       message: 'User registered successfully',
       id: result.insertId
@@ -33,7 +33,7 @@ router.post('/login', async (req, res) => {
   try {
     const sql = `SELECT * FROM users WHERE email = ?`;
     const [results] = await db.query(sql, [email]);
-    
+
     if (results.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -50,27 +50,28 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1d' }
     );
 
-    res.json({ 
-      token, 
-      user: { 
-        id: user.id, 
-        name: user.name, 
-        role: user.role, 
-        is_admin: user.is_admin 
-      } 
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        department: user.department,
+        is_admin: user.is_admin
+      }
     });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Server error during login' });
   }
 });
-    
+
 // GET /users - fetch all users
 router.get('/users', async (req, res) => {
   try {
     const sql = 'SELECT id, name, email, role, department, is_admin, created_at FROM users';
     const [results] = await db.query(sql);
-    
+
     res.json(results);
   } catch (err) {
     console.error('Error fetching users:', err);
@@ -108,7 +109,7 @@ router.post('/users', async (req, res) => {
   try {
     // Check for existing email
     const [existingUsers] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-    
+
     if (existingUsers.length > 0) {
       return res.status(400).json({ message: 'Email already in use' });
     }
@@ -126,10 +127,10 @@ router.post('/users', async (req, res) => {
     };
 
     const [result] = await db.query('INSERT INTO users SET ?', user);
-    
-    res.status(201).json({ 
-      message: 'User created successfully', 
-      user_id: result.insertId 
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user_id: result.insertId
     });
   } catch (error) {
     console.error('Error creating user:', error);
@@ -157,7 +158,7 @@ router.put('/users', async (req, res) => {
     // If ID is provided, update the existing user
     if (id) {
       const updates = { name, email, role, department, is_admin };
-      
+
       // If password is provided, hash and include it
       if (password) {
         updates.password = await bcrypt.hash(password, 10);
@@ -201,13 +202,13 @@ router.put('/users', async (req, res) => {
 router.put('/change-password', async (req, res) => {
   console.log('=== CHANGE PASSWORD ENDPOINT HIT ===');
   console.log('Request body:', req.body);
-  
+
   const { userId, oldPassword, newPassword } = req.body;
 
   if (!userId || !oldPassword || !newPassword) {
     console.log('❌ Missing required fields');
-    return res.status(400).json({ 
-      error: 'User ID, current password, and new password are required' 
+    return res.status(400).json({
+      error: 'User ID, current password, and new password are required'
     });
   }
 
@@ -218,9 +219,9 @@ router.put('/change-password', async (req, res) => {
     // Fetch user from database
     const sql = `SELECT id, password FROM users WHERE id = ?`;
     const [results] = await db.query(sql, [userId]);
-    
+
     console.log('📊 Database results:', results);
-    
+
     if (results.length === 0) {
       console.log('❌ User not found');
       return res.status(404).json({ error: 'User not found' });
@@ -233,7 +234,7 @@ router.put('/change-password', async (req, res) => {
     console.log('🔐 Verifying old password...');
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
     console.log('Password valid:', isOldPasswordValid);
-    
+
     if (!isOldPasswordValid) {
       console.log('❌ Current password is incorrect');
       return res.status(401).json({ error: 'Current password is incorrect' });
@@ -256,15 +257,15 @@ router.put('/change-password', async (req, res) => {
     }
 
     console.log('✅ Password updated successfully');
-    res.json({ 
-      message: 'Password updated successfully' 
+    res.json({
+      message: 'Password updated successfully'
     });
-    
+
   } catch (err) {
     console.error('💥 Password change error:', err);
-    res.status(500).json({ 
-      error: 'Failed to change password', 
-      details: err.message 
+    res.status(500).json({
+      error: 'Failed to change password',
+      details: err.message
     });
   }
 });

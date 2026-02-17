@@ -594,18 +594,21 @@ router.post('/expense', async (req, res) => {
 
 router.get('/expense', async (req, res) => {
   try {
-    const [rows] = await db.execute(`
-      SELECT *
-      FROM expense_records
+    const [rows] = await db.query(`
+      SELECT * FROM expense_records
       ORDER BY transaction_date DESC, id DESC
     `)
 
+    console.log("Fetched rows:", rows.length)
+
     res.json(rows)
+
   } catch (err) {
-    console.error('GET EXPENSES ERROR:', err)
+    console.error(err)
     res.status(500).json({ error: 'Failed to fetch expenses' })
   }
 })
+
 
 router.get('/expense/:id', async (req, res) => {
   try {
@@ -627,6 +630,113 @@ router.get('/expense/:id', async (req, res) => {
   }
 })
 
+
+router.post('/import-excel', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' })
+    }
+
+    // 🔥 Read Excel from disk (since you're using diskStorage)
+    const workbook = XLSX.readFile(req.file.path)
+
+    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+      return res.status(400).json({ error: 'Invalid Excel file' })
+    }
+
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json(sheet)
+
+    if (!data.length) {
+      return res.status(400).json({ error: 'Excel file is empty' })
+    }
+
+    console.log("Parsed rows:", data.length)
+
+    // 🔥 Map Excel rows to DB columns
+    const values = data.map(row => [
+      safeTransactionDate(row),                                           // transaction_date
+      safeText(normalize(row, ['VOUCHER CODE', 'Voucher Code'])),         // voucher_no
+      safeText(normalize(row, ['TRANSACTION DETAILS'])),                   // transaction_details
+      safeNumber(normalize(row, ['COST', 'Spent', 'Amount'])),             // spent
+      safeText(normalize(row, ['CATEGORY']), 'Uncategorized'),             // category
+      'ICT',                                                               // cost_centre (default)
+      null,                                                                // sub_cost_centre
+      null,                                                                // bank_debited
+      1                                                                    // created_by (replace with logged in user id)
+    ])
+
+    const query = `
+      INSERT INTO expense_records
+      (transaction_date, voucher_no, transaction_details, spent, category,
+       cost_centre, sub_cost_centre, bank_debited, created_by)
+      VALUES ?
+    `
+
+    const [result] = await db.query(query, [values])
+
+    // 🔥 Delete uploaded file after processing
+    fs.unlinkSync(req.file.path)
+
+    res.json({
+      message: 'Excel data imported successfully',
+      inserted: result.affectedRows
+    })
+
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: error.message })
+  }
+})
+
+
+router.get('/expense/export', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        transaction_date AS DATE,
+        voucher_no AS "VOUCHER CODE",
+        transaction_details AS "TRANSACTION DETAILS",
+        spent AS COST,
+        category AS CATEGORY,
+        cost_centre AS "COST CENTRE",
+        sub_cost_centre AS "SUB COST CENTRE",
+        bank_debited AS "BANK DEBITED",
+        created_at AS "CREATED AT"
+      FROM expense_records
+      ORDER BY transaction_date DESC, id DESC
+    `)
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "No expense records found" })
+    }
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Expenses")
+
+    // Generate buffer
+    const buffer = XLSX.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx"
+    })
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=expense-export-${Date.now()}.xlsx`
+    )
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    res.send(buffer)
+
+  } catch (error) {
+    console.error("EXPORT ERROR:", error)
+    res.status(500).json({ error: "Failed to export expenses" })
+  }
+})
 router.delete('/expense/:id', async (req, res) => {
   try {
     const { id } = req.params
@@ -646,8 +756,6 @@ router.delete('/expense/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete expense' })
   }
 })
-
-
 
 
 router.put('/expense/:id', async (req, res) => {
@@ -772,6 +880,41 @@ router.get('/report', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate financial report' })
   }
 })
+
+
+
+// router.post('/import-excel', upload.single('file'), async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ error: 'No file uploaded' })
+//     }
+
+//     // 🔥 FIX HERE
+//     const workbook = XLSX.readFile(req.file.path)
+
+//     if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+//       return res.status(400).json({ error: 'Invalid Excel file' })
+//     }
+
+//     const sheetName = workbook.SheetNames[0]
+//     const sheet = workbook.Sheets[sheetName]
+//     const data = XLSX.utils.sheet_to_json(sheet)
+
+//     if (!data.length) {
+//       return res.status(400).json({ error: 'Excel file is empty' })
+//     }
+
+//     console.log("Rows parsed:", data.length)
+
+//     res.json({ message: 'Excel parsed successfully', rows: data.length })
+
+//   } catch (error) {
+//     console.error(error)
+//     res.status(500).json({ error: error.message })
+//   }
+// })
+
+
 
 
 
