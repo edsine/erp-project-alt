@@ -47,7 +47,7 @@ const upload = multer({
 });
 
 router.post('/tasks', upload.single('file'), async (req, res) => {
-  const { title, description, dueDate, priority = 'medium', status = 'pending', assignedTo, createdBy } = req.body;
+  const { title, description, dueDate, priority = 'medium', status = 'pending', assignedTo, createdBy, assignedBy } = req.body;
 
   if (!title || !createdBy) {
     return res.status(400).json({ message: 'Title and createdBy are required.' });
@@ -71,6 +71,7 @@ router.post('/tasks', upload.single('file'), async (req, res) => {
     priority,
     status,
     created_by: createdBy,
+    assigned_by: assignedBy || createdBy, // Who is assigning the task (defaults to creator)
     assigned_to: assignedTo || null,
     report_requested: false,
   };
@@ -130,6 +131,8 @@ router.get('/tasks', async (req, res) => {
         t.updated_at,
         t.created_by,
         creator.name AS created_by_name,
+        t.assigned_by,
+        assigner.name AS assigned_by_name,
         t.assigned_to,
         assignee.name AS assigned_to_name,
         t.attachment,
@@ -138,6 +141,7 @@ router.get('/tasks', async (req, res) => {
         t.report_requested
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
+      LEFT JOIN users assigner ON t.assigned_by = assigner.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
       ORDER BY t.created_at DESC
     `;
@@ -165,6 +169,8 @@ router.get('/tasks/:id', async (req, res) => {
         t.updated_at,
         t.created_by,
         creator.name AS created_by_name,
+        t.assigned_by,
+        assigner.name AS assigned_by_name,
         t.assigned_to,
         assignee.name AS assigned_to_name,
         t.attachment,
@@ -173,6 +179,7 @@ router.get('/tasks/:id', async (req, res) => {
         t.report_requested
       FROM tasks t
       LEFT JOIN users creator ON t.created_by = creator.id
+      LEFT JOIN users assigner ON t.assigned_by = assigner.id
       LEFT JOIN users assignee ON t.assigned_to = assignee.id
       WHERE t.id = ?
     `;
@@ -340,6 +347,90 @@ router.get('/tasks/counts/user/:userId', async (req, res) => {
   }
 });
 
+// Update task details (full edit)
+router.put('/tasks/:taskId/update', upload.single('file'), async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.taskId, 10);
+    const { title, description, dueDate, priority, assignedTo, userId, removeFile } = req.body;
+
+    if (!taskId || !userId) {
+      return res.status(400).json({ message: 'taskId and userId are required.' });
+    }
+
+    // Verify the user is the creator (only creator can edit task details)
+    const checkTaskQuery = 'SELECT created_by, attachment, attachment_path FROM tasks WHERE id = ?';
+    const [results] = await db.query(checkTaskQuery, [taskId]);
+    
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const task = results[0];
+    
+    if (task.created_by !== parseInt(userId)) {
+      return res.status(403).json({ message: 'Only the task creator can edit task details' });
+    }
+
+    // Validate priority if provided
+    if (priority) {
+      const validPriorities = ['low', 'medium', 'high'];
+      if (!validPriorities.includes(priority)) {
+        return res.status(400).json({ message: 'Invalid priority value.' });
+      }
+    }
+
+    // Build update object
+    const updateData = {
+      title: title || task.title,
+      description: description || null,
+      due_date: dueDate || task.due_date,
+      priority: priority || task.priority,
+      assigned_to: assignedTo || task.assigned_to,
+      updated_at: new Date()
+    };
+
+    // Handle file updates
+    if (removeFile === 'true') {
+      // Remove existing file
+      if (task.attachment_path && fs.existsSync(task.attachment_path)) {
+        try {
+          fs.unlinkSync(task.attachment_path);
+        } catch (fileErr) {
+          console.error('Error deleting old file:', fileErr);
+        }
+      }
+      updateData.attachment = null;
+      updateData.attachment_original_name = null;
+      updateData.attachment_path = null;
+    }
+
+    // Add new file if uploaded
+    if (req.file) {
+      // Remove old file if exists
+      if (task.attachment_path && fs.existsSync(task.attachment_path)) {
+        try {
+          fs.unlinkSync(task.attachment_path);
+        } catch (fileErr) {
+          console.error('Error deleting old file:', fileErr);
+        }
+      }
+      updateData.attachment = req.file.filename;
+      updateData.attachment_original_name = req.file.originalname;
+      updateData.attachment_path = req.file.path;
+    }
+
+    // Update the task
+    const updateQuery = 'UPDATE tasks SET ? WHERE id = ?';
+    await db.query(updateQuery, [updateData, taskId]);
+    
+    res.json({ message: 'Task updated successfully' });
+  } catch (err) {
+    console.error('Error updating task:', err);
+    res.status(500).json({ message: 'Failed to update task', error: err.message });
+  }
+});
+
+// Update task status only (for assignees)
 router.put('/tasks/:taskId', async (req, res) => {
   try {
     const taskId = parseInt(req.params.taskId, 10);
@@ -447,6 +538,99 @@ router.post('/tasks/:taskId/clear-report-request', async (req, res) => {
   } catch (err) {
     console.error('Error clearing task report request:', err);
     res.status(500).json({ message: 'Failed to clear task report request', error: err.message });
+  }
+});
+
+// Edit task endpoint
+router.put('/tasks/:taskId/edit', upload.single('file'), async (req, res) => {
+  try {
+    const taskId = parseInt(req.params.taskId, 10);
+    const { title, description, dueDate, priority, assignedTo, assignedBy, userId, removeFile } = req.body;
+
+    if (!taskId || !userId) {
+      return res.status(400).json({ message: 'taskId and userId are required.' });
+    }
+
+    if (!title || !assignedTo || !dueDate) {
+      return res.status(400).json({ message: 'Title, assignedTo, and dueDate are required.' });
+    }
+
+    // Verify the user is the creator OR the person who assigned it (delegator)
+    const checkTaskQuery = 'SELECT created_by, assigned_by, assigned_to, attachment_path FROM tasks WHERE id = ?';
+    const [results] = await db.query(checkTaskQuery, [taskId]);
+    
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    const task = results[0];
+    
+    // Can edit if: creator OR person who assigned it
+    const canEdit = (task.created_by === parseInt(userId)) || (task.assigned_by === parseInt(userId));
+    
+    if (!canEdit) {
+      return res.status(403).json({ message: 'Only the task creator or person who assigned it can edit this task' });
+    }
+
+    const validPriorities = ['low', 'medium', 'high'];
+    if (!validPriorities.includes(priority)) {
+      return res.status(400).json({ message: 'Invalid priority value.' });
+    }
+
+    // Build update object
+    const updateData = {
+      title,
+      description: description || null,
+      due_date: dueDate,
+      priority,
+      assigned_to: assignedTo,
+      updated_at: new Date()
+    };
+
+    // If assignedBy is provided (task is being reassigned/delegated), update assigned_by
+    if (assignedBy) {
+      updateData.assigned_by = parseInt(assignedBy);
+    }
+
+    // Handle file operations
+    if (removeFile === 'true') {
+      // Remove existing file
+      if (task.attachment_path && fs.existsSync(task.attachment_path)) {
+        try {
+          fs.unlinkSync(task.attachment_path);
+        } catch (fileErr) {
+          console.error('Error deleting old file:', fileErr);
+        }
+      }
+      updateData.attachment = null;
+      updateData.attachment_original_name = null;
+      updateData.attachment_path = null;
+    }
+
+    // Add new file if uploaded
+    if (req.file) {
+      // Delete old file if exists
+      if (task.attachment_path && fs.existsSync(task.attachment_path)) {
+        try {
+          fs.unlinkSync(task.attachment_path);
+        } catch (fileErr) {
+          console.error('Error deleting old file:', fileErr);
+        }
+      }
+      
+      updateData.attachment = req.file.filename;
+      updateData.attachment_original_name = req.file.originalname;
+      updateData.attachment_path = req.file.path;
+    }
+
+    // Update task in database
+    const updateQuery = 'UPDATE tasks SET ? WHERE id = ?';
+    await db.query(updateQuery, [updateData, taskId]);
+    
+    res.json({ message: 'Task updated successfully' });
+  } catch (err) {
+    console.error('Error updating task:', err);
+    res.status(500).json({ message: 'Failed to update task', error: err.message });
   }
 });
 

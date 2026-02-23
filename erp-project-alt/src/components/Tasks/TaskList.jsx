@@ -23,6 +23,19 @@ const TaskList = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Edit modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    assignedTo: '',
+    dueDate: '',
+    priority: 'medium',
+  });
+  const [editFile, setEditFile] = useState(null);
+  const [removeExistingFile, setRemoveExistingFile] = useState(false);
+
   // Fetch tasks when component mounts or user changes
   useEffect(() => {
     const fetchTasks = async () => {
@@ -93,18 +106,24 @@ const TaskList = () => {
     }));
   };
 
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     
     if (file) {
-      // Validate file size (50MB limit)
       const maxSize = 50 * 1024 * 1024;
       if (file.size > maxSize) {
         setError('File size must be less than 50MB');
         return;
       }
       
-      // Validate file type
       const allowedTypes = [
         'application/pdf',
         'application/msword',
@@ -127,8 +146,45 @@ const TaskList = () => {
     }
   };
 
+  const handleEditFileChange = (e) => {
+    const file = e.target.files[0];
+    
+    if (file) {
+      const maxSize = 50 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setError('File size must be less than 50MB');
+        return;
+      }
+      
+      const allowedTypes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+        'image/jpeg',
+        'image/png',
+        'image/gif'
+      ];
+      
+      if (!allowedTypes.includes(file.type)) {
+        setError('Unsupported file type. Supported: PDF, Word, Excel, Text, Images');
+        return;
+      }
+      
+      setError('');
+      setEditFile(file);
+      setRemoveExistingFile(false);
+    }
+  };
+
   const removeFile = () => {
     setSelectedFile(null);
+  };
+
+  const removeEditFile = () => {
+    setEditFile(null);
   };
 
   const formatFileSize = (bytes) => {
@@ -171,7 +227,6 @@ const TaskList = () => {
 
       const result = await response.json();
       
-      // Refresh tasks list
       const tasksResponse = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
       const tasksData = await tasksResponse.json();
       setTasks(tasksData.tasks || []);
@@ -184,6 +239,80 @@ const TaskList = () => {
         priority: 'medium',
       });
       setSelectedFile(null);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleOpenEditModal = (task) => {
+    setEditingTask(task);
+    setEditFormData({
+      title: task.title,
+      description: task.description || '',
+      assignedTo: task.assigned_to,
+      dueDate: task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : '',
+      priority: task.priority,
+    });
+    setEditFile(null);
+    setRemoveExistingFile(false);
+    setIsEditModalOpen(true);
+    setError(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingTask(null);
+    setEditFormData({
+      title: '',
+      description: '',
+      assignedTo: '',
+      dueDate: '',
+      priority: 'medium',
+    });
+    setEditFile(null);
+    setRemoveExistingFile(false);
+    setError(null);
+  };
+
+  const handleUpdateTask = async () => {
+    if (!editFormData.title || !editFormData.assignedTo || !editFormData.dueDate) {
+      setError('Please fill all required fields (title, assignee, due date)');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('title', editFormData.title);
+      formData.append('description', editFormData.description);
+      formData.append('dueDate', editFormData.dueDate);
+      formData.append('priority', editFormData.priority);
+      formData.append('assignedTo', editFormData.assignedTo);
+      formData.append('userId', user.id);
+      
+      if (removeExistingFile) {
+        formData.append('removeFile', 'true');
+      }
+      
+      if (editFile) {
+        formData.append('file', editFile);
+      }
+
+      const response = await fetch(`${BASE_URL}/tasks/${editingTask.id}/edit`, {
+        method: 'PUT',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update task');
+      }
+
+      const tasksResponse = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
+      const tasksData = await tasksResponse.json();
+      setTasks(tasksData.tasks || []);
+
+      handleCloseEditModal();
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -234,7 +363,6 @@ const TaskList = () => {
 
   const handleRequestTaskReport = async (task) => {
     try {
-      // Mark the task as having a report requested
       const response = await fetch(`${BASE_URL}/tasks/${task.id}/request-report`, {
         method: 'POST',
         headers: {
@@ -247,19 +375,23 @@ const TaskList = () => {
         throw new Error('Failed to request task report');
       }
 
-      // Update local state
       setTasks(tasks.map(t =>
         t.id === task.id ? { ...t, report_requested: true } : t
       ));
 
-
+      navigate('/dashboard/direct-memos/new', {
+        state: {
+          taskId: task.id,
+          taskTitle: task.title,
+          recipientId: task.assigned_to
+        }
+      });
     } catch (err) {
       setError(err.message);
     }
   };
 
   const handleSubmitTaskReport = (task) => {
-    // Navigate to create task report for this task
     navigate('/dashboard/direct-memos/new', {
       state: {
         taskId: task.id,
@@ -296,14 +428,6 @@ const TaskList = () => {
     return (
       <div className="bg-white rounded-lg shadow-md p-6">
         <p>Loading tasks...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <p className="text-red-500">Error: {error}</p>
       </div>
     );
   }
@@ -382,7 +506,6 @@ const TaskList = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-1">Due Date</h4>
               <input
                 type="date"
                 name="dueDate"
@@ -392,7 +515,6 @@ const TaskList = () => {
               />
             </div>
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-1">Priority</h4>
               <select
                 name="priority"
                 value={newTask.priority}
@@ -405,7 +527,6 @@ const TaskList = () => {
               </select>
             </div>
             <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">File Attachment (optional)</h4>
               <label className="flex items-center justify-center w-full px-3 py-2 border border-gray-300 rounded-md text-sm cursor-pointer hover:bg-gray-50">
                 <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -562,13 +683,22 @@ const TaskList = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         {isCreator && (
-                          <button
-                            onClick={() => handleRequestTaskReport(task)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Request Task Report"
-                          >
-                            Request Report
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleOpenEditModal(task)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit Task"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleRequestTaskReport(task)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Request Task Report"
+                            >
+                              Request Report
+                            </button>
+                          </>
                         )}
                         {isAssignee && (
                           <div className="relative group">
@@ -620,6 +750,205 @@ const TaskList = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Edit Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div 
+              className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" 
+              onClick={handleCloseEditModal}
+            ></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Edit Task
+                  </h3>
+                  <button
+                    onClick={handleCloseEditModal}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {error && (
+                  <div className="mb-4 p-2 bg-red-100 text-red-700 rounded-md text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Task Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="title"
+                      value={editFormData.title}
+                      onChange={handleEditInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Task title"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={editFormData.description}
+                      onChange={handleEditInputChange}
+                      rows="3"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      placeholder="Task description"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Assigned To <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        name="assignedTo"
+                        value={editFormData.assignedTo}
+                        onChange={handleEditInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      >
+                        <option value="">Select user...</option>
+                        {users.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} ({user.email})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        name="dueDate"
+                        value={editFormData.dueDate}
+                        onChange={handleEditInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Priority
+                    </label>
+                    <select
+                      name="priority"
+                      value={editFormData.priority}
+                      onChange={handleEditInputChange}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+
+                  {editingTask?.attachment && !removeExistingFile && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Current Attachment
+                      </label>
+                      <div className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                        <div className="flex items-center space-x-2">
+                          <svg className="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm text-gray-700">
+                            {editingTask.attachment_original_name || editingTask.attachment}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRemoveExistingFile(true)}
+                          className="text-red-500 hover:text-red-700 text-sm"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {editingTask?.attachment && !removeExistingFile ? 'Replace Attachment' : 'Attach File'}
+                    </label>
+                    <label className="flex items-center justify-center w-full px-3 py-2 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      {editFile ? 'Change File' : 'Choose File'}
+                      <input
+                        type="file"
+                        onChange={handleEditFileChange}
+                        className="hidden"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif"
+                      />
+                    </label>
+                  </div>
+
+                  {editFile && (
+                    <div className="flex items-center justify-between bg-blue-50 p-3 rounded-md">
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <svg className="h-5 w-5 text-blue-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                        </svg>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{editFile.name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(editFile.size)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeEditFile}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleUpdateTask}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary text-base font-medium text-white hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         @keyframes glow-pulse {
