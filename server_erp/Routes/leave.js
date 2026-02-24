@@ -18,13 +18,21 @@ const storage = multer.diskStorage({
 
 // Filter: only allow PDF
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === 'application/pdf') {
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/jpeg',
+    'image/jpg',
+    'image/png'
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Only PDF files are allowed'), false);
+    cb(new Error('Only PDF, DOC, DOCX, JPG, PNG allowed'), false);
   }
 };
-
 const upload = multer({ storage, fileFilter });
 
 
@@ -72,6 +80,13 @@ router.post('/leave', upload.single('attachment'), async (req, res) => {
     console.error('❌ Error saving leave request:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+});
+
+router.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err.message.includes('Only')) {
+    return res.status(400).json({ message: err.message });
+  }
+  next(err);
 });
 
 
