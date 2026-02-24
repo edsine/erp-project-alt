@@ -716,7 +716,7 @@ const handleAddNew = async () => {
             ) : (
               <tr>
                 <td colSpan={13} className="px-6 py-4 text-center text-gray-500">
-                  {expensesData.length === 0 ? 'No expense records. Click "Add Expense" to get started.' : 'No records match your search.'}
+                  {expensesData.length === 0 ? 'No expense records available' : 'No records match your search.'}
                 </td>
               </tr>
             )}
