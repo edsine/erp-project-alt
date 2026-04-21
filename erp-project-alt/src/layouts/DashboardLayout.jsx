@@ -2,630 +2,352 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import logo from '../assets/pgl_logo.png'
-import {
-  Home, FileText, ShoppingCart, Calendar,
-  Folder, Users, CheckSquare, DollarSign,
-  Menu, X, ChevronLeft, ChevronRight,
-  Search, Bell, ChevronDown, LogOut,
-  User, Clock, Mail, PieChart
-} from 'lucide-react'
-import { FiSettings, FiKey } from 'react-icons/fi';
 
+// Inject Playfair Display font for PY-SPACE branding
+const fontLink = document.createElement('link');
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap';
+fontLink.rel = 'stylesheet';
+if (!document.head.querySelector('[href*="Playfair+Display"]')) {
+  document.head.appendChild(fontLink);
+}
+
+// Phosphor Icons (install: npm i @phosphor-icons/react)
+import {
+  House,
+  FileText,
+  ShoppingCart,
+  CalendarBlank,
+  Folder,
+  Users,
+  CheckSquare,
+  CurrencyDollar,
+  List,
+  X,
+  Bell,
+  CaretDown,
+  SignOut,
+  Gear,
+  PresentationChart,
+  ArrowLeft,
+  ArrowRight,
+  EnvelopeSimple,
+} from '@phosphor-icons/react'
 
 const DashboardLayout = () => {
-  const { user, isAuthenticated, loading, error } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const [selectedMemoId, setSelectedMemoId] = useState(null);
   const [selectedRequisitionId, setSelectedRequisitionId] = useState(null);
-  const defaultAvatar = 'https://www.gravatar.com/avatar/?d=mp';
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false)
   const navigate = useNavigate()
-  const [searchQuery, setSearchQuery] = useState('')
   const dropdownRef = useRef(null)
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
- 
-  
-  // 🔔 Initialize sound using a ref (so it's not recreated)
-const notificationSound = useRef(null);
+  const notificationSound = useRef(null);
+  const notifRef = useRef(null);
 
-useEffect(() => {
-  const sound = new Audio("/sounds/Notification.m4a");
-  sound.volume = 0.6;
-  notificationSound.current = sound;
-
-  // ✅ Unlock audio for browsers that block autoplay
-  const enableAudio = () => {
-    sound.play().then(() => sound.pause());
-    document.removeEventListener("click", enableAudio);
-  };
-  document.addEventListener("click", enableAudio);
-
-  return () => document.removeEventListener("click", enableAudio);
-}, []);
-
-
-  // useEffect(() => {
-  //   if (!user?.id) return;
-
-  //   const fetchNotifications = async () => {
-  //     try {
-  //       const res = await fetch(`${BASE_URL}/notifications/${user.id}`);
-  //       if (!res.ok) throw new Error("Failed to fetch notifications");
-
-  //       const data = await res.json();
-  //       setNotifications(data);
-  //       setUnreadCount(data.filter((n) => !n.is_read).length);
-  //     } catch (err) {
-  //       console.error("Error fetching notifications:", err);
-  //     }
-  //   };
-
-  //   fetchNotifications();
-
-  //   // 🔁 Poll every 30 seconds
-  //   const interval = setInterval(fetchNotifications, 30000);
-  //   return () => clearInterval(interval);
-  // }, [user?.id]);
-
-
-  // Handle click outside to close dropdown
-
- useEffect(() => {
-  if (!user?.id) return;
-
-  const seenNotifications = new Set(); // track seen ones across fetches
-
-  const fetchNotifications = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/notifications/${user.id}`);
-      if (!res.ok) throw new Error("Failed to fetch notifications");
-      const data = await res.json();
-
-      // 🧠 Find *truly new* unread notifications
-      const newUnread = data.filter(
-        (n) => !n.is_read && !seenNotifications.has(n.id)
-      );
-
-      // 🔔 Play sound if new ones arrived
-      if (newUnread.length > 0 && notificationSound.current) {
-        notificationSound.current.currentTime = 0;
-        notificationSound.current.play().catch((err) =>
-          console.warn("Autoplay blocked or audio failed:", err)
-        );
-      }
-
-      // ✅ Update seen set
-      data.forEach((n) => seenNotifications.add(n.id));
-
-      // ✅ Update UI
-      setNotifications(data);
-      setUnreadCount(data.filter((n) => !n.is_read).length);
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
-    }
-  };
-
-  fetchNotifications();
-
-  const interval = setInterval(fetchNotifications, 30000);
-  return () => clearInterval(interval);
-}, [user?.id]);
-
-
-
- 
- 
- 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setProfileDropdownOpen(false)
-      }
-    }
+    const sound = new Audio("/sounds/Notification.m4a");
+    sound.volume = 0.6;
+    notificationSound.current = sound;
+    const enableAudio = () => {
+      sound.play().then(() => sound.pause());
+      document.removeEventListener("click", enableAudio);
+    };
+    document.addEventListener("click", enableAudio);
+    return () => document.removeEventListener("click", enableAudio);
+  }, []);
 
-    if (profileDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [profileDropdownOpen])
-
-  // Authentication check
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      navigate('/login')
-    }
-  }, [loading, isAuthenticated, navigate])
+    if (!user?.id) return;
+    const seenNotifications = new Set();
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/notifications/${user.id}`);
+        if (!res.ok) throw new Error("Failed to fetch notifications");
+        const data = await res.json();
+        const newUnread = data.filter(n => !n.is_read && !seenNotifications.has(n.id));
+        if (newUnread.length > 0 && notificationSound.current) {
+          notificationSound.current.currentTime = 0;
+          notificationSound.current.play().catch(() => {});
+        }
+        data.forEach(n => seenNotifications.add(n.id));
+        setNotifications(data);
+        setUnreadCount(data.filter(n => !n.is_read).length);
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+      }
+    };
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setProfileDropdownOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (!loading && !isAuthenticated) navigate('/login');
+  }, [loading, isAuthenticated, navigate]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="animate-pulse flex flex-col items-center">
-          <div className="h-12 w-12 bg-primary rounded-full mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-32"></div>
+      <div className="flex items-center justify-center min-h-screen bg-[#f5f5f3]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-[#1E5269] border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-400 tracking-wide">Loading workspace…</span>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!isAuthenticated) {
-    return null
-  }
-
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-lg">Loading user data...</div>
-      </div>
-    )
-  }
+  if (!isAuthenticated || !user) return null;
 
   const handleLogout = () => {
-    setProfileDropdownOpen(false)
-    navigate('/login')
-  }
+    setProfileDropdownOpen(false);
+    navigate('/login');
+  };
 
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen)
-  }
+  const hasFinanceAccess = () =>
+    user && (user.role === 'finance' || user.role === 'chairman' || user.department === 'finance' || user.role === 'admin');
 
-  const closeSidebar = () => {
-    setSidebarOpen(false)
-  }
-
-  // Check if user has access to finance features
-  const hasFinanceAccess = () => {
-    return user && (
-      user.role === 'finance' ||
-      user.role === 'chairman' ||
-      user.department === 'finance' ||
-      user.role === 'admin' 
-    )
-  }
-
-
-//   const handleNotificationClick = async (note) => {
-//   try {
-//     // ✅ Mark as read in backend
-//     await fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, {
-//       method: "PUT",
-//     });
-
-//     // ✅ Update frontend immediately
-//     setNotifications((prev) =>
-//       prev.map((n) => (n.id === note.id ? { ...n, is_read: 1 } : n))
-//     );
-//     setUnreadCount((count) => Math.max(count - 1, 0));
-
-//     // ✅ Close dropdown
-//     setShowNotifications(false);
-
-//     // ✅ Navigate to memo (or any link)
-//     if (note.link) navigate(note.link);
-//   } catch (err) {
-//     console.error("Failed to mark notification as read:", err);
-//   }
-// };
-
-// Example notification click
-
-
-// const handleNotificationClick = async (note) => {
-//   try {
-//     // ✅ Mark as read in backend
-//     const res = await fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, {
-//       method: "PUT",
-//     });
-
-//     if (!res.ok) throw new Error("Failed to mark as read");
-
-//     // ✅ Update frontend — remove it from the list once read
-//     setNotifications((prev) => prev.filter((n) => n.id !== note.id));
-
-//     // ✅ Update unread count
-//     setUnreadCount((count) => Math.max(count - 1, 0));
-
-//     // ✅ Close dropdown
-//     setShowNotifications(false);
-
-//     // ✅ Extract memo ID (works for both `/dashboard/memos/45` or `/dashboard/memos?memoId=45`)
-//     const memoIdMatch = note.link.match(/(\d+)/);
-//     if (memoIdMatch) {
-//       const memoId = parseInt(memoIdMatch[1]);
-//       setSelectedMemoId(memoId);
-//       navigate(`/dashboard/memos/${memoId}`);
-//     }
-//   } catch (err) {
-//     console.error("Failed to handle notification click:", err);
-//   }
-// };
-
-
-// const handleNotificationClick = async (note) => {
-//   try {
-//     // ✅ Optimistically remove the notification right away (instant UI feedback)
-//     setNotifications((prev) => prev.filter((n) => n.id !== note.id));
-//     setUnreadCount((count) => Math.max(count - 1, 0));
-//     setShowNotifications(false);
-
-//     // ✅ Mark as read in backend (no need to wait before navigating)
-//     fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" })
-//       .catch((err) => console.error("Failed to mark notification as read:", err));
-
-//     // ✅ Navigate to memo if link exists
-//     if (note.link) {
-//       const memoIdMatch = note.link.match(/(\d+)/);
-//       if (memoIdMatch) {
-//         const memoId = parseInt(memoIdMatch[1]);
-//         setSelectedMemoId(memoId);
-//         navigate(`/dashboard/memos/${memoId}`);
-//       } else {
-//         console.warn("No memo ID found in link:", note.link);
-//       }
-//     } else {
-//       console.warn("Notification has no link:", note);
-//     }
-//   } catch (err) {
-//     console.error("Error handling notification click:", err);
-//   }
-// };
-
-const handleNotificationClick = async (note) => {
-  try {
-    // ✅ Optimistic UI updates
-    setNotifications((prev) => prev.filter((n) => n.id !== note.id));
-    setUnreadCount((count) => Math.max(count - 1, 0));
-    setShowNotifications(false);
-
-    // ✅ Mark as read in backend
-    fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" })
-      .catch((err) => console.error("Failed to mark notification as read:", err));
-
-    // ✅ Navigate based on link
-    if (note.link) {
-      if (note.link.includes("/memos/")) {
-        const memoIdMatch = note.link.match(/\/memos\/(\d+)/);
-        if (memoIdMatch) {
-          const memoId = parseInt(memoIdMatch[1]);
-          setSelectedMemoId(memoId);
-          navigate(`/dashboard/memos/${memoId}`);
-          return;
+  const handleNotificationClick = async (note) => {
+    try {
+      setNotifications(prev => prev.filter(n => n.id !== note.id));
+      setUnreadCount(count => Math.max(count - 1, 0));
+      setShowNotifications(false);
+      fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" }).catch(() => {});
+      if (note.link) {
+        if (note.link.includes("/memos/")) {
+          const m = note.link.match(/\/memos\/(\d+)/);
+          if (m) { setSelectedMemoId(parseInt(m[1])); navigate(`/dashboard/memos/${m[1]}`); return; }
         }
-      }
-
-      if (note.link.includes("/requisitions/")) {
-        const reqIdMatch = note.link.match(/\/requisitions\/(\d+)/);
-        if (reqIdMatch) {
-          const requisitionId = parseInt(reqIdMatch[1]);
-          setSelectedRequisitionId?.(requisitionId); // optional state
-          navigate(`/dashboard/requisitions/${requisitionId}`);
-          return;
+        if (note.link.includes("/requisitions/")) {
+          const m = note.link.match(/\/requisitions\/(\d+)/);
+          if (m) { navigate(`/dashboard/requisitions/${m[1]}`); return; }
         }
+        navigate(note.link);
       }
+    } catch (err) { console.error(err); }
+  };
 
-      // fallback for other links
-      navigate(note.link);
-    } else {
-      console.warn("Notification has no link:", note);
-    }
-  } catch (err) {
-    console.error("Error handling notification click:", err);
-  }
-};
+  const navItems = [
+    { icon: House, label: 'Dashboard', to: '' },
+    { icon: FileText, label: 'Memos', to: 'memos' },
+    { icon: EnvelopeSimple, label: 'Task Reports', to: 'direct-memos' },
+    { icon: ShoppingCart, label: 'Requisitions', to: 'requisitions' },
+    ...(user.role === 'staff' ? [
+      { icon: CheckSquare, label: 'Tasks', to: 'tasks' },
+      { icon: Users, label: 'Users', to: 'users' },
+    ] : []),
+    { icon: CalendarBlank, label: 'Leaves', to: 'leaves' },
+    { icon: Folder, label: 'Files', to: 'files' },
+    ...(hasFinanceAccess() ? [{ icon: PresentationChart, label: 'Finance', to: 'finance' }] : []),
+    ...(user.role === 'finance' ? [{ icon: CurrencyDollar, label: 'Payroll', to: 'payroll' }] : []),
+  ];
 
-
+  const userInitial = user?.name?.charAt(0)?.toUpperCase() || 'U';
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Mobile sidebar overlay */}
+    <div className="min-h-screen bg-[#f0f0ed] flex overflow-hidden" style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}>
+
+      {/* Mobile overlay */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden transition-opacity"
-          onClick={closeSidebar}
-        ></div>
+        <div className="fixed inset-0 z-20 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-30 bg-white shadow-sm transition-all duration-300 ease-in-out
-        border-r border-gray-200
-        lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        ${sidebarOpen ? 'w-64' : 'lg:w-20 w-64'}
+      {/* ── Floating Sidebar ── */}
+      <aside className={`
+        fixed top-4 left-4 bottom-4 z-30
+        bg-white/95 backdrop-blur-xl
+        rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.08)]
+        border border-white/60
+        flex flex-col
+        transition-all duration-300 ease-in-out
+        lg:translate-x-0
+        ${sidebarOpen ? 'translate-x-0 w-56' : '-translate-x-[calc(100%+1rem)] lg:translate-x-0'}
+        ${sidebarOpen ? 'w-56' : 'lg:w-[68px] w-56'}
       `}>
-        <div className={`flex items-center justify-between p-4 border-b border-gray-200 ${!sidebarOpen ? 'h-16' : ''}`}>
-          {sidebarOpen && (
-            <div className="flex items-center justify-center w-full">
-              <img
-                src={logo}
-                alt="PGL Logo"
-                className="h-9 w-auto max-w-full object-contain"
-              />
-            </div>
-          )}
-          <button
-            onClick={toggleSidebar}
-            className="text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
+
+        {/* Brand */}
+        <div className="flex items-center justify-between px-4 py-5 border-b border-gray-100/80">
+          {/* PY-SPACE with Playfair Display font */}
+          <span
+            className={`tracking-tight text-[#1E5269] text-lg transition-all duration-200 overflow-hidden whitespace-nowrap
+              ${sidebarOpen ? 'opacity-100 max-w-[120px]' : 'lg:opacity-0 lg:max-w-0 opacity-100 max-w-[120px]'}`}
+            style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.01em' }}
           >
-            {sidebarOpen ? (
-              <ChevronLeft className="h-6 w-6" />
-            ) : (
-              <ChevronRight className="h-6 w-6" />
-            )}
+            PY-SPACE
+          </span>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-[#1E5269] hover:bg-gray-50 transition-all"
+          >
+            {sidebarOpen
+              ? <ArrowLeft size={16} weight="bold" />
+              : <ArrowRight size={16} weight="bold" className="lg:block hidden" />
+            }
+            <X size={16} weight="bold" className={`lg:hidden ${sidebarOpen ? 'block' : 'hidden'}`} />
           </button>
         </div>
 
-        <nav className="p-4 mt-5">
-          <ul className="space-y-1">
-            <li>
-              <Link
-                to=""
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <Home className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Dashboard</span>
-                )}
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="memos"
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <FileText className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Memos</span>
-                )}
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="direct-memos"
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <Mail className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Task Reports</span>
-                )}
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="requisitions"
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <ShoppingCart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Requisitions</span>
-                )}
-              </Link>
-            </li>
-            {user && user.role === 'staff' && (
-              <li>
-                <Link
-                  to="tasks"
-                  onClick={closeSidebar}
-                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-                >
-                  <CheckSquare className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                  {(sidebarOpen || window.innerWidth < 1024) && (
-                    <span className="ml-3">Tasks</span>
-                  )}
-                </Link>
-              </li>
-            )}
-            {user && user.role === 'staff' && (
-              <li>
-                <Link
-                  to="users"
-                  onClick={closeSidebar}
-                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-                >
-                  <Users className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                  {(sidebarOpen || window.innerWidth < 1024) && (
-                    <span className="ml-3">Users</span>
-                  )}
-                </Link>
-              </li>
-            )}
-            <li>
-              <Link
-                to="leaves"
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <Calendar className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Leaves</span>
-                )}
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="files"
-                onClick={closeSidebar}
-                className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-              >
-                <Folder className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                {(sidebarOpen || window.innerWidth < 1024) && (
-                  <span className="ml-3">Files</span>
-                )}
-              </Link>
-            </li>
-
-            {/* Finance Dashboard Link - Only for finance department and chairman */}
-            {hasFinanceAccess() && (
-              <li>
-                <Link
-                  to="finance"
-                  onClick={closeSidebar}
-                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-                >
-                  <PieChart className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                  {(sidebarOpen || window.innerWidth < 1024) && (
-                    <span className="ml-3">Finance Dashboard</span>
-                  )}
-                </Link>
-              </li>
-            )}
-
-            {user && user.role === 'finance' && (
-              <li>
-                <Link
-                  to="payroll"
-                  onClick={closeSidebar}
-                  className="flex items-center p-3 text-gray-700 rounded-lg hover:bg-gray-50 group transition-colors"
-                >
-                  <DollarSign className="w-5 h-5 text-gray-500 transition-colors group-hover:text-primary" />
-                  {(sidebarOpen || window.innerWidth < 1024) && (
-                    <span className="ml-3">Payroll</span>
-                  )}
-                </Link>
-              </li>
-            )}
-          </ul>
-        </nav>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
-        {/* Top Navigation */}
-        <header className="bg-white shadow-sm z-10 border-b border-gray-200">
-          <div className="flex items-center justify-between px-6 py-4">
-            {/* Mobile menu button */}
-            <button
-              onClick={toggleSidebar}
-              className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary transition-colors"
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+          {navItems.map(({ icon: Icon, label, to }) => (
+            <Link
+              key={to}
+              to={to}
+              onClick={() => setSidebarOpen(false)}
+              className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 hover:text-[#1E5269] hover:bg-[#1E5269]/5 transition-all duration-150"
             >
-              <Menu className="h-5 w-5" />
-            </button>
+              <Icon size={20} weight="duotone" className="shrink-0 group-hover:scale-105 transition-transform" />
+              <span className={`text-sm font-medium whitespace-nowrap transition-all duration-200 overflow-hidden
+                ${sidebarOpen ? 'opacity-100 max-w-[150px]' : 'lg:opacity-0 lg:max-w-0 opacity-100 max-w-[150px]'}`}>
+                {label}
+              </span>
+            </Link>
+          ))}
+        </nav>
 
-            {/* Search bar */}
-            <div className="flex items-center flex-1 max-w-md mx-4">
-              <div className="relative w-full">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-colors"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+        {/* User footer */}
+        {/* <div className="px-3 py-4 border-t border-gray-100/80">
+          <div className={`flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50/80 ${!sidebarOpen ? 'lg:justify-center' : ''}`}>
+            <div className="w-7 h-7 rounded-lg bg-[#1E5269] flex items-center justify-center text-white text-xs font-bold shrink-0">
+              {userInitial}
+            </div>
+            <div className={`overflow-hidden transition-all duration-200 ${sidebarOpen ? 'opacity-100 max-w-[150px]' : 'lg:opacity-0 lg:max-w-0 opacity-100 max-w-[150px]'}`}>
+              <p className="text-xs font-semibold text-gray-700 truncate">{user?.name}</p>
+              <p className="text-[10px] text-gray-400 capitalize">{user?.role}</p>
+            </div>
+          </div>
+        </div> */}
+      </aside>
+
+      {/* ── Main ── */}
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300
+        ${sidebarOpen ? 'lg:ml-[240px]' : 'lg:ml-[84px]'}
+        ml-0
+      `}>
+
+        {/* ── Floating Navbar ── */}
+        <header className="sticky top-0 z-20 px-4 pt-4">
+          <div className="bg-white/90 backdrop-blur-xl rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] border border-white/70 px-5 py-3 flex items-center justify-between">
+
+            {/* Left side: Mobile burger + Logo + Brand */}
+            <div className="flex items-center gap-3">
+              {/* Mobile burger */}
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 transition"
+              >
+                <List size={20} weight="bold" />
+              </button>
+
+              {/* Logo + Brand name — visible on all screen sizes */}
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={logo}
+                  alt="PGL Logo"
+                  className="h-8 w-auto object-contain"
                 />
+                <span
+                  className="text-[#1E5269] text-lg hidden sm:block"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 900, fontStyle: 'italic', letterSpacing: '-0.01em' }}
+                >
+                  PY-SPACE
+                </span>
               </div>
             </div>
 
-            {/* Right side items */}
-            <div className="flex items-center space-x-4">
+            {/* Right */}
+            <div className="flex items-center gap-2 ml-auto">
 
               {/* Notifications */}
-              <div className="relative">
+              <div className="relative" ref={notifRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-full text-gray-600 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary transition"
+                  className="relative w-9 h-9 flex items-center justify-center rounded-xl text-gray-500 hover:text-[#1E5269] hover:bg-gray-50 transition"
                 >
-                  <Bell className="h-6 w-6" />
+                  <Bell size={19} weight="duotone" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold rounded-full h-4 w-4 flex items-center justify-center">
-                      {unreadCount}
-                    </span>
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white" />
                   )}
                 </button>
 
                 {showNotifications && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white shadow-lg rounded-lg overflow-hidden border border-gray-200 z-50">
-                    <div className="p-3 border-b border-gray-200 font-semibold text-gray-700">
-                      Notifications
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-gray-100 overflow-hidden z-50">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-800">Notifications</span>
+                      {unreadCount > 0 && (
+                        <span className="text-xs bg-red-50 text-red-500 font-medium px-2 py-0.5 rounded-full">{unreadCount} new</span>
+                      )}
                     </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length > 0 ? (
-                        notifications.map((note) => (
-                          <div
-                            key={note.id}
-                            onClick={() => handleNotificationClick(note)}
-
-                            className="cursor-pointer px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 transition"
-                          >
-                            <p className="font-medium">{note.title}</p>
-                            <p className="text-xs text-gray-500">{note.message}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="p-4 text-sm text-gray-500 text-center">No notifications</p>
+                    <div className="max-h-72 overflow-y-auto">
+                      {notifications.length > 0 ? notifications.map(note => (
+                        <div
+                          key={note.id}
+                          onClick={() => handleNotificationClick(note)}
+                          className={`px-4 py-3 cursor-pointer hover:bg-gray-50 border-b border-gray-50 transition ${!note.is_read ? 'bg-blue-50/40' : ''}`}
+                        >
+                          <p className="text-sm font-medium text-gray-800">{note.title}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{note.message}</p>
+                        </div>
+                      )) : (
+                        <p className="px-4 py-8 text-sm text-gray-400 text-center">You're all caught up ✓</p>
                       )}
                     </div>
                   </div>
                 )}
-
               </div>
 
-
-              {/* Profile dropdown */}
+              {/* Profile */}
               <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-primary rounded-full p-1 transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl hover:bg-gray-50 transition"
                 >
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-primary flex items-center justify-center text-white font-medium">
-                    {user?.name?.charAt(0) || 'U'}
+                  <div className="w-8 h-8 rounded-xl bg-[#1E5269] flex items-center justify-center text-white text-sm font-bold">
+                    {userInitial}
                   </div>
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-700 truncate max-w-24">
-                      {user?.name || 'User'}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
-                      {user?.role || 'Role'}
-                    </p>
+                    <p className="text-xs font-semibold text-gray-700 leading-tight">{user?.name?.split(' ')[0]}</p>
+                    <p className="text-[10px] text-gray-400 capitalize">{user?.role}</p>
                   </div>
-                  <ChevronDown
-                    className={`h-4 w-4 text-gray-500 transition-transform ${profileDropdownOpen ? 'transform rotate-180' : ''
-                      }`}
+                  <CaretDown
+                    size={12}
+                    weight="bold"
+                    className={`text-gray-400 transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`}
                   />
                 </button>
 
-                {/* Dropdown menu */}
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
-                      <p className="text-sm text-gray-500 truncate">{user?.email || ''}</p>
+                  <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-gray-100 py-1.5 z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
+                      <p className="text-xs text-gray-400 truncate mt-0.5">{user?.email}</p>
                     </div>
-
                     <div className="py-1">
-                      {/* Settings link */}
                       <Link
                         to="settings/change-password"
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:text-[#1E5269] hover:bg-gray-50 transition"
                       >
-                        <FiSettings className="h-4 w-4 mr-3" />
+                        <Gear size={15} weight="duotone" />
                         Settings
                       </Link>
-
-                      {/* Change Password link */}
-                      {/* <Link
-            to="/change-password"
-            className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <FiKey className="h-4 w-4 mr-3" />
-            Change Password
-          </Link> */}
-
-                      {/* Sign out */}
                       <button
                         onClick={handleLogout}
-                        className="flex items-center w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:text-red-500 hover:bg-red-50/50 transition"
                       >
-                        <LogOut className="h-4 w-4 mr-3" />
+                        <SignOut size={15} weight="duotone" />
                         Sign out
                       </button>
                     </div>
@@ -633,19 +355,16 @@ const handleNotificationClick = async (note) => {
                 )}
               </div>
             </div>
-
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
-          <Outlet context={{ selectedMemoId, setSelectedMemoId, selectedRequisitionId,
-    setSelectedRequisitionId }} />
-
+        {/* Main Content */}
+        <main className="flex-1 px-4 py-4 pb-8 overflow-y-auto">
+          <Outlet context={{ selectedMemoId, setSelectedMemoId, selectedRequisitionId, setSelectedRequisitionId }} />
         </main>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default DashboardLayout
+export default DashboardLayout;

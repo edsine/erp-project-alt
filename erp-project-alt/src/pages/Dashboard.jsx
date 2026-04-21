@@ -3,394 +3,280 @@ import { Link } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import axios from 'axios';
 import {
-  FileText, ShoppingCart, CheckSquare, Calendar,
-  Plus, Clock, User, AlertTriangle,
-  Home, Bell, Activity, ArrowRight,
-  PieChart // Add this import
-} from 'lucide-react';
+  FileText,
+  ShoppingCart,
+  CheckSquare,
+  CalendarBlank,
+  Plus,
+  Clock,
+  ArrowRight,
+  PresentationChart,
+  EnvelopeSimple,
+  ArrowUpRight,
+  Sparkle,
+} from '@phosphor-icons/react';
 
+// ─── Stat Card ────────────────────────────────────────────────────────────────
+const StatCard = ({ icon: Icon, title, value, accent, link }) => (
+  <Link
+    to={link}
+    className="group relative bg-white rounded-2xl p-5 border border-gray-100 hover:border-[#1E5269]/20 hover:shadow-[0_8px_32px_rgba(30,82,105,0.08)] transition-all duration-300 overflow-hidden"
+  >
+    {/* Subtle ambient glow */}
+    <div className={`absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-opacity ${accent}`} />
+
+    <div className="flex items-start justify-between relative">
+      <div>
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3">{title}</p>
+        <p className="text-3xl font-light text-gray-800 tabular-nums">{value}</p>
+      </div>
+      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:text-[#1E5269] group-hover:bg-[#1E5269]/8 transition-all">
+        <Icon size={20} weight="duotone" />
+      </div>
+    </div>
+
+    <div className="flex items-center gap-1 mt-6 text-xs text-gray-400 group-hover:text-[#1E5269] transition-colors">
+      <span>View all</span>
+      <ArrowRight size={12} weight="bold" className="group-hover:translate-x-0.5 transition-transform" />
+    </div>
+  </Link>
+);
+
+// ─── Quick Action Card ─────────────────────────────────────────────────────────
+const QuickAction = ({ icon: Icon, title, description, link }) => (
+  <Link
+    to={link}
+    className="group flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-[#1E5269]/20 hover:bg-[#1E5269]/3 transition-all duration-200"
+  >
+    <div className="w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-[#1E5269]/10 flex items-center justify-center text-gray-400 group-hover:text-[#1E5269] transition-all shrink-0">
+      <Icon size={18} weight="duotone" />
+    </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-sm font-medium text-gray-700 group-hover:text-[#1E5269] transition-colors">{title}</p>
+      <p className="text-xs text-gray-400 mt-0.5 truncate">{description}</p>
+    </div>
+    <ArrowUpRight size={14} className="text-gray-300 group-hover:text-[#1E5269] transition-colors shrink-0" />
+  </Link>
+);
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { user } = useAuth();
-  const [stats, setStats] = useState({
-    memos: 0,
-    requisitions: 0,
-    tasks: 0,
-    leaves: 0
-  });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [memoCount, setMemoCount] = useState(0);
   const [requisitionCount, setRequisitionCount] = useState(0);
   const [taskCount, setTaskCount] = useState(0);
   const [leaveCount, setLeaveCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('all');
   const [directMemoCount, setDirectMemoCount] = useState(0);
+  const [activeTab, setActiveTab] = useState('all');
 
-  // Check if user has access to finance features
- const hasFinanceAccess = () => {
-  if (!user) return false;
-
-  return (
-    user.role?.toLowerCase() === 'finance' ||
-    user.role?.toLowerCase() === 'chairman' ||
-    user.department?.toLowerCase() === 'finance'
-  );
-};
-
+  const hasFinanceAccess = () => {
+    if (!user) return false;
+    return (
+      user.role?.toLowerCase() === 'finance' ||
+      user.role?.toLowerCase() === 'chairman' ||
+      user.department?.toLowerCase() === 'finance'
+    );
+  };
 
   useEffect(() => {
-    const fetchTaskCount = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/tasks/counts/user/${user.id}`);
-        const data = await res.json();
-        if (data.success) setTaskCount(data.count);
-      } catch (error) {
-        console.error('Error fetching task count:', error);
-      }
-    };
+    if (!user) return;
 
-    const fetchDirectMemoCount = async () => {
+    const fetchAll = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/direct-memos/count/user/${user.id}`);
-        const data = await res.json();
-        setDirectMemoCount(data.count || 0);
-      } catch (err) {
-        console.error("Error fetching task report count:", err);
-      }
-    };
-
-    const fetchRequisitionCount = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/requisitions/count/user/${user.id}?role=${user.role}`);
-        const data = await res.json();
-        
-        console.log('Requisition count response:', data);
-        
-        if (data.success) {
-          setRequisitionCount(data.count || 0);
-        } else {
-          console.error('Failed to fetch requisition count:', data.message);
-          setRequisitionCount(0);
-        }
-      } catch (err) {
-        console.error('Failed to fetch requisition count:', err);
-        setRequisitionCount(0);
-      }
-    };
-
-    const fetchMemoCount = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/memos/counts/${user.id}`);
-        const data = await res.json();
-        setMemoCount(data.count || 0);
-      } catch (err) {
-        console.error("Error fetching memo count:", err);
-      }
-    };
-
-    const fetchLeaveCount = async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/leave-requests/count/user/${user.id}`);
-        const data = await res.json();
-        if (data.success) {
-          setLeaveCount(data.count || 0);
-        } else {
-          console.error("Failed to fetch leave count:", data.error);
-        }
-      } catch (err) {
-        console.error("Error fetching leave count:", err);
-      }
-    };
-
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        
+        await Promise.allSettled([
+          fetch(`${BASE_URL}/tasks/counts/user/${user.id}`).then(r => r.json()).then(d => d.success && setTaskCount(d.count)),
+          fetch(`${BASE_URL}/direct-memos/count/user/${user.id}`).then(r => r.json()).then(d => setDirectMemoCount(d.count || 0)),
+          fetch(`${BASE_URL}/requisitions/count/user/${user.id}?role=${user.role}`).then(r => r.json()).then(d => d.success && setRequisitionCount(d.count || 0)),
+          fetch(`${BASE_URL}/memos/counts/${user.id}`).then(r => r.json()).then(d => setMemoCount(d.count || 0)),
+          fetch(`${BASE_URL}/leave-requests/count/user/${user.id}`).then(r => r.json()).then(d => d.success && setLeaveCount(d.count || 0)),
+        ]);
         try {
-          const countsResponse = await Promise.all([
-            axios.get(`${BASE_URL}/api/memos/count`),
-            axios.get(`${BASE_URL}/api/requisitions/count`),
-            axios.get(`${BASE_URL}/api/tasks/count`),
-            axios.get(`${BASE_URL}/api/leave/count`)
-          ]);
-          
-          setStats({
-            memos: countsResponse[0].data.count || 0,
-            requisitions: countsResponse[1].data.count || 0,
-            tasks: countsResponse[2].data.count || 0,
-            leaves: countsResponse[3].data.count || 0
-          });
-        } catch (countsError) {
-          console.log('Generic count endpoints not available, using individual endpoints');
-        }
-
-        try {
-          const activitiesResponse = await axios.get(`${BASE_URL}/api/activities/recent`);
-          setRecentActivities(Array.isArray(activitiesResponse.data) ? activitiesResponse.data : []);
-        } catch (activitiesError) {
-          console.error('Error fetching activities:', activitiesError);
-          setRecentActivities([]);
-        }
-
+          const act = await axios.get(`${BASE_URL}/api/activities/recent`);
+          setRecentActivities(Array.isArray(act.data) ? act.data : []);
+        } catch (_) { setRecentActivities([]); }
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    // Call all fetch functions
-    if (user) {
-      fetchTaskCount();
-      fetchRequisitionCount();
-      fetchMemoCount();
-      fetchLeaveCount();
-      fetchDirectMemoCount();
-      fetchDashboardData();
-      
-      // Set up interval for refreshing counts
-      const interval = setInterval(() => {
-        fetchMemoCount();
-        fetchRequisitionCount();
-        fetchTaskCount();
-        fetchLeaveCount();
-        fetchDirectMemoCount();
-      }, 60000);
-      
-      return () => clearInterval(interval);
-    }
+    fetchAll();
+    const interval = setInterval(fetchAll, 60000);
+    return () => clearInterval(interval);
   }, [user, BASE_URL]);
 
-  
-  useEffect(() => {
-  console.log("DASHBOARD USER:", JSON.stringify(user, null, 2));
-}, [user]);
+  const getFirstName = () => user?.name?.split(' ')[0] || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
-console.log(
-  "CHECK:",
-  user.department,
-  user.department?.trim().toLowerCase() === "finance"
-);
+  const stats = [
+    { icon: FileText, title: 'Memos', value: memoCount, accent: 'bg-blue-400', link: '/dashboard/memos' },
+    { icon: EnvelopeSimple, title: 'Task Reports', value: directMemoCount, accent: 'bg-cyan-400', link: '/dashboard/direct-memos' },
+    { icon: ShoppingCart, title: 'Requisitions', value: requisitionCount, accent: 'bg-emerald-400', link: '/dashboard/requisitions' },
+    { icon: CheckSquare, title: 'Tasks', value: taskCount, accent: 'bg-amber-400', link: '/dashboard/tasks' },
+    { icon: CalendarBlank, title: 'Leaves', value: leaveCount, accent: 'bg-violet-400', link: '/dashboard/leaves' },
+    ...(hasFinanceAccess() ? [{ icon: PresentationChart, title: 'Finance', value: '→', accent: 'bg-teal-400', link: '/dashboard/finance' }] : []),
+  ];
 
-
-  const getFirstName = () => user?.name?.split(' ')[0] || 'User';
+  const filteredActivities = recentActivities.filter(a => {
+    if (activeTab === 'all') return true;
+    return a.status === activeTab;
+  });
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-32 bg-gray-100 rounded-lg"></div>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 h-64 bg-gray-100 rounded-lg"></div>
-            <div className="h-64 bg-gray-100 rounded-lg"></div>
-          </div>
+      <div className="space-y-6 animate-pulse">
+        <div className="h-20 bg-white rounded-2xl border border-gray-100" />
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(5)].map((_, i) => <div key={i} className="h-36 bg-white rounded-2xl border border-gray-100" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 h-80 bg-white rounded-2xl border border-gray-100" />
+          <div className="h-80 bg-white rounded-2xl border border-gray-100" />
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="bg-red-50 border-l-4 border-red-500 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  const StatCard = ({ icon: Icon, title, value, color, link }) => (
-    <Link to={link} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{title}</p>
-          <p className="text-3xl font-light mt-1">{value}</p>
-        </div>
-        <div className={`p-3 rounded-full ${color === 'blue' ? 'bg-blue-50 text-blue-600' : 
-          color === 'green' ? 'bg-green-50 text-green-600' :
-          color === 'yellow' ? 'bg-yellow-50 text-yellow-600' :
-          color === 'purple' ? 'bg-purple-50 text-purple-600' : 
-          color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-gray-50 text-gray-600'}`}>
-          <Icon className="h-6 w-6" />
-        </div>
-      </div>
-      <div className="mt-6">
-        <span className="text-sm font-medium text-primary hover:text-primary-dark flex items-center transition-colors">
-          View all
-          <ArrowRight className="ml-1 h-4 w-4" />
-        </span>
-      </div>
-    </Link>
-  );
-const QuickAction = ({ icon: Icon, title, description, link, color }) => (
-  <Link 
-    to={link} 
-    className="flex items-start p-4 rounded-lg border border-gray-200 hover:border-primary hover:bg-gray-50 transition-all group"
-  >
-    <div className={`p-2 rounded-lg ${
-      color === 'blue' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' : 
-      color === 'green' ? 'bg-green-50 text-green-600 group-hover:bg-green-100' :
-      color === 'purple' ? 'bg-purple-50 text-purple-600 group-hover:bg-purple-100' : 
-      'bg-gray-50 text-gray-600'
-    }`}>
-      <Icon className="h-5 w-5" />
-    </div>
-    <div className="ml-3 flex-1">
-      <h3 className="text-sm font-medium text-gray-800 group-hover:text-primary transition-colors">
-        {title}
-      </h3>
-      <p className="text-xs text-gray-500 mt-1">{description}</p>
-    </div>
-    <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-primary transition-colors mt-1" />
-  </Link>
-);
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-light text-gray-800">Welcome back,</h1>
-          <h2 className="text-3xl font-semibold text-primary">{getFirstName()}</h2>
-        </div>
+    <div className="space-y-5 max-w-7xl mx-auto">
+
+      {/* ── Greeting ── */}
+<div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-primary/2 to-transparent rounded-3xl p-8 border border-primary/10 flex items-center justify-between">
+  
+  {/* LEFT CONTENT */}
+  <div className="relative z-10">
+    <p className="text-sm text-gray-400 mb-1">{greeting},</p>
+    
+    <h1 className="text-4xl font-semibold text-primary leading-tight">
+      {getFirstName()} <span className="text-[#1E5269]"></span>
+    </h1>
+    
+    <p className="text-gray-500 mt-2 text-sm">
+      Here's what's happening with your workspace today.
+    </p>
+  </div>
+
+  {/* RIGHT CONTENT */}
+  <div className="hidden sm:flex items-center gap-2 text-xs text-gray-500 bg-white/60 backdrop-blur-md px-4 py-2 rounded-xl border border-gray-100 relative z-10">
+    <Sparkle size={14} weight="duotone" className="text-[#1E5269]" />
+    <span>
+      {new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric'
+      })}
+    </span>
+  </div>
+
+  {/* BACKGROUND DECOR */}
+  <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+</div>
+
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {stats.map(s => <StatCard key={s.title} {...s} />)}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard 
-          icon={FileText} 
-          title="Memos" 
-          value={memoCount} 
-          color="blue" 
-          link="/dashboard/memos" 
-        />
-        <StatCard 
-          icon={FileText} 
-          title="Task Reports" 
-          value={directMemoCount} 
-          color="blue" 
-          link="/dashboard/direct-memos" 
-        />
-        <StatCard 
-          icon={ShoppingCart} 
-          title="Requisitions" 
-          value={requisitionCount} 
-          color="green" 
-          link="/dashboard/requisitions" 
-        />
-        <StatCard 
-          icon={CheckSquare} 
-          title="Tasks" 
-          value={taskCount} 
-          color="yellow" 
-          link="/dashboard/tasks" 
-        />
-        <StatCard 
-          icon={Calendar} 
-          title="Leaves" 
-          value={leaveCount}
-          color="purple" 
-          link="/dashboard/leaves" 
-        />
-        
-        {/* Finance Dashboard Card - Only for authorized users */}
-        {hasFinanceAccess() && (
-          <StatCard 
-            icon={PieChart} 
-            title="Finance Dashboard" 
-            value="View" 
-            color="indigo" 
-            link="/dashboard/finance" 
-          />
-        )}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── Bottom Row ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
         {/* Recent Activities */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-light text-gray-800">Recent Activities</h2>
-              <div className="flex space-x-1">
-                <button 
-                  onClick={() => setActiveTab('all')}
-                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'all' ? 'bg-primary text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-700">Recent Activities</h2>
+            <div className="flex gap-1">
+              {['all', 'pending', 'completed'].map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-3 py-1 text-xs rounded-lg capitalize transition-all ${
+                    activeTab === tab
+                      ? 'bg-[#1E5269] text-white'
+                      : 'text-gray-400 hover:bg-gray-50'
+                  }`}
                 >
-                  All
+                  {tab}
                 </button>
-                <button 
-                  onClick={() => setActiveTab('pending')}
-                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  Pending
-                </button>
-                <button 
-                  onClick={() => setActiveTab('completed')}
-                  className={`px-3 py-1 text-xs rounded-md ${activeTab === 'completed' ? 'bg-green-100 text-green-800' : 'text-gray-500 hover:bg-gray-50'}`}
-                >
-                  Completed
-                </button>
-              </div>
+              ))}
             </div>
           </div>
-          <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto">
-            {recentActivities.length > 0 ? (
-              recentActivities
-                .filter(activity => {
-                  if (activeTab === 'all') return true;
-                  if (activeTab === 'pending') return activity.status === 'pending';
-                  if (activeTab === 'completed') return activity.status === 'completed';
-                  return true;
-                })
-                .map(activity => (
-                  <ActivityItem key={activity.id} activity={activity} />
-                ))
-            ) : (
-              <div className="text-center py-12">
-                <Clock className="mx-auto h-12 w-12 text-gray-300" />
-                <h3 className="mt-2 text-sm font-medium text-gray-500">No activities found</h3>
-                <p className="mt-1 text-xs text-gray-400">Your activities will appear here</p>
+
+          <div className="divide-y divide-gray-50 max-h-[380px] overflow-y-auto">
+            {filteredActivities.length > 0 ? filteredActivities.map(activity => (
+              <div key={activity.id} className="px-6 py-3.5 hover:bg-gray-50/50 transition group">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-gray-50 group-hover:bg-[#1E5269]/8 flex items-center justify-center transition">
+                      <FileText size={14} weight="duotone" className="text-gray-400 group-hover:text-[#1E5269] transition" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{activity.title || activity.type}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{activity.description}</p>
+                    </div>
+                  </div>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                    activity.status === 'completed'
+                      ? 'bg-green-50 text-green-600'
+                      : 'bg-amber-50 text-amber-600'
+                  }`}>
+                    {activity.status}
+                  </span>
+                </div>
+              </div>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <Clock size={28} weight="duotone" className="text-gray-200 mb-3" />
+                <p className="text-sm text-gray-400 font-medium">No activities yet</p>
+                <p className="text-xs text-gray-300 mt-1">Your activity history will appear here</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-light text-gray-800 mb-6">Quick Actions</h2>
-          <div className="space-y-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-4">Quick Actions</h2>
+          <div className="space-y-2">
             <QuickAction
               icon={Plus}
-              title="Create New Memo"
+              title="New Memo"
               description="Send a memo to your team"
               link="/dashboard/memos/new"
-              color="blue"
             />
             <QuickAction
-              icon={Plus}
-              title="Create Requisition"
-              description="Request new items or services"
+              icon={ShoppingCart}
+              title="New Requisition"
+              description="Request items or services"
               link="/dashboard/requisitions/new"
-              color="green"
             />
             <QuickAction
-              icon={Plus}
+              icon={CalendarBlank}
               title="Request Leave"
               description="Submit a leave application"
               link="/dashboard/leaves/new"
-              color="purple"
+            />
+          </div>
+
+          {/* Subtle separator */}
+          <div className="my-4 border-t border-gray-50" />
+          <p className="text-[10px] text-gray-300 uppercase tracking-widest font-medium px-1">Workspace</p>
+          <div className="mt-2 space-y-2">
+            <QuickAction
+              icon={FileText}
+              title="View All Memos"
+              description="Browse your memo history"
+              link="/dashboard/memos"
+            />
+            <QuickAction
+              icon={CheckSquare}
+              title="My Tasks"
+              description="Check pending tasks"
+              link="/dashboard/tasks"
             />
           </div>
         </div>
