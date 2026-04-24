@@ -3,1272 +3,643 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import {
+  FileText, MagnifyingGlass, Plus, X, CheckCircle,
+  XCircle, Clock, ArrowDown, Paperclip, ChatCircle,
+  CaretLeft, CheckSquare, Trash,
+} from '@phosphor-icons/react';
 
-// Add CommentSection component for memos
+// ─── Comment Section ───────────────────────────────────────────────────────────
 const CommentSection = ({ memoId, user }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showCommentInput, setShowCommentInput] = useState(false);
+  const [showInput, setShowInput] = useState(false);
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-  useEffect(() => {
-    fetchComments();
-  }, [memoId]);
+  useEffect(() => { fetchComments(); }, [memoId]);
 
   const fetchComments = async () => {
     try {
-      const response = await axios.get(
-        `${BASE_URL}/memos/${memoId}/comments`,
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
-      setComments(response.data);
-    } catch (error) {
-      console.error('Failed to fetch comments:', error);
-    }
+      const res = await axios.get(`${BASE_URL}/memos/${memoId}/comments`, {
+        headers: { Authorization: `Bearer ${user.token}` },
+      });
+      setComments(res.data);
+    } catch (e) { console.error(e); }
   };
 
-  const handleAddComment = async () => {
+  const handleAdd = async () => {
     if (!newComment.trim()) return;
-
     setLoading(true);
     try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memoId}/comments`,
-        {
-          comment: newComment,
-          user_id: user.id,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
+      const res = await axios.post(`${BASE_URL}/memos/${memoId}/comments`,
+        { comment: newComment, user_id: user.id },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
-
-      if (response.status === 201) {
-        setNewComment('');
-        setShowCommentInput(false);
-        fetchComments(); // Refresh comments
-      }
-    } catch (error) {
-      console.error('Failed to add comment:', error);
-      alert('Failed to add comment. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+      if (res.status === 201) { setNewComment(''); setShowInput(false); fetchComments(); }
+    } catch (e) { alert('Failed to add comment.'); }
+    finally { setLoading(false); }
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleString();
-  };
+  const fmt = (d) => new Date(d).toLocaleString();
 
   return (
-    <div className="mt-6 border-t pt-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-500">Comments ({comments.length})</h3>
+    <div className="mt-6 pt-6 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <ChatCircle size={16} weight="duotone" className="text-gray-400" />
+          <span className="text-sm font-semibold text-gray-700">Comments</span>
+          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{comments.length}</span>
+        </div>
         <button
-          type="button"
-          onClick={() => setShowCommentInput(!showCommentInput)}
-          className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
+          onClick={() => setShowInput(!showInput)}
+          className="text-xs font-medium text-[#1E5269] hover:underline"
         >
-          {showCommentInput ? 'Cancel' : 'Add Comment'}
+          {showInput ? 'Cancel' : '+ Add comment'}
         </button>
       </div>
 
-      {/* Comment input - shown only when button is clicked */}
-      {showCommentInput && (
-        <div className="mb-4 bg-gray-50 p-4 rounded-md">
+      {showInput && (
+        <div className="mb-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Type your comment here..."
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Write a comment…"
+            className="w-full bg-white text-sm px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1E5269] resize-none"
             rows="3"
           />
-          <div className="flex justify-end mt-2 space-x-2">
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={() => setShowInput(false)} className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded-lg transition">Cancel</button>
             <button
-              onClick={() => setShowCommentInput(false)}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddComment}
+              onClick={handleAdd}
               disabled={loading || !newComment.trim()}
-              className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 text-xs font-medium bg-[#1E5269] text-white rounded-lg disabled:opacity-40 transition"
             >
-              {loading ? 'Adding...' : 'Post Comment'}
+              {loading ? 'Posting…' : 'Post'}
             </button>
           </div>
         </div>
       )}
 
-      {/* Comments list */}
-      <div className="space-y-4">
-        {comments.length > 0 ? (
-          comments.map((comment) => (
-            <div key={comment.id} className="bg-gray-50 p-4 rounded-md">
-              <div className="flex justify-between items-start">
-                <div className="font-medium text-sm text-gray-800">{comment.user_name}</div>
-                <div className="text-xs text-gray-500">
-                  {formatDate(comment.created_at)}
-                </div>
-              </div>
-              <p className="text-sm mt-2 text-gray-700">{comment.comment}</p>
+      <div className="space-y-3">
+        {comments.length > 0 ? comments.map(c => (
+          <div key={c.id} className="bg-gray-50 rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-gray-700">{c.user_name}</span>
+              <span className="text-[10px] text-gray-400">{fmt(c.created_at)}</span>
             </div>
-          ))
-        ) : (
-          <p className="text-center text-gray-500 py-4"></p>
+            <p className="text-sm text-gray-600">{c.comment}</p>
+          </div>
+        )) : (
+          <p className="text-xs text-gray-400 text-center py-4">No comments yet</p>
         )}
       </div>
     </div>
   );
 };
 
-// Add finance tabs constants
-const FINANCE_TABS = {
-  TO_BE_ACTED: 'to_be_acted',
-  ACTED_UPON: 'acted_upon'
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const FINANCE_TABS = { TO_BE_ACTED: 'to_be_acted', ACTED_UPON: 'acted_upon' };
+
+const formatFileSize = (b) => {
+  if (!b) return '';
+  const k = 1024, s = ['B', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(b) / Math.log(k));
+  return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
 };
 
-const getFileIcon = (file) => {
-  const fileType = file.mimetype.split('/')[0];
-  const extension = file.originalname.split('.').pop().toLowerCase();
-
-  const iconClass = "h-8 w-8 text-gray-400";
-
-  // PDF
-  if (file.mimetype === 'application/pdf' || extension === 'pdf') {
-    return (
-      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-      </svg>
-    );
-  }
-
-  // Word
-  if (file.mimetype.includes('word') || ['doc', 'docx'].includes(extension)) {
-    return (
-      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-      </svg>
-    );
-  }
-
-  // Excel
-  if (file.mimetype.includes('excel') || ['xls', 'xlsx'].includes(extension)) {
-    return (
-      <svg className={iconClass} fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
-      </svg>
-    );
-  }
-
-  // Image
-  if (fileType === 'image') {
-    return (
-      <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    );
-  }
-
-  // Default file icon
+const StatusPill = ({ status }) => {
+  const map = {
+    approved: 'bg-green-50 text-green-700',
+    rejected: 'bg-red-50 text-red-600',
+    completed: 'bg-blue-50 text-blue-700',
+    submitted: 'bg-violet-50 text-violet-700',
+    pending: 'bg-amber-50 text-amber-700',
+  };
+  const s = status?.toLowerCase();
+  const label = s === 'submitted' ? 'Submitted' : s?.charAt(0).toUpperCase() + s?.slice(1);
   return (
-    <svg className={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-    </svg>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${map[s] || map.pending}`}>
+      {label}
+    </span>
   );
 };
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
+// ─── Main Component ────────────────────────────────────────────────────────────
 const MemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
-
   const { user } = useAuth();
-  const [memos, setMemos] = useState([]);
+  const navigate = useNavigate();
   const { memoId } = useParams();
-  const [acknowledgments, setAcknowledgments] = useState([]);
+
+  const [memos, setMemos] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState({});
-  const [activeTab, setActiveTab] = useState('pending'); // Changed default to 'pending'
+  const [activeTab, setActiveTab] = useState('pending');
   const [financeActionedMemos, setFinanceActionedMemos] = useState([]);
-  // Add state for decision comments
   const [approvalComment, setApprovalComment] = useState('');
   const [rejectionComment, setRejectionComment] = useState('');
   const [showApprovalComment, setShowApprovalComment] = useState(false);
   const [showRejectionComment, setShowRejectionComment] = useState(false);
 
-
-  // Fetch all users when component mounts
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const response = await axios.get(
-          `${BASE_URL}/users`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-
-        const usersMap = response.data.reduce((acc, user) => {
-          acc[user.id] = user;
-          return acc;
-        }, {});
-
-        setUsers(usersMap);
-      } catch (err) {
-        console.error('Failed to fetch users:', err);
-      }
-    };
-
-    fetchUsers();
-  }, [BASE_URL, user.token]);
+    axios.get(`${BASE_URL}/users`, { headers: { Authorization: `Bearer ${user.token}` } })
+      .then(r => setUsers(r.data.reduce((a, u) => ({ ...a, [u.id]: u }), {})))
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
-    const fetchMemos = async () => {
-      try {
-        const response = await axios.get(
-          `${BASE_URL}/memos/user/${user.id}?role=${user.role}`,
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-
-        const memosArray = response.data;
-
-        const transformedMemos = memosArray.map(memo => ({
-          ...memo,
-          sender: users[memo.created_by]?.name || `User ${memo.created_by}`,
-          senderDetails: users[memo.created_by],
-          isSender: memo.created_by === user.id,
-          date: new Date(memo.created_at).toLocaleDateString(),
-          status: memo.status || 'submitted',
-          priority: memo.priority || 'medium',
-          acknowledged: isMemoAcknowledgedByUser(memo, user.id),
-          paid_by_finance: memo.paid_by_finance === 1
-        }));
-
-        setMemos(transformedMemos);
-        const paidMemoIds = transformedMemos
-          .filter(m => m.paid_by_finance)
-          .map(m => m.id);
-        setFinanceActionedMemos(paidMemoIds);
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch memos');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMemos();
+    axios.get(`${BASE_URL}/memos/user/${user.id}?role=${user.role}`, {
+      headers: { Authorization: `Bearer ${user.token}` }
+    }).then(r => {
+      const transformed = r.data.map(m => ({
+        ...m,
+        sender: users[m.created_by]?.name || `User ${m.created_by}`,
+        senderDetails: users[m.created_by],
+        isSender: m.created_by === user.id,
+        date: new Date(m.created_at).toLocaleDateString(),
+        status: m.status || 'submitted',
+        priority: m.priority || 'medium',
+        acknowledged: isMemoAcknowledgedByUser(m, user.id),
+        paid_by_finance: m.paid_by_finance === 1,
+      }));
+      setMemos(transformed);
+      setFinanceActionedMemos(transformed.filter(m => m.paid_by_finance).map(m => m.id));
+    }).catch(e => setError(e.response?.data?.message || 'Failed to fetch memos'))
+      .finally(() => setLoading(false));
   }, [user, users]);
 
   useEffect(() => {
     if (memoId && memos.length > 0) {
-      const memoToOpen = memos.find(m => m.id === parseInt(memoId));
-      if (memoToOpen) {
-        setSelectedMemo(memoToOpen);
-      }
+      const m = memos.find(m => m.id === parseInt(memoId));
+      if (m) setSelectedMemo(m);
     }
   }, [memoId, memos]);
 
+  const isMemoAcknowledgedByUser = (memo, userId) => {
+    if (!memo.acknowledgments) return false;
+    return (Array.isArray(memo.acknowledgments) ? memo.acknowledgments : [])
+      .some(a => typeof a === 'object' && a.id === userId);
+  };
 
-  // Filter memos based on search term
-  const searchFilteredMemos = memos.filter(memo => {
-    return (
-      memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      memo.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (memo.content && memo.content.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
-
-  // Helper function to check if memo is approved
   const isMemoApproved = (memo) => {
-    if (memo.created_by === user.id) {
-      return memo.approved_by_manager === 1 ||
-        memo.approved_by_executive === 1 ||
-        memo.approved_by_finance === 1 ||
-        memo.approved_by_gmd === 1 ||
-        memo.approved_by_chairman === 1;
-    }
+    if (memo.created_by === user.id) return memo.approved_by_chairman === 1 && financeActionedMemos.includes(memo.id);
     const roleField = `approved_by_${user.role}`;
-    const isFinalApproval = memo.approved_by_chairman === 1;
-
-    // For senders - show only fully approved AND paid memos
-    if (memo.created_by === user.id) {
-      return memo.approved_by_chairman === 1 && financeActionedMemos.includes(memo.id);
-    }
-
-    // Approved tab shows if:
-    // - This user's role has approved
-    // - Or final approval has been given
-    return memo[roleField] === 1 || isFinalApproval;
+    return memo[roleField] === 1 || memo.approved_by_chairman === 1;
   };
 
-  // Helper function to check if memo is rejected
-  const isMemoRejected = (memo) => {
-    return memo.status.toLowerCase() === 'rejected' ||
-      memo.rejected_by_chairman === 1 ||
-      memo.rejected_by_gmd === 1 ||
-      memo.rejected_by_finance === 1 ||
-      memo.rejected_by_executive === 1 ||
-      memo.rejected_by_manager === 1;
+  const isMemoRejected = (memo) => memo.status?.toLowerCase() === 'rejected' ||
+    ['chairman', 'gmd', 'finance', 'executive', 'manager'].some(r => memo[`rejected_by_${r}`] === 1);
+
+  const isMemoCompleted = (memo) => memo.status?.toLowerCase() === 'completed';
+
+  const searchFiltered = memos.filter(m =>
+    m.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    m.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.content && m.content.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
+  const getFinanceFiltered = (tab) => {
+    const ca = searchFiltered.filter(m => m.approved_by_chairman === 1);
+    return tab === FINANCE_TABS.TO_BE_ACTED
+      ? ca.filter(m => !financeActionedMemos.includes(m.id))
+      : ca.filter(m => financeActionedMemos.includes(m.id));
   };
 
-  // Helper function to check if memo is completed
-  const isMemoCompleted = (memo) => {
-    return memo.status.toLowerCase() === 'completed';
-  };
-
-  // Add this function to filter memos for finance tabs
-  const getFinanceFilteredMemos = (tab) => {
-    if (user.role?.toLowerCase() !== 'finance') return [];
-
-    const chairmanApprovedMemos = searchFilteredMemos.filter(
-      memo => memo.approved_by_chairman === 1
-    );
-
-    if (tab === FINANCE_TABS.TO_BE_ACTED) {
-      return chairmanApprovedMemos.filter(
-        memo => !financeActionedMemos.includes(memo.id)
-      );
-    } else if (tab === FINANCE_TABS.ACTED_UPON) {
-      return chairmanApprovedMemos.filter(
-        memo => financeActionedMemos.includes(memo.id)
-      );
-    }
-
-    return [];
-  };
-
-  // Filter memos by status based on active tab
-  const getFilteredMemosByStatus = () => {
-    // Handle finance-specific tabs
-    if (user.role?.toLowerCase() === 'finance' &&
-      (activeTab === FINANCE_TABS.TO_BE_ACTED || activeTab === FINANCE_TABS.ACTED_UPON)) {
-      return getFinanceFilteredMemos(activeTab);
-    }
-
+  const getFiltered = () => {
+    if (user.role?.toLowerCase() === 'finance' && [FINANCE_TABS.TO_BE_ACTED, FINANCE_TABS.ACTED_UPON].includes(activeTab))
+      return getFinanceFiltered(activeTab);
     switch (activeTab) {
-      case 'pending':
-        return searchFilteredMemos.filter(memo => {
-          if (memo.created_by === user.id) {
-            return !isMemoApproved(memo) &&
-              !isMemoRejected(memo) &&
-              !isMemoCompleted(memo);
-          }
-          const roleField = `approved_by_${user.role}`;
-          const rejectField = `rejected_by_${user.role}`;
-          return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
-        });
-      case 'approved':
-        return searchFilteredMemos.filter(memo =>
-          isMemoApproved(memo) && !isMemoCompleted(memo)
-        );
-      case 'rejected':
-        return searchFilteredMemos.filter(memo =>
-          isMemoRejected(memo) && !isMemoCompleted(memo)
-        );
-      case 'completed':
-        return searchFilteredMemos.filter(memo =>
-          isMemoCompleted(memo)
-        );
-      default:
-        return searchFilteredMemos.filter(memo =>
-          (memo.status.toLowerCase() === 'pending' ||
-            memo.status.toLowerCase() === 'submitted') &&
-          !isMemoApproved(memo) &&
-          !isMemoRejected(memo) &&
-          !isMemoCompleted(memo)
-        );
+      case 'pending': return searchFiltered.filter(m => {
+        if (m.created_by === user.id) return !isMemoApproved(m) && !isMemoRejected(m) && !isMemoCompleted(m);
+        return m[`approved_by_${user.role}`] !== 1 && m[`rejected_by_${user.role}`] !== 1 && !isMemoCompleted(m);
+      });
+      case 'approved': return searchFiltered.filter(m => isMemoApproved(m) && !isMemoCompleted(m));
+      case 'rejected': return searchFiltered.filter(m => isMemoRejected(m) && !isMemoCompleted(m));
+      case 'completed': return searchFiltered.filter(m => isMemoCompleted(m));
+      default: return searchFiltered;
     }
   };
 
-  const filteredMemos = getFilteredMemosByStatus();
-
-  // Get counts for each status
-  const getStatusCounts = () => {
-  // Use the same logic as getFilteredMemosByStatus()
-  const pending = searchFilteredMemos.filter(memo => {
-    if (memo.created_by === user.id) {
-      return !isMemoApproved(memo) &&
-        !isMemoRejected(memo) &&
-        !isMemoCompleted(memo);
+  const getCounts = () => {
+    const base = {
+      pending: searchFiltered.filter(m => {
+        if (m.created_by === user.id) return !isMemoApproved(m) && !isMemoRejected(m) && !isMemoCompleted(m);
+        return m[`approved_by_${user.role}`] !== 1 && m[`rejected_by_${user.role}`] !== 1 && !isMemoCompleted(m);
+      }).length,
+      approved: searchFiltered.filter(m => isMemoApproved(m) && !isMemoCompleted(m)).length,
+      rejected: searchFiltered.filter(m => isMemoRejected(m) && !isMemoCompleted(m)).length,
+      completed: searchFiltered.filter(m => isMemoCompleted(m)).length,
+    };
+    if (user.role?.toLowerCase() === 'finance') {
+      const ca = searchFiltered.filter(m => m.approved_by_chairman === 1);
+      base[FINANCE_TABS.TO_BE_ACTED] = ca.filter(m => !financeActionedMemos.includes(m.id)).length;
+      base[FINANCE_TABS.ACTED_UPON] = ca.filter(m => financeActionedMemos.includes(m.id)).length;
     }
-    const roleField = `approved_by_${user.role}`;
-    const rejectField = `rejected_by_${user.role}`;
-    return memo[roleField] !== 1 && memo[rejectField] !== 1 && !isMemoCompleted(memo);
-  }).length;
+    return base;
+  };
 
-  const approved = searchFilteredMemos.filter(memo =>
-    isMemoApproved(memo) && !isMemoCompleted(memo)
-  ).length;
-
-  const rejected = searchFilteredMemos.filter(memo =>
-    isMemoRejected(memo) && !isMemoCompleted(memo)
-  ).length;
-
-  const completed = searchFilteredMemos.filter(memo =>
-    isMemoCompleted(memo)
-  ).length;
-
-  // Add finance-specific counts if user is finance
-  const counts = { pending, approved, rejected, completed };
-
-  if (user.role?.toLowerCase() === 'finance') {
-    const chairmanApproved = searchFilteredMemos.filter(
-      memo => memo.approved_by_chairman === 1
-    );
-
-    counts[FINANCE_TABS.TO_BE_ACTED] = chairmanApproved.filter(
-      memo => !financeActionedMemos.includes(memo.id)
-    ).length;
-
-    counts[FINANCE_TABS.ACTED_UPON] = chairmanApproved.filter(
-      memo => financeActionedMemos.includes(memo.id)
-    ).length;
-  }
-
-  return counts;
-};
-
-  const statusCounts = getStatusCounts();
+  const counts = getCounts();
+  const filtered = getFiltered();
 
   const handleMemoClick = (memo) => {
-    if (selectedMemo && selectedMemo.id === memo.id) {
-      setSelectedMemo(null);
-      navigate('/dashboard/memos');
-    } else {
-      setSelectedMemo({
-        ...memo,
-        acknowledged: isMemoAcknowledgedByUser(memo, user.id)
-      });
-      navigate(`/dashboard/memos/${memo.id}`);
-    }
+    if (selectedMemo?.id === memo.id) { setSelectedMemo(null); navigate('/dashboard/memos'); }
+    else { setSelectedMemo({ ...memo, acknowledged: isMemoAcknowledgedByUser(memo, user.id) }); navigate(`/dashboard/memos/${memo.id}`); }
   };
 
-  // Add this function to handle the Pay action for memos
   const handlePay = async (memo) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/pay`,
-        { user_id: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert('Payment processed successfully!');
-
-        const updatedMemos = memos.map(m =>
-          m.id === memo.id
-            ? { ...m, paid_by_finance: 1, status: 'completed' }
-            : m
-        );
-        setMemos(updatedMemos);
-
+      const res = await axios.post(`${BASE_URL}/memos/${memo.id}/pay`, { user_id: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.status === 200) {
+        setMemos(prev => prev.map(m => m.id === memo.id ? { ...m, paid_by_finance: 1, status: 'completed' } : m));
         setFinanceActionedMemos(prev => [...prev, memo.id]);
         setSelectedMemo(null);
       }
-    } catch (error) {
-      console.error('Payment failed:', error.response?.data || error.message);
-      alert(`❌ Error: ${error.response?.data?.message || 'Payment failed'}`);
-    }
+    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Payment failed'}`); }
   };
 
-const handleApprove = async (memo) => {
-  // Only non-Chairman roles need recommendations
-  if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) {
-    alert('Please add recommendations for approval');
-    return;
-  }
-
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/approve`,
-      {
-        user_id: user.id,
-        role: user.role,
-      },
-      {
-        headers: {
-          Authorization: user?.token ? `Bearer ${user.token}` : '',
-        },
+  const handleApprove = async (memo) => {
+    if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) { alert('Please add recommendations'); return; }
+    try {
+      const res = await axios.post(`${BASE_URL}/memos/${memo.id}/approve`, { user_id: user.id, role: user.role }, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.status === 200) {
+        if (approvalComment.trim()) await axios.post(`${BASE_URL}/memos/${memo.id}/comments`,
+          { comment: user.role.toLowerCase() === 'chairman' ? `Chairman Approval: ${approvalComment}` : `Recommendation: ${approvalComment}`, user_id: user.id },
+          { headers: { Authorization: `Bearer ${user.token}` } });
+        setMemos(prev => prev.map(m => Number(m.id) === Number(memo.id) ? { ...m, ...res.data.updatedFields, [`approved_by_${user.role}`]: 1 } : m));
+        setSelectedMemo(null); setApprovalComment(''); setShowApprovalComment(false);
       }
-    );
+    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Approval failed'}`); }
+  };
 
-    if (response.status === 200) {
-      // Add approval comment only if comment exists
-      if (approvalComment.trim()) {
-        await axios.post(
-          `${BASE_URL}/memos/${memo.id}/comments`,
-          {
-            comment: user.role.toLowerCase() === 'chairman' 
-              ? `Chairman Approval: ${approvalComment}`
-              : `Recommendation: ${approvalComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
+  const handleReject = async (memo) => {
+    if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) { alert('Please add remarks'); return; }
+    try {
+      const res = await axios.post(`${BASE_URL}/memos/${memo.id}/reject`, { userId: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.data?.success) {
+        if (rejectionComment.trim()) await axios.post(`${BASE_URL}/memos/${memo.id}/comments`,
+          { comment: user.role.toLowerCase() === 'chairman' ? `Chairman Rejection: ${rejectionComment}` : `Rejection Remark: ${rejectionComment}`, user_id: user.id },
+          { headers: { Authorization: `Bearer ${user.token}` } });
+        const { field } = res.data;
+        setMemos(prev => prev.map(m => m.id === memo.id ? { ...m, status: 'rejected', [field]: 1 } : m));
+        setSelectedMemo(null); setRejectionComment(''); setShowRejectionComment(false);
       }
-
-      alert(`✅ Success: ${response.data.message}`);
-      const updatedMemo = {
-        ...memo,
-        ...response.data.updatedFields,
-        status: response.data.updatedFields.status || memo.status,
-        [`approved_by_${user.role}`]: 1,
-        [`rejected_by_${user.role}`]: 0
-      };
-
-      setMemos(prev =>
-        prev.map(m => Number(m.id) === Number(memo.id) ? updatedMemo : m)
-      );
-
-      setSelectedMemo(null); // Close the memo view
-      setApprovalComment('');
-      setShowApprovalComment(false);
-
-      if (response.data.nextApprover) {
-        alert(`Next approver: ${response.data.nextApprover}`);
-      }
-    }
-  } catch (error) {
-    console.error('Approval failed:', error.response?.data || error.message);
-    const errorMessage = error.response?.data?.details
-      ? `${error.response.data.message}: ${error.response.data.details}`
-      : error.response?.data?.message || 'Approval failed';
-    alert(`❌ Error: ${errorMessage}`);
-  }
-};
-
-const handleReject = async (memo) => {
-  // Only non-Chairman roles need remarks for rejection
-  if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) {
-    alert('Please add remarks for rejection');
-    return;
-  }
-
-  if (!memo) return;
-
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/memos/${memo.id}/reject`,
-      { userId: user.id },
-      { headers: { Authorization: `Bearer ${user.token}` } }
-    );
-
-    if (response.data?.success) {
-      // Add rejection comment only if comment exists
-      if (rejectionComment.trim()) {
-        await axios.post(
-          `${BASE_URL}/memos/${memo.id}/comments`,
-          {
-            comment: user.role.toLowerCase() === 'chairman'
-              ? `Chairman Rejection: ${rejectionComment}`
-              : `Rejection Remark: ${rejectionComment}`,
-            user_id: user.id,
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-      }
-
-      const { field, rejectedBy, message } = response.data;
-
-      const updatedMemos = memos.map((m) =>
-        m.id === memo.id
-          ? {
-            ...m,
-            status: 'rejected',
-            [field]: 1,
-            rejected_by_name: rejectedBy,
-          }
-          : m
-      );
-
-      setMemos(updatedMemos);
-      setSelectedMemo(null); // Close the memo view
-      setRejectionComment('');
-      setShowRejectionComment(false);
-      console.log(message);
-    }
-  } catch (err) {
-    console.error('Reject error:', err);
-    setError(err.response?.data?.message || 'Failed to reject memo');
-  }
-};
-
+    } catch (e) { setError(e.response?.data?.message || 'Failed to reject'); }
+  };
 
   const handleDeleteMemo = async (memoId) => {
-    if (!window.confirm("Are you sure you want to delete this memo?")) return;
-
+    if (!window.confirm('Delete this memo?')) return;
     try {
-      const response = await axios.delete(`${BASE_URL}/memos/${memoId}`, {
-        headers: {
-          Authorization: `Bearer ${user.token}`,
-        },
-      });
-
-      if (response.status === 200) {
-        alert("✅ Memo deleted successfully");
-        setMemos((prev) => prev.filter((m) => m.id !== memoId));
-        setSelectedMemo(null);
-      }
-    } catch (error) {
-      console.error("Failed to delete memo:", error);
-      alert(`❌ Error: ${error.response?.data?.message || "Delete failed"}`);
-    }
-  };
-
-
-  const getStatusBadge = (status) => {
-    const statusLower = status.toLowerCase();
-
-    if (statusLower.includes('approved') && statusLower.includes('submitted')) {
-      return {
-        className: 'bg-green-100 text-green-800 border-green-200',
-        text: 'Approved & Submitted',
-        icon: (
-          <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        )
-      };
-    }
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return {
-          className: 'bg-green-100 text-green-800 border-green-200',
-          text: 'Approved',
-          icon: (
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          )
-        };
-      case 'rejected':
-        return {
-          className: 'bg-red-100 text-red-800 border-red-200',
-          text: 'Rejected',
-          icon: (
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          )
-        };
-      case 'completed':
-        return {
-          className: 'bg-blue-100 text-blue-800 border-blue-200',
-          text: 'Completed',
-          icon: (
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          )
-        };
-      case 'submitted':
-        return {
-          className: 'bg-purple-100 text-purple-800 border-purple-200',
-          text: 'Submitted',
-          icon: (
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          )
-        };
-      default:
-        return {
-          className: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-          text: 'Pending',
-          icon: (
-            <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          )
-        };
-    }
+      await axios.delete(`${BASE_URL}/memos/${memoId}`, { headers: { Authorization: `Bearer ${user.token}` } });
+      setMemos(prev => prev.filter(m => m.id !== memoId));
+      setSelectedMemo(null);
+    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Delete failed'}`); }
   };
 
   const handleAcknowledge = async (memo) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/memos/${memo.id}/acknowledge`,
-        { user_id: user.id },
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        }
-      );
-
-      if (response.status === 200) {
-        alert(`✅ Acknowledged: ${response.data.message}`);
-
-        let updatedAcks = response.data.acknowledgments;
-        if (typeof updatedAcks === 'string') {
-          try {
-            updatedAcks = JSON.parse(updatedAcks);
-          } catch (err) {
-            updatedAcks = [];
-          }
-        }
-
-        // Map acknowledgment user IDs to names
-        updatedAcks = updatedAcks.map(ack => {
-          if (typeof ack === 'object' && ack.id) {
-            return {
-              ...ack,
-              name: users[ack.id]?.name || `User ${ack.id}`
-            };
-          }
-          return ack;
-        });
-
-        const updatedMemo = {
-          ...memo,
-          acknowledged: true,
-          acknowledgments: updatedAcks
-        };
-
-        setSelectedMemo(updatedMemo);
-        setMemos(prev => prev.map(m => (m.id === memo.id ? updatedMemo : m)));
+      const res = await axios.post(`${BASE_URL}/memos/${memo.id}/acknowledge`, { user_id: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
+      if (res.status === 200) {
+        let acks = res.data.acknowledgments;
+        if (typeof acks === 'string') { try { acks = JSON.parse(acks); } catch { acks = []; } }
+        acks = acks.map(a => typeof a === 'object' && a.id ? { ...a, name: users[a.id]?.name || `User ${a.id}` } : a);
+        const updated = { ...memo, acknowledged: true, acknowledgments: acks };
+        setSelectedMemo(updated);
+        setMemos(prev => prev.map(m => m.id === memo.id ? updated : m));
       }
-    } catch (error) {
-      console.error('Acknowledgment failed:', error);
-      alert(`❌ Error: ${error.response?.data?.message || 'Acknowledgment failed'}`);
-    }
+    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Failed'}`); }
   };
 
-  const isMemoAcknowledgedByUser = (memo, userId) => {
-    if (!memo.acknowledgments) return false;
-    const acks = Array.isArray(memo.acknowledgments)
-      ? memo.acknowledgments
-      : [];
-    return acks.some(a => typeof a === 'object' && a.id === userId);
-  };
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-[#1E5269] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
-  if (loading) return <p className="text-center py-4">Loading memos...</p>;
-  if (error) return <p className="text-center py-4 text-red-500">{error}</p>;
+  if (error) return <div className="bg-red-50 text-red-600 text-sm rounded-xl p-4">{error}</div>;
 
-  const getMemoTypeBadge = (type) => {
-    if (type === 'report') {
-      return {
-        text: 'Report',
-        className: 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-      };
-    }
-    return {
-      text: 'Normal',
-      className: 'bg-blue-100 text-blue-800 border border-blue-300'
-    };
-  };
+  const tabs = [
+    { key: 'pending', label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    ...(user.role?.toLowerCase() === 'finance' ? [
+      { key: FINANCE_TABS.TO_BE_ACTED, label: 'To Act' },
+      { key: FINANCE_TABS.ACTED_UPON, label: 'Acted' },
+    ] : []),
+    { key: 'rejected', label: 'Rejected' },
+  ];
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
-      {/* Memo List Panel */}
-      <div className={`${selectedMemo ? 'hidden md:block md:w-1/3' : 'w-full'}`}>
-        <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Memos</h2>
-            {user.role !== 'gmd' && user.role !== 'chairman' && (
-              <Link
-                to="/dashboard/memos/new"
-                className="px-3 py-1 bg-primary text-white text-sm rounded-md hover:bg-primary-dark"
-              >
-                New Memo
-              </Link>
-            )}
-          </div>
+    <div className="flex gap-5" style={{ fontFamily: "'DM Sans', sans-serif", minHeight: 'calc(100vh - 96px)' }}>
 
-          {/* Search Input */}
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Search memos..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          {/* Updated Status Tabs */}
-          <div className="mb-4">
-            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('pending')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'pending'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                Pending ({statusCounts.pending})
-              </button>
-              <button
-                onClick={() => setActiveTab('approved')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'approved'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                Approved ({statusCounts.approved})
-              </button>
+      {/* ── List Panel ── */}
+      <div className={`${selectedMemo ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-[340px] shrink-0`}>
+        <div className="bg-white rounded-2xl border border-gray-100 flex flex-col overflow-hidden" style={{ minHeight: 'calc(100vh - 96px)' }}>
 
-              {/* Finance-specific tabs */}
-              {user.role?.toLowerCase() === 'finance' && (
-                <>
-                  <button
-                    onClick={() => setActiveTab(FINANCE_TABS.TO_BE_ACTED)}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.TO_BE_ACTED
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                  >
-                    To be Acted Upon ({statusCounts[FINANCE_TABS.TO_BE_ACTED] || 0})
-                  </button>
-                  <button
-                    onClick={() => setActiveTab(FINANCE_TABS.ACTED_UPON)}
-                    className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === FINANCE_TABS.ACTED_UPON
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                  >
-                    Acted Upon ({statusCounts[FINANCE_TABS.ACTED_UPON] || 0})
-                  </button>
-                </>
+          {/* Header */}
+          <div className="px-5 pt-5 pb-4 border-b border-gray-50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileText size={18} weight="duotone" className="text-[#1E5269]" />
+                <h2 className="text-sm font-bold text-gray-800">Memos</h2>
+              </div>
+              {user.role !== 'gmd' && user.role !== 'chairman' && (
+                <Link to="/dashboard/memos/new"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1E5269] text-white text-xs font-medium rounded-xl hover:bg-[#1E5269]/90 transition">
+                  <Plus size={13} weight="bold" /> New Memo
+                </Link>
               )}
+            </div>
 
-              <button
-                onClick={() => setActiveTab('rejected')}
-                className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-colors ${activeTab === 'rejected'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
-                  }`}
-              >
-                Rejected ({statusCounts.rejected})
-              </button>
+            {/* Search */}
+            <div className="relative">
+              <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search memos…"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#1E5269]"
+              />
             </div>
           </div>
 
-          {/* Memos List */}
-          <div className="space-y-2">
-            {filteredMemos.length > 0 ? (
-              filteredMemos.map(memo => (
-                <div
-                  key={memo.id}
-                  onClick={() => handleMemoClick(memo)}
-                  className={`p-3 border rounded-md cursor-pointer hover:bg-gray-50 ${memo.status === 'submitted' ? 'border-l-4 border-l-primary' : ''
-                    } ${selectedMemo?.id === memo.id ? 'bg-gray-100' : ''}`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium">{memo.title}</h3>
-                      <div className="flex gap-2 mt-1">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(memo.status).className}`}
-                        >
-                          {getStatusBadge(memo.status).icon}
-                          {getStatusBadge(memo.status).text}
-                        </span>
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMemoTypeBadge(memo.memo_type).className}`}
-                        >
-                          {getMemoTypeBadge(memo.memo_type).text}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    From: {memo.sender} {memo.senderDetails?.department && `(${memo.senderDetails.department})`}
-                  </p>
-                  <p className="text-xs text-gray-400">{memo.date}</p>
+          {/* Tabs */}
+          <div className="px-4 pt-3 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setActiveTab(t.key)}
+                className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${activeTab === t.key ? 'bg-[#1E5269] text-white' : 'text-gray-400 hover:bg-gray-50'}`}>
+                {t.label}
+                <span className={`ml-1.5 text-[10px] ${activeTab === t.key ? 'opacity-70' : 'opacity-50'}`}>
+                  {counts[t.key] ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1.5 pt-1">
+            {filtered.length > 0 ? filtered.map(memo => (
+              <button key={memo.id} onClick={() => handleMemoClick(memo)}
+                className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all group
+                  ${selectedMemo?.id === memo.id
+                    ? 'bg-[#1E5269]/5 border-[#1E5269]/20'
+                    : 'bg-white border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                  }`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium text-gray-800 truncate leading-tight">{memo.title}</p>
+                  <StatusPill status={memo.status} />
                 </div>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 py-4">
-                {`No ${activeTab} memos found`}
-              </p>
+                <p className="text-xs text-gray-400 mt-1.5 truncate">
+                  {memo.sender}{memo.senderDetails?.department && ` · ${memo.senderDetails.department}`}
+                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${memo.memo_type === 'report' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                    {memo.memo_type === 'report' ? 'Report' : 'Memo'}
+                  </span>
+                  <span className="text-[10px] text-gray-400">{memo.date}</span>
+                </div>
+              </button>
+            )) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <FileText size={28} weight="duotone" className="text-gray-200 mb-2" />
+                <p className="text-sm text-gray-400">No {activeTab} memos</p>
+              </div>
             )}
           </div>
         </div>
       </div>
 
+      {/* ── Detail Panel ── */}
       {selectedMemo && (
-        <div className="md:w-2/3">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  {selectedMemo.title}
-                  {selectedMemo.memo_type === 'report' && selectedMemo.acknowledged && (
-                    <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path d="M5 13l4 4L19 7" />
-                      </svg>
-                      Acknowledged
-                    </span>
-                  )}
-                </h2>
+        <div className="flex-1 min-w-0">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex flex-col" style={{ minHeight: 'calc(100vh - 96px)' }}>
 
-                <p className="text-sm text-gray-500">
-                  From: {selectedMemo.sender}
-                  {selectedMemo.senderDetails?.department && ` (${selectedMemo.senderDetails.department})`}
+            {/* Detail Header */}
+            <div className="px-6 py-5 border-b border-gray-50 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <h2 className="text-base font-bold text-gray-800">{selectedMemo.title}</h2>
+                  {selectedMemo.memo_type === 'report' && selectedMemo.acknowledged && (
+                    <span className="text-[10px] bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide">Acknowledged</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">
+                  From: <span className="text-gray-600 font-medium">{selectedMemo.sender}</span>
+                  {selectedMemo.senderDetails?.department && ` · ${selectedMemo.senderDetails.department}`}
+                  <span className="mx-2 text-gray-200">|</span>
+                  {selectedMemo.date}
                 </p>
-                <p className="text-xs text-gray-400">Date: {selectedMemo.date}</p>
-                <div className="mt-2">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(selectedMemo.status).className}`}>
-                    {getStatusBadge(selectedMemo.status).icon}
-                    {getStatusBadge(selectedMemo.status).text}
+                <div className="mt-2 flex items-center gap-2">
+                  <StatusPill status={selectedMemo.status} />
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${selectedMemo.memo_type === 'report' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                    {selectedMemo.memo_type === 'report' ? 'Report' : 'Memo'}
                   </span>
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedMemo(null)}
-                className="md:hidden text-gray-500 hover:text-gray-700"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedMemo.created_by === user.id && (
+                  <button onClick={() => handleDeleteMemo(selectedMemo.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition">
+                    <Trash size={15} weight="duotone" />
+                  </button>
+                )}
+                <button onClick={() => setSelectedMemo(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 transition">
+                  <X size={15} weight="bold" />
+                </button>
+              </div>
             </div>
 
-            <div className="prose max-w-none mb-6">
-              <pre className="whitespace-pre-wrap font-sans">{selectedMemo.content}</pre>
-            </div>
+            {/* Scrollable body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5">
 
-            {selectedMemo.attachments && (
-              <div className="mt-6 border-t pt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Attachments</h4>
-                <div className="space-y-2">
-                  {JSON.parse(selectedMemo.attachments).map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center space-x-3 min-w-0">
-                        {getFileIcon(file)}
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{file.originalname}</p>
-                          <div className="flex items-center text-xs text-gray-500">
-                            <span>{formatFileSize(file.size)}</span>
-                            <span className="mx-2">•</span>
-                            <span>{file.mimetype.split('/')[1]?.toUpperCase() || 'FILE'}</span>
-                          </div>
-                        </div>
+              {/* Content */}
+              <div className="prose prose-sm max-w-none mb-6">
+                <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed bg-gray-50/60 rounded-xl p-4 border border-gray-100">
+                  {selectedMemo.content}
+                </pre>
+              </div>
+
+              {/* Attachments */}
+              {selectedMemo.attachments && (() => {
+                try {
+                  const files = JSON.parse(selectedMemo.attachments);
+                  if (!files?.length) return null;
+                  return (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Paperclip size={14} weight="duotone" className="text-gray-400" />
+                        <span className="text-xs font-semibold text-gray-600">Attachments ({files.length})</span>
                       </div>
-                      <a
-                        href={`${BASE_URL}/memos/download/${selectedMemo.id}/${file.filename}`}
-                        download={file.originalname}
-                        className="text-primary hover:text-primary-dark transition-colors"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </a>
+                      <div className="space-y-2">
+                        {files.map((file, i) => (
+                          <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+                                <FileText size={14} weight="duotone" className="text-gray-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-700 truncate">{file.originalname}</p>
+                                <p className="text-[10px] text-gray-400">{formatFileSize(file.size)} · {file.mimetype?.split('/')[1]?.toUpperCase()}</p>
+                              </div>
+                            </div>
+                            <a href={`${import.meta.env.VITE_BASE_URL}/memos/download/${selectedMemo.id}/${file.filename}`}
+                              download={file.originalname} target="_blank" rel="noopener noreferrer"
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-[#1E5269] hover:bg-white transition">
+                              <ArrowDown size={14} weight="bold" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  ))}
+                  );
+                } catch { return null; }
+              })()}
+
+              {/* Approval Pipeline */}
+              <div className="mb-6">
+                <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">Approval Pipeline</p>
+                <div className="flex gap-2 flex-wrap">
+                  {['manager', 'executive', 'finance', 'gmd', 'chairman'].map(role => {
+                    const approved = selectedMemo[`approved_by_${role}`] === 1;
+                    const rejected = selectedMemo[`rejected_by_${role}`] === 1;
+                    return (
+                      <div key={role} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border ${
+                        approved ? 'bg-green-50 border-green-100 text-green-700' :
+                        rejected ? 'bg-red-50 border-red-100 text-red-600' :
+                        'bg-gray-50 border-gray-100 text-gray-400'
+                      }`}>
+                        {approved ? <CheckCircle size={12} weight="fill" /> : rejected ? <XCircle size={12} weight="fill" /> : <Clock size={12} weight="duotone" />}
+                        <span className="capitalize">{role}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
 
-            {/* Approval status indicators */}
-            <div className="grid grid-cols-5 gap-2 mb-6">
-              {[
-                { role: 'manager', label: 'Manager' },
-                { role: 'executive', label: 'Executive' },
-                { role: 'finance', label: 'Finance' },
-                { role: 'gmd', label: 'GMD' },
-                { role: 'chairman', label: 'Chairman' }
-              ].map(({ role, label }) => {
-                const approved = selectedMemo[`approved_by_${role}`] === 1;
-                const rejected = selectedMemo[`rejected_by_${role}`] === 1;
+              {/* Acknowledgment for reports */}
+              {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (
+                <div className="mb-4 bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" className="w-4 h-4 accent-[#1E5269] rounded"
+                      onChange={e => { if (e.target.checked) handleAcknowledge(selectedMemo); }} />
+                    <span className="text-sm text-amber-800 font-medium">I acknowledge this memo</span>
+                  </label>
+                </div>
+              )}
 
-                return (
-                  <div
-                    key={role}
-                    className={`p-2 rounded text-center text-xs ${approved ? 'bg-green-100 text-green-800' :
-                      rejected ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100'
-                      }`}
-                  >
-                    <div className="font-medium">{label}</div>
-                    <div>
-                      {approved ? 'Approved' : rejected ? 'Rejected' : 'Pending'}
+              {selectedMemo.memo_type === 'report' && (
+                <div className="mb-4">
+                  {/* Pending roles (string entries) */}
+                  {selectedMemo.acknowledgments?.filter(a => typeof a === 'string').length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Pending Acknowledgment From</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMemo.acknowledgments.filter(a => typeof a === 'string').map((role, idx) => (
+                          <span key={idx} className="text-xs bg-amber-50 text-amber-700 px-2.5 py-1 rounded-xl border border-amber-100">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  )}
+                  {/* Acknowledged users (object entries) */}
+                  {selectedMemo.acknowledgments?.filter(a => typeof a === 'object').length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Acknowledged by</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedMemo.acknowledgments.filter(a => typeof a === 'object').map(a => (
+                          <span key={a.id} className="text-xs bg-green-50 text-green-700 px-2.5 py-1 rounded-xl border border-green-100">
+                            {a.name} · {a.role}{a.dept && ` (${a.dept})`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* Comment Section */}
-            {selectedMemo && (
-              <CommentSection
-                memoId={selectedMemo.id}
-                user={user}
-              />
-            )}
-
-            {/* Pay button for finance users on to-be-acted items */}
-            {user.role?.toLowerCase() === 'finance' &&
-              activeTab === FINANCE_TABS.TO_BE_ACTED &&
-              !financeActionedMemos.includes(selectedMemo.id) && (
-                <div className="mt-6">
-                  <button
-                    onClick={() => handlePay(selectedMemo)}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                  >
-                    Pay
+              {/* Pay button (Finance) */}
+              {user.role?.toLowerCase() === 'finance' && activeTab === FINANCE_TABS.TO_BE_ACTED && !financeActionedMemos.includes(selectedMemo.id) && (
+                <div className="mb-4">
+                  <button onClick={() => handlePay(selectedMemo)}
+                    className="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded-xl hover:bg-green-700 transition">
+                    Mark as Paid
                   </button>
                 </div>
               )}
 
-            {/* Acknowledgment checkbox for reports */}
-            {selectedMemo.memo_type === 'report' && !selectedMemo.acknowledged && (
-              <div className="mt-6 border-t pt-4">
-                <label className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    className="form-checkbox h-4 w-4 text-primary"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        handleAcknowledge(selectedMemo);
-                      }
-                    }}
-                  />
-                  <span className="ml-2 text-sm text-gray-700">I acknowledge this memo</span>
-                </label>
-              </div>
-            )}
+              {/* Approve/Reject */}
+              {(() => {
+                const userRole = user?.role?.toLowerCase();
+                const normalizeRole = r => (r?.includes('executive') || r?.includes('ict')) ? 'executive' : r;
+                const nr = normalizeRole(userRole);
+                const approved = selectedMemo[`approved_by_${nr}`] === 1;
+                const rejected = selectedMemo[`rejected_by_${nr}`] === 1;
+                const acted = approved || rejected;
+                const isExec = userRole?.includes('executive') || userRole?.includes('ict');
+                const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExec;
+                const statusOk = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
+                const isChairman = userRole === 'chairman';
+                const canShow = (isAuthorized && !acted && statusOk) || (isChairman && !approved && !rejected);
+                if (!canShow) return null;
 
-            {selectedMemo.memo_type === 'report' && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium mb-1">Pending Acknowledgment From:</h4>
-                <ul className="list-disc list-inside text-sm text-gray-500">
-                  {selectedMemo.acknowledgments
-                    .filter(a => typeof a === 'string')
-                    .map((role, idx) => (
-                      <li key={idx}>{role}</li>
-                    ))}
-                </ul>
-              </div>
-            )}
+                return (
+                  <div className="space-y-3">
+                    {/* Approval textarea */}
+                    {showApprovalComment && userRole !== 'chairman' && (
+                      <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                        <p className="text-xs font-semibold text-blue-800 mb-2">Recommendation</p>
+                        <textarea value={approvalComment} onChange={e => setApprovalComment(e.target.value)}
+                          placeholder="Enter recommendations…" rows="3"
+                          className="w-full text-sm px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 resize-none bg-white" />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => { setShowApprovalComment(false); setApprovalComment(''); }}
+                            className="px-3 py-1.5 text-xs text-gray-500 hover:bg-white rounded-lg transition">Cancel</button>
+                          <button onClick={() => handleApprove(selectedMemo)} disabled={!approvalComment.trim()}
+                            className="px-4 py-1.5 text-xs font-medium bg-[#1E5269] text-white rounded-lg disabled:opacity-40">Submit Approval</button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Rejection textarea */}
+                    {showRejectionComment && userRole !== 'chairman' && (
+                      <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                        <p className="text-xs font-semibold text-red-800 mb-2">Rejection Remark</p>
+                        <textarea value={rejectionComment} onChange={e => setRejectionComment(e.target.value)}
+                          placeholder="Enter remarks…" rows="3"
+                          className="w-full text-sm px-3 py-2 border border-red-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-400 resize-none bg-white" />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => { setShowRejectionComment(false); setRejectionComment(''); }}
+                            className="px-3 py-1.5 text-xs text-gray-500 hover:bg-white rounded-lg transition">Cancel</button>
+                          <button onClick={() => handleReject(selectedMemo)} disabled={!rejectionComment.trim()}
+                            className="px-4 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg disabled:opacity-40">Submit Rejection</button>
+                        </div>
+                      </div>
+                    )}
+                    {/* Buttons */}
+                    {!showApprovalComment && !showRejectionComment && (
+                      <div className="flex justify-end gap-2 pt-2 border-t border-gray-50">
+                        <button
+                          onClick={() => isChairman ? handleReject(selectedMemo) : (setShowRejectionComment(true), setShowApprovalComment(false))}
+                          className="px-5 py-2 text-sm font-medium border border-red-200 text-red-500 rounded-xl hover:bg-red-50 transition">
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => isChairman ? handleApprove(selectedMemo) : (setShowApprovalComment(true), setShowRejectionComment(false))}
+                          className="px-5 py-2 text-sm font-medium bg-[#1E5269] text-white rounded-xl hover:bg-[#1E5269]/90 transition">
+                          Approve
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
-            {selectedMemo.memo_type === 'report' && selectedMemo.acknowledgments?.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-medium mb-2">Acknowledged by:</h4>
-                <ul className="list-disc list-inside text-sm text-gray-700">
-                  {selectedMemo.acknowledgments
-                    .filter(a => typeof a === 'object')
-                    .map((a) => (
-                      <li key={a.id}>
-                        {a.name} — {a.role} {a.dept && `(${a.dept})`}
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Approval buttons for authorized roles */}
-            {(() => {
-              const userRole = user?.role?.toLowerCase();
-
-              // Debug logging
-              console.log('=== DEBUG APPROVAL BUTTON ===');
-              console.log('User role:', userRole);
-              console.log('Memo status:', selectedMemo.status);
-              console.log('Memo data:', selectedMemo);
-
-              // Normalize role for all executive variations
-              const normalizeRole = (role) => {
-                if (!role) return role;
-                if (role.includes('executive') || role.includes('ict')) {
-                  return 'executive';
-                }
-                return role;
-              };
-
-              const normalizedRole = normalizeRole(userRole);
-              console.log('Normalized role:', normalizedRole);
-
-              const hasUserApproved = selectedMemo[`approved_by_${normalizedRole}`] === 1;
-              const hasUserRejected = selectedMemo[`rejected_by_${normalizedRole}`] === 1;
-              const hasUserActed = hasUserApproved || hasUserRejected;
-
-              console.log('Approval status:', hasUserApproved);
-              console.log('Rejection status:', hasUserRejected);
-
-              // Check if user is authorized 
-              const isExecutive = userRole?.includes('executive') || userRole?.includes('ict');
-              const isAuthorized = ['manager', 'finance', 'gmd', 'chairman'].includes(userRole) || isExecutive;
-
-              // Allow action if status is pending/submitted OR if it's in_review   
-              const statusAllowsAction = ['pending', 'submitted', 'in_review'].includes(selectedMemo.status);
-              const canAct = !hasUserActed && statusAllowsAction;
-
-              // Special case for chairman
-              const isChairman = userRole === 'chairman';
-              const canChairmanApprove = isChairman && !hasUserApproved && !hasUserRejected;
-
-              console.log('Is authorized:', isAuthorized);
-              console.log('Status allows action:', statusAllowsAction);
-              console.log('Can act:', canAct);
-              console.log('Is chairman:', isChairman);
-              console.log('Can chairman approve:', canChairmanApprove);
-
-              // Show buttons if authorized and can act, OR if chairman can approve
-              const shouldShowButtons = (isAuthorized && canAct) || canChairmanApprove;
-
-              console.log('Should show buttons:', shouldShowButtons);
-              console.log('=== END DEBUG ===');
-
-              if (!shouldShowButtons) {
-                return null;
-              }
-
-              return (
-                <div className="mt-6 space-y-4">
-                  {/* Approval Comment Input - only show for non-Chairman */}
-{showApprovalComment && user.role.toLowerCase() !== 'chairman' && (
-  <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-    <h4 className="text-sm font-medium text-blue-800 mb-2">
-      Recommendation
-    </h4>
-    <textarea
-      value={approvalComment}
-      onChange={(e) => setApprovalComment(e.target.value)}
-      placeholder="Enter your recommendations for approval..."
-      className="w-full px-3 py-2 border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
-      rows="3"
-    />
-    <div className="flex justify-end space-x-2 mt-2">
-      <button
-        onClick={() => {
-          setShowApprovalComment(false);
-          setApprovalComment('');
-        }}
-        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={() => handleApprove(selectedMemo)}
-        disabled={!approvalComment.trim()}
-        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-      >
-        Submit Approval
-      </button>
-    </div>
-  </div>
-)}
-
-{/* Rejection Comment Input - only show for non-Chairman */}
-{showRejectionComment && user.role.toLowerCase() !== 'chairman' && (
-  <div className="bg-red-50 p-4 rounded-md border border-red-200">
-    <h4 className="text-sm font-medium text-red-800 mb-2">
-      Rejection Remark
-    </h4>
-    <textarea
-      value={rejectionComment}
-      onChange={(e) => setRejectionComment(e.target.value)}
-      placeholder="Enter your remarks for rejection..."
-      className="w-full px-3 py-2 border border-red-300 rounded-md focus:outline-none focus:ring-1 focus:ring-red-500"
-      rows="3"
-    />
-    <div className="flex justify-end space-x-2 mt-2">
-      <button
-        onClick={() => {
-          setShowRejectionComment(false);
-          setRejectionComment('');
-        }}
-        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 text-sm"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={() => handleReject(selectedMemo)}
-        disabled={!rejectionComment.trim()}
-        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-      >
-        Submit Rejection
-      </button>
-    </div>
-  </div>
-)}
-
-                  {/* Action Buttons */}
-                  {!showApprovalComment && !showRejectionComment && (
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        onClick={() => {
-                          // Chairman rejects directly, others show comment input
-                          if (user.role.toLowerCase() === 'chairman') {
-                            handleReject(selectedMemo);
-                          } else {
-                            setShowRejectionComment(true);
-                            setShowApprovalComment(false);
-                          }
-                        }}
-                        disabled={hasUserActed && !isChairman}
-                        className={`px-4 py-2 border rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                          ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
-                          : 'border-red-500 text-red-500 hover:bg-red-50'
-                          }`}
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => {
-                          // Chairman approves directly, others show comment input
-                          if (user.role.toLowerCase() === 'chairman') {
-                            handleApprove(selectedMemo);
-                          } else {
-                            setShowApprovalComment(true);
-                            setShowRejectionComment(false);
-                          }
-                        }}
-                        disabled={hasUserActed && !isChairman}
-                        className={`px-4 py-2 rounded-md text-sm font-medium ${(hasUserActed && !isChairman)
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-primary text-white hover:bg-primary-dark'
-                          }`}
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
+              {/* Comments */}
+              <CommentSection memoId={selectedMemo.id} user={user} />
+            </div>
           </div>
         </div>
       )}
