@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
 import logo from '../assets/pgl_logo.png'
+import ex1 from '../assets/ex1.jpg';
+import ex2 from '../assets/ex2.jpg';
+import ex3 from '../assets/ex3.jpg';
+import ex4 from '../assets/ex4.jpg';
 
 // Inject Playfair Display font for PY-SPACE branding
 const fontLink = document.createElement('link');
@@ -157,8 +161,10 @@ const DashboardLayout = () => {
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || 'U';
 
   return (
-    <div className="min-h-screen bg-[#f0f0ed] flex overflow-hidden" style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}>
-
+    <div className="min-h-screen bg-[#e0b9a] flex overflow-hidden" style={{ fontFamily: "'DM Sans', 'Inter', sans-serif" }}>
+      <div className="fixed inset-0 -z-10">
+        <img src={ex3} alt="Background 1" className="absolute top-0 left-0 w-full h-full object-cover opacity-20" />
+      </div>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-20 bg-black/20 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
