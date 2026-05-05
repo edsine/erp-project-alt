@@ -1,7 +1,14 @@
+// ClientFileList.jsx
 import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { 
+  FolderOpen, Download, Trash2, Eye, Search, Filter, 
+  ChevronDown, Loader2, CheckSquare, Square, FileText,
+  File, Image, FileSpreadsheet, FileCode, X
+} from 'lucide-react';
+import { useMemo } from 'react';
 
 const ClientFileList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -19,7 +26,9 @@ const ClientFileList = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
 
+  
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -51,14 +60,20 @@ const ClientFileList = () => {
     fetchData();
   }, [clientId, navigate]);
 
-  const filteredFiles = files.filter(file => {
+const filteredFiles = useMemo(() => {
+  return files.filter(file => {
     const matchesSearch = file.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      file.description.toLowerCase().includes(searchTerm.toLowerCase());
-
+      (file.description && file.description.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filter === 'all' || file.category === filter;
-
     return matchesSearch && matchesFilter;
   });
+}, [files, searchTerm, filter]);
+
+  // Reset selectAll when filtered files change
+  useEffect(() => {
+    setSelectAll(false);
+    setSelectedFiles([]);
+  }, [filteredFiles]);
 
   const toggleFileSelection = (fileId) => {
     setSelectedFiles(prev =>
@@ -161,13 +176,10 @@ const ClientFileList = () => {
         }
       });
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
 
       const contentDisposition = response.headers.get('content-disposition');
       let finalFileName = fileName;
-      
       if (contentDisposition) {
         const match = contentDisposition.match(/filename="?(.+?)"?(;|$)/i);
         if (match) finalFileName = match[1];
@@ -176,24 +188,19 @@ const ClientFileList = () => {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      
       link.href = url;
       link.download = finalFileName;
-      link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
-
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
       }, 200);
-
     } catch (err) {
       console.error('Download error:', err);
       alert(`Download failed: ${err.message || 'Please try again'}`);
     }
   };
-
 
   const handleView = async (fileId, fileName, fileType) => {
     const token = localStorage.getItem('token');
@@ -202,279 +209,334 @@ const ClientFileList = () => {
       return;
     }
 
-    try {
-      const isViewable = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'image/jpeg',
-    'image/png',
-    'text/plain'
-      ].includes(fileType);
+    const isViewable = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/jpeg',
+      'image/png',
+      'text/plain'
+    ].includes(fileType);
 
-      if (isViewable) {
-        window.open(`${BASE_URL}/files/view/${fileId}`, '_blank');
-      } else {
-        handleDownload(fileId, fileName);
-      }
-    } catch (err) {
-      console.error('View failed:', err);
-      setError(err.response?.data?.message || 'Failed to view file');
+    if (isViewable) {
+      window.open(`${BASE_URL}/files/view/${fileId}`, '_blank');
+    } else {
+      handleDownload(fileId, fileName);
     }
   };
 
-  if (loading) return <div className="text-center py-8">Loading files...</div>;
-  if (error) return <div className="text-center text-red-500 py-8">{error}</div>;
-  if (!client) return <div className="text-center py-8">Client not found</div>;
+  const getFileIcon = (fileType) => {
+    const type = fileType?.split('/')[0];
+    if (fileType === 'application/pdf') return <FileText className="w-8 h-8 text-red-500" />;
+    if (type === 'image') return <Image className="w-8 h-8 text-blue-500" />;
+    if (fileType?.includes('word')) return <FileText className="w-8 h-8 text-blue-600" />;
+    if (fileType?.includes('excel') || fileType?.includes('spreadsheet')) 
+      return <FileSpreadsheet className="w-8 h-8 text-green-600" />;
+    if (type === 'text') return <FileCode className="w-8 h-8 text-gray-600" />;
+    return <File className="w-8 h-8 text-gray-400" />;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const getCategoryColor = (category) => {
+    switch (category) {
+      case 'requisition': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'memo': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'contract': return 'bg-purple-50 text-purple-700 border-purple-200';
+      case 'report': return 'bg-amber-50 text-amber-700 border-amber-200';
+      default: return 'bg-gray-50 text-gray-600 border-gray-200';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-center">
+        {error}
+      </div>
+    );
+  }
+
+  if (!client) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-700 text-center">
+        Client not found
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h2 className="text-lg sm:text-xl font-bold">{client.name}</h2>
-          <p className="text-sm sm:text-base text-gray-500">{client.code}</p>
+    <div className="space-y-6">
+      {/* Header Section */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">{client.name}</h1>
+            <p className="text-sm text-gray-500 mt-1">{client.code}</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to={`/dashboard/files/${clientId}/upload`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition shadow-sm text-sm font-medium"
+            >
+              <FolderOpen className="w-4 h-4" />
+              Upload File
+            </Link>
+          </div>
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
-          >
-            <option value="all">All Categories</option>
-            <option value="requisition">Requisitions</option>
-            <option value="memo">Memos</option>
-            <option value="contract">Contracts</option>
-            <option value="report">Reports</option>
-            <option value="other">Other</option>
-          </select>
-          
-          <input
-            type="text"
-            placeholder="Search files..."
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-primary text-sm sm:text-base"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          
+      </div>
+
+      {/* Controls Bar */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between">
+          <div className="flex flex-wrap gap-3 items-center">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search files..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-64 text-sm"
+              />
+            </div>
+
+            {/* Category Filter */}
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                className="pl-9 pr-8 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 appearance-none bg-white text-sm"
+              >
+                <option value="all">All Categories</option>
+                <option value="requisition">Requisitions</option>
+                <option value="memo">Memos</option>
+                <option value="contract">Contracts</option>
+                <option value="report">Reports</option>
+                <option value="other">Other</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            </div>
+
+            {/* View toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded-md transition ${viewMode === 'grid' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition ${viewMode === 'list' ? 'bg-white shadow-sm text-primary' : 'text-gray-500'}`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Bulk selection */}
+            {filteredFiles.length > 0 && (
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-1 text-sm text-gray-600 hover:text-primary transition"
+              >
+                {selectAll ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                {selectAll ? 'Deselect all' : 'Select all'}
+              </button>
+            )}
+          </div>
+
+          {/* Bulk delete button */}
           {selectedFiles.length > 0 && (
             <button
               onClick={handleDeleteSelected}
               disabled={isDeleting}
-              className={`px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm sm:text-base ${
-                isDeleting ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 transition shadow-sm text-sm font-medium disabled:opacity-50"
             >
-              {isDeleting ? 'Deleting...' : `Delete (${selectedFiles.length})`}
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+              Delete ({selectedFiles.length})
             </button>
           )}
-          
-          <Link
-            to={`/dashboard/files/${clientId}/upload`}
-            className="px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark text-sm sm:text-base text-center"
-          >
-            Upload File
-          </Link>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 sm:p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Success / Error messages */}
       {success && (
-        <div className="mb-4 bg-green-50 border-l-4 border-green-500 p-3 sm:p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-green-700">{success}</p>
-            </div>
-          </div>
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-green-700 text-sm">
+          {success}
+        </div>
+      )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">
+          {error}
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                <input
-                  type="checkbox"
-                  checked={selectAll}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                />
-              </th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {filteredFiles.length > 0 ? (
-              filteredFiles.map(file => (
-                <tr key={file.id} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedFiles.includes(file.id)}
-                      onChange={() => toggleFileSelection(file.id)}
-                      className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
-                    />
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div 
-                        className="flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10 cursor-pointer"
-                        onClick={() => handleView(file.id, file.name, file.type)}
-                        title={`Click to ${[
-                          'image/jpeg',
-                          'image/png',
-                          'image/gif',
-                          'application/pdf',
-                          'text/plain'
-                        ].includes(file.type) ? 'view' : 'download'} ${file.name}`}
-                      >
-                        {getFileIcon(file.type)}
-                      </div>
-                      <div className="ml-2 sm:ml-4">
-                        <div className="text-sm font-medium text-gray-900 truncate max-w-[150px] sm:max-w-none">{file.name}</div>
-                        <div className="text-xs sm:text-sm text-gray-500 truncate max-w-[150px] sm:max-w-none">{file.description}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      file.category === 'requisition' ? 'bg-green-100 text-green-800' :
-                      file.category === 'memo' ? 'bg-blue-100 text-blue-800' :
-                      file.category === 'contract' ? 'bg-purple-100 text-purple-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {file.category}
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                    {new Date(file.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
-                    {formatFileSize(file.size)}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleDownload(file.id, file.name)}
-                        className="text-blue-600 hover:text-blue-900"
-                        title="Download"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(file.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Delete"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
-                  No files found
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* File Listing - Grid or List */}
+      {filteredFiles.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+          <File className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No files found</p>
+          <p className="text-sm text-gray-400 mt-1">Try adjusting your search or filter</p>
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filteredFiles.map(file => (
+            <div
+              key={file.id}
+              className={`bg-white rounded-2xl shadow-sm border transition-all duration-200 hover:shadow-md group ${
+                selectedFiles.includes(file.id) ? 'ring-2 ring-primary border-primary' : 'border-gray-100'
+              }`}
+            >
+              {/* Selection checkbox (top right) */}
+              <div className="relative">
+                <button
+                  onClick={() => toggleFileSelection(file.id)}
+                  className="absolute top-3 right-3 z-10 p-1 rounded-md bg-white/80 backdrop-blur-sm hover:bg-white transition"
+                >
+                  {selectedFiles.includes(file.id) ? (
+                    <CheckSquare className="w-4 h-4 text-primary" />
+                  ) : (
+                    <Square className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+                
+                {/* File Icon & Name */}
+                <div className="p-5 pb-3 flex flex-col items-center text-center">
+                  <div className="mb-3 mt-8">{getFileIcon(file.type)}</div>
+                  <h3 className="font-medium text-gray-800 text-sm mt-9 -mb-5 line-clamp-2">{file.name}</h3>
+                  {file.description && (
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{file.description}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Metadata */}
+              <div className="px-4 pb-3 flex flex-wrap justify-between items-center text-xs text-gray-500 border-t border-gray-50 pt-3">
+                <span className={`px-2 py-0.5 rounded-full border ${getCategoryColor(file.category)}`}>
+                  {file.category}
+                </span>
+                <span>{formatFileSize(file.size)}</span>
+              </div>
+              <div className="px-4 pb-3 text-xs text-gray-400">
+                Uploaded {new Date(file.created_at).toLocaleDateString()}
+              </div>
+
+              {/* Actions */}
+              <div className="flex border-t border-gray-100 divide-x divide-gray-100">
+                <button
+                  onClick={() => handleView(file.id, file.name, file.type)}
+                  className="flex-1 py-2.5 text-gray-600 hover:text-primary flex items-center justify-center gap-1 text-sm transition"
+                >
+                  <Eye className="w-4 h-4" />
+                  View
+                </button>
+                <button
+                  onClick={() => handleDownload(file.id, file.name)}
+                  className="flex-1 py-2.5 text-gray-600 hover:text-primary flex items-center justify-center gap-1 text-sm transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+                <button
+                  onClick={() => handleDelete(file.id)}
+                  className="flex-1 py-2.5 text-gray-600 hover:text-red-600 flex items-center justify-center gap-1 text-sm transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // List view (responsive table-like cards)
+        <div className="space-y-3">
+          {filteredFiles.map(file => (
+            <div
+              key={file.id}
+              className={`bg-white rounded-xl shadow-sm border transition-all hover:shadow-md ${
+                selectedFiles.includes(file.id) ? 'ring-2 ring-primary border-primary' : 'border-gray-100'
+              }`}
+            >
+              <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* Checkbox + Icon */}
+                <div className="flex items-center gap-3 sm:w-1/3">
+                  <button onClick={() => toggleFileSelection(file.id)} className="flex-shrink-0">
+                    {selectedFiles.includes(file.id) ? (
+                      <CheckSquare className="w-5 h-5 text-primary" />
+                    ) : (
+                      <Square className="w-5 h-5 text-gray-400" />
+                    )}
+                  </button>
+                  <div className="flex-shrink-0">{getFileIcon(file.type)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-gray-800 text-sm truncate">{file.name}</div>
+                    {file.description && (
+                      <div className="text-xs text-gray-400 truncate">{file.description}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Metadata */}
+                <div className="flex flex-wrap gap-4 sm:flex-1 sm:justify-between items-center text-sm">
+                  <span className={`px-2 py-0.5 rounded-full border text-xs ${getCategoryColor(file.category)}`}>
+                    {file.category}
+                  </span>
+                  <span className="text-gray-500 text-xs">{formatFileSize(file.size)}</span>
+                  <span className="text-gray-400 text-xs">{new Date(file.created_at).toLocaleDateString()}</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleView(file.id, file.name, file.type)}
+                      className="p-1.5 text-gray-500 hover:text-primary transition rounded-md"
+                      title="View"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDownload(file.id, file.name)}
+                      className="p-1.5 text-gray-500 hover:text-primary transition rounded-md"
+                      title="Download"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(file.id)}
+                      className="p-1.5 text-gray-500 hover:text-red-600 transition rounded-md"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
-
-function getFileIcon(fileType) {
-  const type = fileType?.split('/')[0];
-  const subtype = fileType?.split('/')[1];
-  
-  if (fileType === 'application/pdf') {
-    return (
-      <svg className="h-full w-full text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
-  }
-  
-  if (type === 'image') {
-    return (
-      <svg className="h-full w-full text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    );
-  }
-  
-  if (fileType === 'application/msword' || 
-      fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    return (
-      <svg className="h-full w-full text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
-  }
-  
-  if (fileType === 'application/vnd.ms-excel' || 
-      fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-    return (
-      <svg className="h-full w-full text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
-  }
-  
-  if (type === 'text') {
-    return (
-      <svg className="h-full w-full text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    );
-  }
-  
-  return (
-    <svg className="h-full w-full text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-    </svg>
-  );
-}
-
-function formatFileSize(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i]);
-}
 
 export default ClientFileList;
