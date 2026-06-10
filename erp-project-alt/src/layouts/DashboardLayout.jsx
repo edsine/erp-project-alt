@@ -24,7 +24,7 @@ import {
   Folder,
   Users,
   CheckSquare,
-  CurrencyDollar,
+  // CurrencyDollar,
   List,
   X,
   Bell,
@@ -155,7 +155,7 @@ const DashboardLayout = () => {
     { icon: CalendarBlank, label: 'Leaves', to: 'leaves' },
     { icon: Folder, label: 'Files', to: 'files' },
     ...(hasFinanceAccess() ? [{ icon: PresentationChart, label: 'Finance', to: 'finance' }] : []),
-    ...(user.role === 'finance' ? [{ icon: CurrencyDollar, label: 'Payroll', to: 'payroll' }] : []),
+    // ...(user.role === 'finance' ? [{ icon: CurrencyDollar, label: 'Payroll', to: 'payroll' }] : []),
   ];
 
   const userInitial = user?.name?.charAt(0)?.toUpperCase() || 'U';
