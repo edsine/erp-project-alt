@@ -155,51 +155,38 @@ const FileList = () => {
     </div>
   );
 
-  const renderTableView = () => (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
+const renderTableView = () => (
+  <div className="overflow-x-auto">
+    <div className="min-w-[640px]">
+      <table className="w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Client
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Code
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Files
-            </th>
-            <th scope="col" className="relative px-6 py-3">
-              <span className="sr-only">Edit</span>
-            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Files</th>
+            <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {filteredClients.map(client => (
-            <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <Link to={`/dashboard/files/${client.id}`} className="flex items-center space-x-3">
-                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-primary font-medium">
+            <tr key={client.id} className="hover:bg-gray-50 transition">
+              <td className="px-4 py-3">
+                <Link to={`/dashboard/files/${client.id}`} className="flex items-center gap-3">
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium text-xs">
                     {client.code.substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="font-medium text-gray-900">{client.name}</div>
+                  <div className="font-medium text-gray-800 break-words">{client.name}</div>
                 </Link>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {client.code}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  <FiFile className="mr-1 h-3 w-3" />
-                  {client.file_count} {client.file_count === 1 ? 'file' : 'files'}
+              <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{client.code}</td>
+              <td className="px-4 py-3 whitespace-nowrap">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                  <FiFile className="mr-1 h-3 w-3" /> {client.file_count}
                 </span>
               </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <Link
-                  to={`edit-client/${client.id}`}
-                  className="text-primary hover:text-primary-dark transition-colors"
-                >
-                  <FiEdit2 className="h-5 w-5" />
+              <td className="px-4 py-3 text-right whitespace-nowrap">
+                <Link to={`edit-client/${client.id}`} className="text-primary hover:text-primary-dark transition">
+                  <FiEdit2 className="h-4 w-4" />
                 </Link>
               </td>
             </tr>
@@ -207,7 +194,8 @@ const FileList = () => {
         </tbody>
       </table>
     </div>
-  );
+  </div>
+);
 
   const renderCardView = () => (
     <div className="grid grid-cols-1 gap-4 sm:gap-6">
