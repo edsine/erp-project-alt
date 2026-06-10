@@ -34,7 +34,8 @@ const ExpensesModule = () => {
           category: item.category,
           costCentre: item.cost_centre,
           subCostCentre: item.sub_cost_centre,
-          bankDebited: item.bank_debited
+          bankDebited: item.bank_debited,
+          requisition_id: item.requisition_id  // ✅ ← critical flag: if present & not null, expense came from a requisition
         };
       });
       setExpensesData(mapped);
@@ -70,6 +71,11 @@ const ExpensesModule = () => {
   }, [searchTerm, dateRange, expensesData]);
 
   const handleEdit = useCallback((expense) => {
+    // ❌ Do not allow editing if the expense originated from a requisition
+    if (expense.requisition_id) {
+      alert('Expenses created from requisitions cannot be edited manually.');
+      return;
+    }
     setEditingId(expense.id);
     setEditForm(expense);
   }, []);
@@ -87,6 +93,13 @@ const ExpensesModule = () => {
   }, []);
 
   const handleSave = useCallback(async (id) => {
+    // 🛡️ Extra safety: if the expense has a requisition_id, block save
+    const targetExpense = expensesData.find(exp => exp.id === id);
+    if (targetExpense?.requisition_id) {
+      alert('Cannot save changes – this expense is linked to a requisition.');
+      setEditingId(null);
+      return;
+    }
     try {
       setLoading(true);
       const res = await fetch(`${BASE_URL}/finance/expense/${id}`, {
@@ -112,9 +125,14 @@ const ExpensesModule = () => {
     } finally {
       setLoading(false);
     }
-  }, [editForm]);
+  }, [editForm, expensesData]);
 
   const handleDelete = useCallback(async (id) => {
+    const targetExpense = expensesData.find(exp => exp.id === id);
+    if (targetExpense?.requisition_id) {
+      alert('Cannot delete – this expense is linked to a requisition.');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this expense?')) return;
     try {
       setLoading(true);
@@ -127,7 +145,7 @@ const ExpensesModule = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [expensesData]);
 
   const handleAddNew = useCallback(async () => {
     try {
@@ -136,7 +154,18 @@ const ExpensesModule = () => {
       const res = await fetch(`${BASE_URL}/finance/expense`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionDate: today, voucherNo: '', transactionDetails: '', spent: 0, category: '', costCentre: '', subCostCentre: null, bankDebited: 'No', createdBy: 1 })
+        body: JSON.stringify({
+          transactionDate: today,
+          voucherNo: '',
+          transactionDetails: '',
+          spent: 0,
+          category: '',
+          costCentre: '',
+          subCostCentre: null,
+          bankDebited: 'No',
+          createdBy: 1
+          // ✅ no requisition_id → manual expense, editable
+        })
       });
       if (!res.ok) throw new Error('Create failed');
       await loadExpenses();
@@ -204,8 +233,16 @@ const ExpensesModule = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold text-gray-800">Annual Expenses</h2>
         <div className="flex flex-wrap gap-3">
-          <input type="text" placeholder="Search expenses..." className="px-3 py-2 border border-gray-200 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          <button onClick={handleAddNew} disabled={loading} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium shadow-sm hover:bg-primary/90">Add Expense</button>
+          <input
+            type="text"
+            placeholder="Search expenses..."
+            className="px-3 py-2 border border-gray-200 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button onClick={handleAddNew} disabled={loading} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium shadow-sm hover:bg-primary/90">
+            Add Expense
+          </button>
         </div>
       </div>
 
@@ -236,48 +273,93 @@ const ExpensesModule = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredData.map((expense, idx) => (
-              <tr key={expense.id} className="hover:bg-gray-50 transition">
-                <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
-                <td className="px-4 py-3 text-sm">{expense.day || '—'}</td>
-                <td className="px-4 py-3 text-sm">{expense.month || '—'}</td>
-                <td className="px-4 py-3 text-sm">{expense.week || '—'}</td>
-                <td className="px-4 py-3 text-sm">
-                  {editingId === expense.id ? <input type="date" name="date" value={editForm.date} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" /> : expense.date || '—'}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {editingId === expense.id ? <input type="text" name="voucherCode" value={editForm.voucherCode} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" /> : expense.voucherCode || 'Not set'}
-                </td>
-                <td className="px-4 py-3 text-sm max-w-xs break-words whitespace-normal">
-                  {editingId === expense.id ? <input type="text" name="transactionDetails" value={editForm.transactionDetails} onChange={handleEditChange} className="w-64 px-2 py-1 border rounded-lg" /> : expense.transactionDetails || 'No details'}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {editingId === expense.id ? <input type="number" name="spent" value={editForm.spent} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" /> : `₦${(expense.spent || 0).toLocaleString()}`}
-                </td>
-                <td className="px-4 py-3 text-sm">
-                  {editingId === expense.id ? <input type="text" name="category" value={editForm.category} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" /> : expense.category || 'Not set'}
-                </td>
-                <td className="px-4 py-3 text-sm">{expense.costCentre || '—'}</td>
-                <td className="px-4 py-3 text-sm">{expense.subCostCentre || '—'}</td>
-                <td className="px-4 py-3 text-sm">
-                  {editingId === expense.id ? (
-                    <select name="bankDebited" value={editForm.bankDebited} onChange={handleEditChange} className="w-24 px-2 py-1 border rounded-lg">
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  ) : (
-                    <span className={expense.bankDebited === 'Yes' ? 'text-green-600 font-medium' : 'text-red-600'}>{expense.bankDebited || 'No'}</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right whitespace-nowrap">
-                  {editingId === expense.id ? (
-                    <div className="flex gap-2"><button onClick={() => handleSave(expense.id)} className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs">Save</button><button onClick={() => setEditingId(null)} className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs">Cancel</button></div>
-                  ) : (
-                    <div className="flex gap-2"><button onClick={() => handleEdit(expense)} className="px-3 py-1 bg-primary text-white rounded-lg text-xs">Edit</button><button onClick={() => handleDelete(expense.id)} className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs">Delete</button></div>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {filteredData.map((expense, idx) => {
+              const isFromRequisition = !!expense.requisition_id;
+              return (
+                <tr key={expense.id} className={`hover:bg-gray-50 transition ${isFromRequisition ? 'bg-gray-50/50' : ''}`}>
+                  <td className="px-4 py-3 text-sm text-gray-500">{idx + 1}</td>
+                  <td className="px-4 py-3 text-sm">{expense.day || '—'}</td>
+                  <td className="px-4 py-3 text-sm">{expense.month || '—'}</td>
+                  <td className="px-4 py-3 text-sm">{expense.week || '—'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <input type="date" name="date" value={editForm.date} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" />
+                    ) : (
+                      expense.date || '—'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <input type="text" name="voucherCode" value={editForm.voucherCode} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" />
+                    ) : (
+                      expense.voucherCode || 'Not set'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm max-w-xs break-words whitespace-normal">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <input type="text" name="transactionDetails" value={editForm.transactionDetails} onChange={handleEditChange} className="w-64 px-2 py-1 border rounded-lg" />
+                    ) : (
+                      expense.transactionDetails || 'No details'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <input type="number" name="spent" value={editForm.spent} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" />
+                    ) : (
+                      `₦${(expense.spent || 0).toLocaleString()}`
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <input type="text" name="category" value={editForm.category} onChange={handleEditChange} className="w-32 px-2 py-1 border rounded-lg" />
+                    ) : (
+                      expense.category || 'Not set'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">{expense.costCentre || '—'}</td>
+                  <td className="px-4 py-3 text-sm">{expense.subCostCentre || '—'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <select name="bankDebited" value={editForm.bankDebited} onChange={handleEditChange} className="w-24 px-2 py-1 border rounded-lg">
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    ) : (
+                      <span className={expense.bankDebited === 'Yes' ? 'text-green-600 font-medium' : 'text-red-600'}>
+                        {expense.bankDebited || 'No'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap">
+                    {editingId === expense.id && !isFromRequisition ? (
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSave(expense.id)} className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs">Save</button>
+                        <button onClick={() => setEditingId(null)} className="px-3 py-1 bg-gray-500 text-white rounded-lg text-xs">Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(expense)}
+                          className={`px-3 py-1 rounded-lg text-xs ${isFromRequisition ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'}`}
+                          disabled={isFromRequisition}
+                          title={isFromRequisition ? 'Expense from requisition – not editable' : ''}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(expense.id)}
+                          className={`px-3 py-1 rounded-lg text-xs ${isFromRequisition ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'}`}
+                          disabled={isFromRequisition}
+                          title={isFromRequisition ? 'Expense from requisition – cannot delete' : ''}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
