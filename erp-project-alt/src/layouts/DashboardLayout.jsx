@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
+import { hasFinanceAccess, hasUsersAccess, hasFilesAccess } from "../utils/accessControl";
 import logo from '../assets/pgl_logo.png'
 import ex1 from '../assets/ex1.jpg';
 import ex2 from '../assets/ex2.jpg';
@@ -120,9 +121,6 @@ const DashboardLayout = () => {
     navigate('/login');
   };
 
-  const hasFinanceAccess = () =>
-    user && (user.role === 'finance' || user.role === 'chairman' || user.department === 'finance' || user.role === 'admin');
-
   const handleNotificationClick = async (note) => {
     try {
       setNotifications(prev => prev.filter(n => n.id !== note.id));
@@ -150,11 +148,15 @@ const DashboardLayout = () => {
     { icon: ShoppingCart, label: 'Requisitions', to: 'requisitions' },
     ...(user.role === 'staff' ? [
       { icon: CheckSquare, label: 'Tasks', to: 'tasks' },
+    ] : []),
+    ...(hasUsersAccess(user) ? [
       { icon: Users, label: 'Users', to: 'users' },
     ] : []),
     { icon: CalendarBlank, label: 'Leaves', to: 'leaves' },
-    { icon: Folder, label: 'Files', to: 'files' },
-    ...(hasFinanceAccess() ? [{ icon: PresentationChart, label: 'Finance', to: 'finance' }] : []),
+    ...(hasFilesAccess(user) ? [
+      { icon: Folder, label: 'Files', to: 'files' },
+    ] : []),
+    ...(hasFinanceAccess(user) ? [{ icon: PresentationChart, label: 'Finance', to: 'finance' }] : []),
     // ...(user.role === 'finance' ? [{ icon: CurrencyDollar, label: 'Payroll', to: 'payroll' }] : []),
   ];
 

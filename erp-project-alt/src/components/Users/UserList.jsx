@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../UI/Toast';
 const UserList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { user } = useAuth()
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -91,7 +93,7 @@ const UserList = () => {
         throw new Error(responseData.message || 'Failed to add user');
       }
 
-      alert('User added successfully!');
+      toast.success('User added successfully!');
 
       setUsers([...users, { ...newUser, id: responseData.user_id }]);
 
@@ -140,7 +142,7 @@ const UserList = () => {
 
       if (!response.ok) {
         console.error('Update failed:', result.message);
-        alert(result.message || 'Something went wrong');
+        toast.error(result.message || 'Something went wrong');
         return;
       }
 
@@ -149,11 +151,11 @@ const UserList = () => {
         prev.map(u => (u.id === userData.id ? { ...u, ...userData } : u))
       );
 
-      alert('User updated successfully!');
+      toast.success('User updated successfully!');
       setEditingUserId(null);
     } catch (error) {
       console.error('❌ API error:', error);
-      alert('Failed to update user. Please try again.');
+      toast.error('Failed to update user. Please try again.');
     }
   };
 

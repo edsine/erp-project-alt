@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { requireUsersAccess } = require('../Middleware/accessControl');
 const router = express.Router();
 
 // Register Route
@@ -67,7 +68,7 @@ router.post('/login', async (req, res) => {
 });
 
 // GET /users - fetch all users
-router.get('/users', async (req, res) => {
+router.get('/users', requireUsersAccess, async (req, res) => {
   try {
     const sql = 'SELECT id, name, email, role, department, is_admin, created_at FROM users';
     const [results] = await db.query(sql);
@@ -80,7 +81,7 @@ router.get('/users', async (req, res) => {
 });
 
 // GET /users/:id - fetch a single user by ID
-router.get('/users/:id', async (req, res) => {
+router.get('/users/:id', requireUsersAccess, async (req, res) => {
   try {
     const userId = req.params.id;
     const sql = 'SELECT id, name, email, role, department, is_admin, created_at FROM users WHERE id = ?';
@@ -99,7 +100,7 @@ router.get('/users/:id', async (req, res) => {
 });
 
 // POST /users - Create a new user
-router.post('/users', async (req, res) => {
+router.post('/users', requireUsersAccess, async (req, res) => {
   const { name, email, password, role, department, is_admin = 0 } = req.body;
 
   if (!name || !email || !password || !role) {
@@ -139,7 +140,7 @@ router.post('/users', async (req, res) => {
 });
 
 // POST /users - Create or update a user
-router.put('/users', async (req, res) => {
+router.put('/users', requireUsersAccess, async (req, res) => {
   const {
     id,
     name,
@@ -271,7 +272,7 @@ router.put('/change-password', async (req, res) => {
 });
 
 // DELETE /users/:id - Delete a user by ID
-router.delete('/users/:id', async (req, res) => {
+router.delete('/users/:id', requireUsersAccess, async (req, res) => {
   const userId = req.params.id;
 
   try {

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../UI/Toast';
 
 // Reuse the CommentSection component from the original code
 const CommentSection = ({ memoId, user }) => {
@@ -10,6 +11,7 @@ const CommentSection = ({ memoId, user }) => {
   const [loading, setLoading] = useState(false);
   const [showCommentInput, setShowCommentInput] = useState(false);
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const toast = useToast();
 
   useEffect(() => {
     fetchComments();
@@ -56,7 +58,7 @@ const CommentSection = ({ memoId, user }) => {
       }
     } catch (error) {
       console.error('Failed to add comment:', error);
-      alert('Failed to add comment. Please try again.');
+      toast.error('Failed to add comment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -228,6 +230,7 @@ const DirectMemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
   const { user } = useAuth();
+  const toast = useToast();
   const [memos, setMemos] = useState([]);
   const [selectedMemo, setSelectedMemo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -445,10 +448,10 @@ const handleApproval = async (memoId, status, comments = '') => {
     setMemos(updatedMemos);
     
     // Show success message
-    alert(`Memo ${status} successfully`);
+    toast.success(`Memo ${status} successfully`);
   } catch (error) {
     console.error('Failed to update approval status:', error);
-    alert('Failed to update approval status. Please try again.');
+    toast.error('Failed to update approval status. Please try again.');
   }
 };
 

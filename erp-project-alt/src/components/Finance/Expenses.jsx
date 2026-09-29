@@ -1,8 +1,12 @@
 // ExpensesModule.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useToast } from '../UI/Toast';
+import { useConfirm } from '../UI/ConfirmDialog';
 
 const ExpensesModule = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const toast = useToast();
+  const confirm = useConfirm();
   const [filteredData, setFilteredData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
@@ -42,7 +46,7 @@ const ExpensesModule = () => {
       setFilteredData(mapped);
     } catch (err) {
       console.error(err);
-      alert('Failed to load expenses');
+      toast.error('Failed to load expenses');
     } finally {
       setLoading(false);
     }
@@ -73,7 +77,7 @@ const ExpensesModule = () => {
   const handleEdit = useCallback((expense) => {
     // ❌ Do not allow editing if the expense originated from a requisition
     if (expense.requisition_id) {
-      alert('Expenses created from requisitions cannot be edited manually.');
+      toast.warning('Expenses created from requisitions cannot be edited manually.');
       return;
     }
     setEditingId(expense.id);
@@ -96,7 +100,7 @@ const ExpensesModule = () => {
     // 🛡️ Extra safety: if the expense has a requisition_id, block save
     const targetExpense = expensesData.find(exp => exp.id === id);
     if (targetExpense?.requisition_id) {
-      alert('Cannot save changes – this expense is linked to a requisition.');
+      toast.warning('Cannot save changes – this expense is linked to a requisition.');
       setEditingId(null);
       return;
     }
@@ -121,7 +125,7 @@ const ExpensesModule = () => {
       setEditingId(null);
     } catch (err) {
       console.error(err);
-      alert('Failed to update expense');
+      toast.error('Failed to update expense');
     } finally {
       setLoading(false);
     }
@@ -130,10 +134,10 @@ const ExpensesModule = () => {
   const handleDelete = useCallback(async (id) => {
     const targetExpense = expensesData.find(exp => exp.id === id);
     if (targetExpense?.requisition_id) {
-      alert('Cannot delete – this expense is linked to a requisition.');
+      toast.warning('Cannot delete – this expense is linked to a requisition.');
       return;
     }
-    if (!confirm('Are you sure you want to delete this expense?')) return;
+    if (!(await confirm({ title: 'Delete expense', message: 'Are you sure you want to delete this expense?', confirmLabel: 'Delete', danger: true }))) return;
     try {
       setLoading(true);
       const res = await fetch(`${BASE_URL}/finance/expense/${id}`, { method: 'DELETE' });
@@ -141,7 +145,7 @@ const ExpensesModule = () => {
       await loadExpenses();
     } catch (err) {
       console.error(err);
-      alert('Failed to delete expense');
+      toast.error('Failed to delete expense');
     } finally {
       setLoading(false);
     }
@@ -171,7 +175,7 @@ const ExpensesModule = () => {
       await loadExpenses();
     } catch (err) {
       console.error(err);
-      alert('Failed to create expense');
+      toast.error('Failed to create expense');
     } finally {
       setLoading(false);
     }
@@ -187,11 +191,11 @@ const ExpensesModule = () => {
       const response = await fetch(`${BASE_URL}/finance/import-excel`, { method: 'POST', body: formData });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Import failed');
-      alert(result.message || 'Import successful');
+      toast.success(result.message || 'Import successful');
       await loadExpenses();
     } catch (error) {
       console.error(error);
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
       event.target.value = '';
@@ -209,8 +213,8 @@ const ExpensesModule = () => {
     window.URL.revokeObjectURL(url);
   }, []);
 
-  const handleClearAll = useCallback(() => {
-    if (confirm('Are you sure you want to clear ALL expense records? This cannot be undone.')) {
+  const handleClearAll = useCallback(async () => {
+    if (await confirm({ title: 'Clear all expenses', message: 'Are you sure you want to clear ALL expense records? This cannot be undone.', confirmLabel: 'Clear all', danger: true })) {
       setExpensesData([]);
       localStorage.removeItem('expensesData');
       setEditingId(null);

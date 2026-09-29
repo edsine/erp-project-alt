@@ -437,22 +437,91 @@ router.post('/leave/:id/reject', async (req, res) => {
   const leaveId = req.params.id;
   const { user_id } = req.body;
 
-  const [userRes] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
-  const role = userRes[0]?.role?.trim().toLowerCase();
+  if (!user_id) {
+    return res.status(400).json({ message: 'User ID is required for rejection.' });
+  }
 
-  const roleRejectMap = {
-    manager: 'rejected_by_manager',
-    executive: 'rejected_by_executive',
-    hr: 'rejected_by_hr',
-    gmd: 'rejected_by_gmd',
-    chairman: 'rejected_by_chairman',
-  };
+  try {
+    // 1. Get approver's role and department
+    const [userResults] = await db.query('SELECT role, department FROM users WHERE id = ?', [user_id]);
+    if (userResults.length === 0) return res.status(404).json({ message: 'User not found.' });
 
-  const field = roleRejectMap[role];
-  if (!field) return res.status(403).json({ message: `Role ${role} not authorized to reject.` });
+    const approver = userResults[0];
+    const role = approver.role?.trim().toLowerCase();
 
-  await db.query(`UPDATE leave_requests SET ${field} = 1, status = 'rejected' WHERE id = ?`, [leaveId]);
-  res.json({ message: `Rejected by ${role}`, field });
+    // 2. Get leave request details (to determine sender's department + current status)
+    const [leaveRequest] = await db.query(
+      'SELECT user_id, status FROM leave_requests WHERE id = ?',
+      [leaveId]
+    );
+    if (leaveRequest.length === 0)
+      return res.status(404).json({ message: 'Leave request not found.' });
+
+    if (leaveRequest[0].status !== 'pending') {
+      return res.status(400).json({ message: 'Leave request has already been actioned.' });
+    }
+
+    const requesterId = leaveRequest[0].user_id;
+    const [requesterInfo] = await db.query(
+      'SELECT department FROM users WHERE id = ?',
+      [requesterId]
+    );
+    const requesterDept = requesterInfo[0]?.department?.trim().toLowerCase();
+
+    // 3. Determine rejection flow (mirrors the approval flow so only the current
+    //    approver in the sequence may reject)
+    let roleRejectMap;
+
+    if (requesterDept !== 'ict') {
+      // Non-ICT flow
+      roleRejectMap = {
+        finance:  { field: 'rejected_by_executive', dependsOn: null },
+        hr:       { field: 'rejected_by_hr',        dependsOn: 'approved_by_executive' },
+        gmd:      { field: 'rejected_by_gmd',       dependsOn: 'approved_by_hr' },
+        chairman: { field: 'rejected_by_chairman',  dependsOn: 'approved_by_gmd' },
+      };
+    } else {
+      // ICT flow
+      roleRejectMap = {
+        manager:   { field: 'rejected_by_manager',   dependsOn: null },
+        executive: { field: 'rejected_by_executive', dependsOn: 'approved_by_manager' },
+        hr:        { field: 'rejected_by_hr',        dependsOn: 'approved_by_executive' },
+        gmd:       { field: 'rejected_by_gmd',       dependsOn: 'approved_by_hr' },
+        chairman:  { field: 'rejected_by_chairman',  dependsOn: 'approved_by_gmd' },
+      };
+    }
+
+    if (!roleRejectMap[role]) {
+      return res.status(403).json({ message: `Role '${role}' is not authorized to reject this leave.` });
+    }
+
+    const { field, dependsOn } = roleRejectMap[role];
+
+    // 4. Check current approval status
+    const [leaveCheck] = await db.query(
+      `SELECT ${field}${dependsOn ? `, ${dependsOn}` : ''} FROM leave_requests WHERE id = ?`,
+      [leaveId]
+    );
+    const leave = leaveCheck[0];
+
+    if (leave[field] === 1) {
+      return res.status(400).json({ message: `Already rejected by ${role}` });
+    }
+
+    if (dependsOn && leave[dependsOn] !== 1) {
+      return res.status(403).json({
+        message: `Cannot reject yet. Waiting for ${dependsOn.replace('approved_by_', '')} approval.`,
+      });
+    }
+
+    // 5. Reject the request
+    await db.query(`UPDATE leave_requests SET ${field} = 1, status = 'rejected' WHERE id = ?`, [leaveId]);
+    return res.json({ message: `Rejected by ${role}`, field });
+
+  } catch (err) {
+    console.error('🔥 Error in leave rejection process:', err);
+    return res.status(500).json({ message: 'Error updating rejection status' });
+  }
 });
 
 

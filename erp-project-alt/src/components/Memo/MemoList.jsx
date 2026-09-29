@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../UI/Toast';
+import { useConfirm } from '../UI/ConfirmDialog';
 import {
   FileText, MagnifyingGlass, Plus, X, CheckCircle,
   XCircle, Clock, ArrowDown, Paperclip, ChatCircle,
@@ -16,6 +18,7 @@ const CommentSection = ({ memoId, user }) => {
   const [loading, setLoading] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const toast = useToast();
 
   useEffect(() => { fetchComments(); }, [memoId]);
 
@@ -37,7 +40,7 @@ const CommentSection = ({ memoId, user }) => {
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       if (res.status === 201) { setNewComment(''); setShowInput(false); fetchComments(); }
-    } catch (e) { alert('Failed to add comment.'); }
+    } catch (e) { toast.error('Failed to add comment.'); }
     finally { setLoading(false); }
   };
 
@@ -128,6 +131,8 @@ const StatusPill = ({ status }) => {
 const MemoList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const { memoId } = useParams();
 
@@ -257,11 +262,11 @@ const MemoList = () => {
         setFinanceActionedMemos(prev => [...prev, memo.id]);
         setSelectedMemo(null);
       }
-    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Payment failed'}`); }
+    } catch (e) { toast.error(`Error: ${e.response?.data?.message || 'Payment failed'}`); }
   };
 
   const handleApprove = async (memo) => {
-    if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) { alert('Please add recommendations'); return; }
+    if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) { toast.error('Please add recommendations'); return; }
     try {
       const res = await axios.post(`${BASE_URL}/memos/${memo.id}/approve`, { user_id: user.id, role: user.role }, { headers: { Authorization: `Bearer ${user.token}` } });
       if (res.status === 200) {
@@ -271,11 +276,11 @@ const MemoList = () => {
         setMemos(prev => prev.map(m => Number(m.id) === Number(memo.id) ? { ...m, ...res.data.updatedFields, [`approved_by_${user.role}`]: 1 } : m));
         setSelectedMemo(null); setApprovalComment(''); setShowApprovalComment(false);
       }
-    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Approval failed'}`); }
+    } catch (e) { toast.error(`Error: ${e.response?.data?.message || 'Approval failed'}`); }
   };
 
   const handleReject = async (memo) => {
-    if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) { alert('Please add remarks'); return; }
+    if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) { toast.error('Please add remarks'); return; }
     try {
       const res = await axios.post(`${BASE_URL}/memos/${memo.id}/reject`, { userId: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
       if (res.data?.success) {
@@ -290,12 +295,12 @@ const MemoList = () => {
   };
 
   const handleDeleteMemo = async (memoId) => {
-    if (!window.confirm('Delete this memo?')) return;
+    if (!(await confirm({ title: 'Delete memo', message: 'Are you sure you want to delete this memo?', confirmLabel: 'Delete', danger: true }))) return;
     try {
       await axios.delete(`${BASE_URL}/memos/${memoId}`, { headers: { Authorization: `Bearer ${user.token}` } });
       setMemos(prev => prev.filter(m => m.id !== memoId));
       setSelectedMemo(null);
-    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Delete failed'}`); }
+    } catch (e) { toast.error(`Error: ${e.response?.data?.message || 'Delete failed'}`); }
   };
 
   const handleAcknowledge = async (memo) => {
@@ -309,7 +314,7 @@ const MemoList = () => {
         setSelectedMemo(updated);
         setMemos(prev => prev.map(m => m.id === memo.id ? updated : m));
       }
-    } catch (e) { alert(`Error: ${e.response?.data?.message || 'Failed'}`); }
+    } catch (e) { toast.error(`Error: ${e.response?.data?.message || 'Failed'}`); }
   };
 
   if (loading) return (

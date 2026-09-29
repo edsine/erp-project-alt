@@ -26,6 +26,8 @@ import ExpensesModule from '../components/Finance/Expenses'
 import ReportsModule from '../components/Finance/Reports'
 import FinancialDashboard from '../components/Finance/Finance'
 import ChangePassword from '../components/Settings/ChangePassword'
+import RequireAccess from '../components/Auth/RequireAccess'
+import { hasFilesAccess, hasUsersAccess } from '../utils/accessControl'
 // import SingleMemo from '../components/Memo/Singlememo'
 
 const router = createBrowserRouter([
@@ -72,31 +74,31 @@ const router = createBrowserRouter([
       },
       {
         path: 'files/new-client',
-        element: <NewClient />,
+        element: <RequireAccess check={hasFilesAccess}><NewClient /></RequireAccess>,
       },
       {
         path: 'files',
-        element: <FileList />,
+        element: <RequireAccess check={hasFilesAccess}><FileList /></RequireAccess>,
       },
       {
         path: 'files/:clientId',
-        element: <ClientFileList />,
+        element: <RequireAccess check={hasFilesAccess}><ClientFileList /></RequireAccess>,
       },
       {
         path: 'files/:clientId/upload',
-        element: <UploadFile />,
+        element: <RequireAccess check={hasFilesAccess}><UploadFile /></RequireAccess>,
       },
       {
         path: 'files/:clientId/:fileId',
-        element: <FileDetails />,
+        element: <RequireAccess check={hasFilesAccess}><FileDetails /></RequireAccess>,
       },
       {
         path: 'files/edit-client/:clientId',
-        element: <EditClient />,
+        element: <RequireAccess check={hasFilesAccess}><EditClient /></RequireAccess>,
       },
       {
         path: 'users',
-        element: <UserList />,
+        element: <RequireAccess check={hasUsersAccess}><UserList /></RequireAccess>,
       },
       {
         path: 'leaves',

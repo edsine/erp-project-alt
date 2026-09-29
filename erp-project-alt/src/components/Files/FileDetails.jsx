@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { useConfirm } from '../UI/ConfirmDialog';
 
 const FileDetails = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { clientId, fileId } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ const FileDetails = () => {
   }, [fileId, navigate]);
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this file?')) {
+    if (await confirm({ title: 'Delete file', message: 'Are you sure you want to delete this file?', confirmLabel: 'Delete', danger: true })) {
       try {
         const token = localStorage.getItem('token');
         if (!token) {

@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import { useToast } from '../UI/Toast';
+import { useConfirm } from '../UI/ConfirmDialog';
 import { 
   FolderOpen, Download, Trash2, Eye, Search, Filter, 
   ChevronDown, Loader2, CheckSquare, Square, FileText,
@@ -15,6 +17,8 @@ const ClientFileList = () => {
   const { clientId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
+  const confirm = useConfirm();
   
   const [client, setClient] = useState(null);
   const [files, setFiles] = useState([]);
@@ -98,7 +102,7 @@ const filteredFiles = useMemo(() => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete ${selectedFiles.length} file(s)?`)) {
+    if (!(await confirm({ title: 'Delete files', message: `Are you sure you want to delete ${selectedFiles.length} file(s)?`, confirmLabel: 'Delete', danger: true }))) {
       return;
     }
 
@@ -147,7 +151,7 @@ const filteredFiles = useMemo(() => {
       return;
     }
 
-    if (window.confirm('Are you sure you want to delete this file?')) {
+    if (await confirm({ title: 'Delete file', message: 'Are you sure you want to delete this file?', confirmLabel: 'Delete', danger: true })) {
       try {
         await axios.delete(`${BASE_URL}/files/${fileId}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -164,7 +168,7 @@ const filteredFiles = useMemo(() => {
   const handleDownload = async (fileId, fileName) => {
     const token = localStorage.getItem('token');
     if (!token) {
-      alert('Please login to download files');
+      toast.error('Please login to download files');
       return;
     }
 
@@ -198,7 +202,7 @@ const filteredFiles = useMemo(() => {
       }, 200);
     } catch (err) {
       console.error('Download error:', err);
-      alert(`Download failed: ${err.message || 'Please try again'}`);
+      toast.error(`Download failed: ${err.message || 'Please try again'}`);
     }
   };
 
@@ -221,7 +225,19 @@ const filteredFiles = useMemo(() => {
     ].includes(fileType);
 
     if (isViewable) {
-      window.open(`${BASE_URL}/files/view/${fileId}`, '_blank');
+      try {
+        const response = await fetch(`${BASE_URL}/files/view/${fileId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      } catch (err) {
+        console.error('View error:', err);
+        toast.error('Failed to view file');
+      }
     } else {
       handleDownload(fileId, fileName);
     }

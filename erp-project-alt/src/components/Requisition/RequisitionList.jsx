@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useParams } from 'react-router-dom';
+import { useToast } from '../UI/Toast';
 import {
   ShoppingCart, MagnifyingGlass, Plus, X, CheckCircle,
   XCircle, Clock, ArrowDown, Paperclip, ChatCircle, FileText,
@@ -16,6 +17,7 @@ const CommentSection = ({ requisitionId, user }) => {
   const [loading, setLoading] = useState(false);
   const [showInput, setShowInput] = useState(false);
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const toast = useToast();
 
   useEffect(() => { fetchComments(); }, [requisitionId]);
 
@@ -37,7 +39,7 @@ const CommentSection = ({ requisitionId, user }) => {
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
       if (res.status === 201) { setNewComment(''); setShowInput(false); fetchComments(); }
-    } catch (e) { console.error('Failed to add comment:', e); alert('Failed to add comment. Please try again.'); }
+    } catch (e) { console.error('Failed to add comment:', e); toast.error('Failed to add comment. Please try again.'); }
     finally { setLoading(false); }
   };
 
@@ -190,6 +192,7 @@ const RequisitionList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { id, requisitionId } = useParams();
   const { user } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const [requisitions, setRequisitions] = useState([]);
@@ -332,16 +335,16 @@ const RequisitionList = () => {
     try {
       const res = await axios.post(`${BASE_URL}/requisitions/${req.id}/mark-paid`, { user_id: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
       if (res.status === 200) {
-        alert('Requisition marked as paid successfully!');
+        toast.success('Requisition marked as paid successfully!');
         const updated = { ...req, paid_by_finance: 1 };
         setRequisitions(prev => prev.map(r => r.id === req.id ? updated : r));
         setSelectedRequisition(updated);
       }
-    } catch (e) { console.error('Payment failed:', e.response?.data || e.message); alert(`❌ Error: ${e.response?.data?.message || 'Payment failed'}`); }
+    } catch (e) { console.error('Payment failed:', e.response?.data || e.message); toast.error(`Error: ${e.response?.data?.message || 'Payment failed'}`); }
   };
 
   const handleApprove = async (req) => {
-    if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) { alert('Please add recommendations for approval'); return; }
+    if (user.role.toLowerCase() !== 'chairman' && !approvalComment.trim()) { toast.error('Please add recommendations for approval'); return; }
     try {
       const res = await axios.post(`${BASE_URL}/requisitions/${req.id}/approve`, { user_id: user.id, role: user.role }, { headers: { Authorization: `Bearer ${user.token}` } });
       if (res.status === 200) {
@@ -350,19 +353,19 @@ const RequisitionList = () => {
             { comment: user.role.toLowerCase() === 'chairman' ? `Chairman Approval: ${approvalComment}` : `Recommendation: ${approvalComment}`, user_id: user.id },
             { headers: { Authorization: `Bearer ${user.token}` } });
         }
-        alert(`✅ Success: ${res.data.message}`);
+        toast.success(res.data.message);
         const updated = { ...req, ...res.data.updatedFields, [`approved_by_${user.role}`]: 1, [`rejected_by_${user.role}`]: 0 };
         setRequisitions(prev => prev.map(r => r.id === req.id ? updated : r));
         setSelectedRequisition(null);
         setApprovalComment('');
         setShowApprovalComment(false);
-        if (res.data.nextApprover) { alert(`Next approver: ${res.data.nextApprover}`); }
+        if (res.data.nextApprover) { toast.info(`Next approver: ${res.data.nextApprover}`); }
       }
-    } catch (e) { console.error('Approval failed:', e.response?.data || e.message); alert(`❌ Error: ${e.response?.data?.message || 'Approval failed'}`); }
+    } catch (e) { console.error('Approval failed:', e.response?.data || e.message); toast.error(`Error: ${e.response?.data?.message || 'Approval failed'}`); }
   };
 
   const handleReject = async (req) => {
-    if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) { alert('Please add remarks for rejection'); return; }
+    if (user.role.toLowerCase() !== 'chairman' && !rejectionComment.trim()) { toast.error('Please add remarks for rejection'); return; }
     try {
       const res = await axios.post(`${BASE_URL}/requisitions/${req.id}/reject`, { userId: user.id }, { headers: { Authorization: `Bearer ${user.token}` } });
       if (res.data?.success) {

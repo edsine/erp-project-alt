@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useConfirm } from '../UI/ConfirmDialog';
 
 const EditClient = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const { clientId } = useParams();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [formData, setFormData] = useState({
     name: '',
     code: ''
@@ -64,7 +66,7 @@ const EditClient = () => {
   };
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this client?')) {
+    if (await confirm({ title: 'Delete client', message: 'Are you sure you want to delete this client?', confirmLabel: 'Delete', danger: true })) {
       try {
         const token = localStorage.getItem('token');
         await axios.delete(

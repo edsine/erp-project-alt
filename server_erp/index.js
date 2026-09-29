@@ -8,7 +8,7 @@ const TaskRoutes = require('./Routes/tasks');
 const filesRoutes = require('./Routes/files');
 const leaveRoutes = require('./Routes/leave');
 const ReportRoutes = require('./Routes/Reprts');
-// const activityRoutes = require('./Routes/activityRoutes'); 
+const activityRoutes = require('./Routes/activityRoutes');
 const directMemosRoutes = require('./Routes/directMemos');
  const financeRoutes = require('./Routes/Finance') 
 
@@ -25,7 +25,7 @@ app.use('/api', TaskRoutes);
 app.use('/api', filesRoutes);
 app.use('/api', leaveRoutes);
 app.use('/api', ReportRoutes);
-// app.use('/api', activityRoutes);
+app.use('/api', activityRoutes);
 app.use('/api/direct-memos', directMemosRoutes);
 app.use('/api/finance', financeRoutes); 
 console.log("Finance routes file loaded")

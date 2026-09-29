@@ -5,12 +5,49 @@ import {
   FiPlus, FiSearch, FiX, FiCalendar, FiUser,
   FiCheck, FiClock, FiAlertCircle, FiChevronRight
 } from 'react-icons/fi';
+import { useToast } from '../UI/Toast';
+
+// Approval flow definitions (mirror the backend leave.js approval sequence)
+function getApprovalFlow(department) {
+  const isIct = String(department || '').toLowerCase() === 'ict';
+  if (isIct) {
+    return [
+      { role: 'manager',   field: 'approved_by_manager',   reject: 'rejected_by_manager',   dependsOn: null },
+      { role: 'executive', field: 'approved_by_executive', reject: 'rejected_by_executive', dependsOn: 'approved_by_manager' },
+      { role: 'hr',        field: 'approved_by_hr',        reject: 'rejected_by_hr',        dependsOn: 'approved_by_executive' },
+      { role: 'gmd',       field: 'approved_by_gmd',       reject: 'rejected_by_gmd',       dependsOn: 'approved_by_hr' },
+      { role: 'chairman',  field: 'approved_by_chairman',  reject: 'rejected_by_chairman',  dependsOn: 'approved_by_gmd' },
+    ];
+  }
+  return [
+    { role: 'finance',   field: 'approved_by_executive', reject: 'rejected_by_executive', dependsOn: null },
+    { role: 'hr',        field: 'approved_by_hr',        reject: 'rejected_by_hr',        dependsOn: 'approved_by_executive' },
+    { role: 'gmd',       field: 'approved_by_gmd',       reject: 'rejected_by_gmd',       dependsOn: 'approved_by_hr' },
+    { role: 'chairman',  field: 'approved_by_chairman',  reject: 'rejected_by_chairman',  dependsOn: 'approved_by_gmd' },
+  ];
+}
+
+// Whether the current user may act on this leave (i.e. it is their turn in the flow)
+function isMyTurn(user, leave) {
+  if (!user || !leave || leave.status !== 'pending') return false;
+
+  const role = String(user.role || '').toLowerCase();
+  const flow = getApprovalFlow(leave.department);
+  const step = flow.find((s) => s.role === role);
+  if (!step) return false;
+
+  if (leave[step.field] === 1 || leave[step.reject] === 1) return false;
+  if (step.dependsOn && leave[step.dependsOn] !== 1) return false;
+
+  return true;
+}
 
 const LeaveList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const [users, setUsers] = useState({});
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
   const [leaves, setLeaves] = useState([])
   const [selectedLeave, setSelectedLeave] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -89,7 +126,7 @@ const LeaveList = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     if (!user || !user.id) {
-      alert("You're not logged in or user ID is missing.");
+      toast.error("You're not logged in or user ID is missing.");
       return;
     }
 
@@ -115,8 +152,9 @@ const LeaveList = () => {
         )
       );
       setSelectedLeave(null);
+      toast.success(`Request ${newStatus === 'approved' ? 'approved' : 'rejected'} successfully`);
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 
@@ -298,8 +336,8 @@ const LeaveList = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            {selectedLeave.status === 'pending' && (
+            {/* Action Buttons (only shown to the current approver in the flow) */}
+            {isMyTurn(user, selectedLeave) ? (
               <div className="flex flex-col sm:flex-row justify-end gap-3">
                 <button
                   onClick={() => handleStatusChange(selectedLeave.id, 'rejected')}
@@ -315,7 +353,14 @@ const LeaveList = () => {
                   Approve Request
                 </button>
               </div>
-            )}
+            ) : selectedLeave.status === 'pending' ? (
+              <div className="flex justify-end">
+                <p className="inline-flex items-center text-xs text-gray-400">
+                  <FiClock className="mr-1 h-3.5 w-3.5" />
+                  Awaiting approval from the next approver in the flow
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

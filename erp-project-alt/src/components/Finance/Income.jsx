@@ -1,9 +1,13 @@
 // IncomeModule.jsx
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import { useToast } from '../UI/Toast';
+import { useConfirm } from '../UI/ConfirmDialog';
 
 const IncomeModule = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
+  const toast = useToast();
+  const confirm = useConfirm();
   const [filteredData, setFilteredData] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState({ from: '', to: '' });
@@ -118,14 +122,14 @@ const IncomeModule = () => {
       setEditingId(null);
     } catch (err) {
       console.error('SAVE ERROR:', err);
-      alert('Failed to save income');
+      toast.error('Failed to save income');
     } finally {
       setLoading(false);
     }
   }, [editForm]);
 
   const handleDelete = useCallback(async (id) => {
-    if (!confirm('Are you sure you want to delete this income record?')) return;
+    if (!(await confirm({ title: 'Delete income', message: 'Are you sure you want to delete this income record?', confirmLabel: 'Delete', danger: true }))) return;
     try {
       setLoading(true);
       const res = await fetch(`${BASE_URL}/finance/income/${id}`, { method: 'DELETE' });
@@ -133,7 +137,7 @@ const IncomeModule = () => {
       await loadIncome();
     } catch (err) {
       console.error('DELETE ERROR:', err);
-      alert('Failed to delete income');
+      toast.error('Failed to delete income');
     } finally {
       setLoading(false);
     }
@@ -174,11 +178,11 @@ const IncomeModule = () => {
       const res = await fetch(`${BASE_URL}/finance/income/import`, { method: 'POST', body: formData });
       if (!res.ok) throw new Error('Import failed');
       const result = await res.json();
-      alert(`Imported ${result.inserted} record(s)`);
+      toast.success(`Imported ${result.inserted} record(s)`);
       await loadIncome();
     } catch (err) {
       console.error('IMPORT ERROR:', err);
-      alert('Failed to import Excel file');
+      toast.error('Failed to import Excel file');
     } finally {
       setLoading(false);
       event.target.value = '';

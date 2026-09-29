@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useConfirm } from '../UI/ConfirmDialog';
 
 const TaskList = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -342,7 +344,7 @@ const TaskList = () => {
   };
 
   const handleDeleteTask = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) {
+    if (!(await confirm({ title: 'Delete task', message: 'Are you sure you want to delete this task?', confirmLabel: 'Delete', danger: true }))) {
       return;
     }
 

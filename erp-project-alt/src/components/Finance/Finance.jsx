@@ -6,7 +6,7 @@ import ExpensesModule from './Expenses';
 import ReportsModule from './Reports';
 
 const FinancialDashboard = () => {
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const BASE_URL = import.meta.env.VITE_BASE_URL;
   const [activeTab, setActiveTab] = useState('income');
   const [incomeData, setIncomeData] = useState([]);
   const [expensesData, setExpensesData] = useState([]);

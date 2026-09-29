@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from "../context/AuthContext";
+import { hasFinanceAccess } from "../utils/accessControl";
 import axios from 'axios';
 import {
   FileText,
@@ -59,6 +60,22 @@ const QuickAction = ({ icon: Icon, title, description, link }) => (
   </Link>
 );
 
+// ─── Activity helpers ────────────────────────────────────────────────────────
+const activityIcons = {
+  Memo: FileText,
+  Requisition: ShoppingCart,
+  Task: CheckSquare,
+  Leave: CalendarBlank,
+  DirectMemo: EnvelopeSimple,
+};
+
+const activityStatusStyles = {
+  pending: 'bg-amber-50 text-amber-600',
+  completed: 'bg-green-50 text-green-600',
+  approved: 'bg-blue-50 text-blue-600',
+  rejected: 'bg-red-50 text-red-600',
+};
+
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
@@ -71,15 +88,6 @@ const Dashboard = () => {
   const [leaveCount, setLeaveCount] = useState(0);
   const [directMemoCount, setDirectMemoCount] = useState(0);
   const [activeTab, setActiveTab] = useState('all');
-
-  const hasFinanceAccess = () => {
-    if (!user) return false;
-    return (
-      user.role?.toLowerCase() === 'finance' ||
-      user.role?.toLowerCase() === 'chairman' ||
-      user.department?.toLowerCase() === 'finance'
-    );
-  };
 
   useEffect(() => {
     if (!user) return;
@@ -94,7 +102,7 @@ const Dashboard = () => {
           fetch(`${BASE_URL}/leave-requests/count/user/${user.id}`).then(r => r.json()).then(d => d.success && setLeaveCount(d.count || 0)),
         ]);
         try {
-          const act = await axios.get(`${BASE_URL}/api/activities/recent`);
+          const act = await axios.get(`${BASE_URL}/activities/recent`);
           setRecentActivities(Array.isArray(act.data) ? act.data : []);
         } catch (_) { setRecentActivities([]); }
       } catch (err) {
@@ -119,7 +127,7 @@ const Dashboard = () => {
     { icon: ShoppingCart, title: 'Requisitions', value: requisitionCount, accent: 'bg-emerald-400', link: '/dashboard/requisitions' },
     { icon: CheckSquare, title: 'Tasks', value: taskCount, accent: 'bg-amber-400', link: '/dashboard/tasks' },
     { icon: CalendarBlank, title: 'Leaves', value: leaveCount, accent: 'bg-violet-400', link: '/dashboard/leaves' },
-    ...(hasFinanceAccess() ? [{ icon: PresentationChart, title: 'Finance', value: '→', accent: 'bg-teal-400', link: '/dashboard/finance' }] : []),
+    ...(hasFinanceAccess(user) ? [{ icon: PresentationChart, title: 'Finance', value: '→', accent: 'bg-teal-400', link: '/dashboard/finance' }] : []),
   ];
 
   const filteredActivities = recentActivities.filter(a => {
@@ -207,28 +215,27 @@ const Dashboard = () => {
           </div>
 
           <div className="divide-y divide-gray-50 max-h-[380px] overflow-y-auto">
-            {filteredActivities.length > 0 ? filteredActivities.map(activity => (
+            {filteredActivities.length > 0 ? filteredActivities.map(activity => {
+              const Icon = activityIcons[activity.type] || FileText;
+              return (
               <div key={activity.id} className="px-6 py-3.5 hover:bg-gray-50/50 transition group">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-gray-50 group-hover:bg-[#1E5269]/8 flex items-center justify-center transition">
-                      <FileText size={14} weight="duotone" className="text-gray-400 group-hover:text-[#1E5269] transition" />
+                      <Icon size={14} weight="duotone" className="text-gray-400 group-hover:text-[#1E5269] transition" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-gray-700">{activity.title || activity.type}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{activity.description}</p>
                     </div>
                   </div>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                    activity.status === 'completed'
-                      ? 'bg-green-50 text-green-600'
-                      : 'bg-amber-50 text-amber-600'
-                  }`}>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${activityStatusStyles[activity.status] || 'bg-amber-50 text-amber-600'}`}>
                     {activity.status}
                   </span>
                 </div>
               </div>
-            )) : (
+              );
+            }) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Clock size={28} weight="duotone" className="text-gray-200 mb-3" />
                 <p className="text-sm text-gray-400 font-medium">No activities yet</p>
