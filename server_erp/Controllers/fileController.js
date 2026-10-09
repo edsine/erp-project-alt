@@ -305,8 +305,10 @@ exports.uploadMultipleFiles = async (req, res) => {
     return res.status(400).json({ success: false, message: 'No files uploaded' });
   }
 
-  const { client_id, category, uploaded_by } = req.body;
+  const { client_id, category } = req.body;
+  const uploaded_by = req.user.id;
   if (!client_id || !category) {
+    req.files.forEach(file => fs.unlink(file.path, () => {}));
     return res.status(400).json({ success: false, message: 'Client ID and category are required' });
   }
 
@@ -349,7 +351,7 @@ exports.uploadMultipleFiles = async (req, res) => {
       message: `${uploadedFiles.length} files uploaded successfully`
     });
   } catch (err) {
-    console.error(err);
+    console.error('UploadMultipleFiles Error:', err);
     res.status(500).json({ success: false, message: 'Failed to upload files' });
   }
 };

@@ -584,10 +584,11 @@ router.get('/leave-requests/count/user/:userId', async (req, res) => {
     const department = user.department;
 
     // Define role categories
+    // leave_requests has no finance columns; finance approves via the executive fields
     const approvalRoles = {
-      'gmd': 'approved_by_gmd',
-      'finance': 'approved_by_finance',
-      'chairman': 'approved_by_chairman'
+      'gmd': { approved: 'approved_by_gmd', rejected: 'rejected_by_gmd' },
+      'finance': { approved: 'approved_by_executive', rejected: 'rejected_by_executive' },
+      'chairman': { approved: 'approved_by_chairman', rejected: 'rejected_by_chairman' }
     };
     const departmentRoles = ['manager', 'executive', 'hr'];
 
@@ -596,14 +597,14 @@ router.get('/leave-requests/count/user/:userId', async (req, res) => {
 
     if (approvalRoles[role]) {
       // Approval roles (GMD, Finance, Chairman)
-      const approvalField = approvalRoles[role];
+      const { approved, rejected } = approvalRoles[role];
       query = `
         SELECT COUNT(*) AS count
         FROM leave_requests lr
         JOIN users u ON lr.user_id = u.id
         WHERE lr.status = 'pending'
-        AND lr.${approvalField} = 0
-        AND (lr.rejected_by_${role} = 0 OR lr.rejected_by_${role} IS NULL)
+        AND lr.${approved} = 0
+        AND (lr.${rejected} = 0 OR lr.${rejected} IS NULL)
       `;
     } 
     else if (departmentRoles.includes(role)) {

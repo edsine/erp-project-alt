@@ -1,0 +1,413 @@
+PROJECT AUDIT - 10/04/2026 13:46:48
+
+
+===== 1. FOLDER TREE (2 LEVELS) =====
+
+  
+
+  
+  
+
+  
+  
+  
+  
+  
+
+
+
+===== 2. PACKAGE.JSON SCRIPTS =====
+
+--- C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\package.json ---
+Name: erp-project-alt
+Main: 
+Scripts:
+  dev: vite
+  build: vite build
+  lint: eslint .
+  preview: vite preview
+
+--- C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\package.json ---
+Name: 
+Main: 
+Scripts:
+
+===== POSSIBLE BACKEND ENTRY FILES =====
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\services\api.js
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\index.js
+
+===== 3. API / AXIOS / CORS REFERENCES =====
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Auth\Login.jsx:115: <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Auth\Register.jsx:61: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Auth\Register.jsx:181: <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\DirectMemoList.jsx:13: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\DirectMemoList.jsx:230: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:142: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:426: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:16: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:176: const response = await fetch(`${BASE_URL}/files/download/${fileId}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:229: const response = await fetch(`${BASE_URL}/files/view/${fileId}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\EditClient.jsx:7: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:8: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:75: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:90: <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileList.jsx:11: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\NewClient.jsx:6: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:11: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:283: <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:7: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:24: const res = await fetch(`${BASE_URL}/finance/expense`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:109: const res = await fetch(`${BASE_URL}/finance/expense/${id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:143: const res = await fetch(`${BASE_URL}/finance/expense/${id}`, { method: 'DELETE' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:158: const res = await fetch(`${BASE_URL}/finance/expense`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:191: const response = await fetch(`${BASE_URL}/finance/import-excel`, { method: 'POST', body: formData });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:206: const response = await fetch(`${BASE_URL}/finance/expense/export`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Finance.jsx:9: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Finance.jsx:33: const response = await fetch(`${BASE_URL}/finance/expenses`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Finance.jsx:45: const response = await fetch(`${BASE_URL}/finance/income`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Income.jsx:8: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Income.jsx:26: const res = await fetch(`${BASE_URL}/finance/income/table`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Income.jsx:115: const res = await fetch(isNew ? `${BASE_URL}/finance/income` : `${BASE_URL}/finance/income/${id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Income.jsx:135: const res = await fetch(`${BASE_URL}/finance/income/${id}`, { method: 'DELETE' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Income.jsx:178: const res = await fetch(`${BASE_URL}/finance/income/import`, { method: 'POST', body: formData });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Reports.jsx:30: const res = await fetch(`${import.meta.env.VITE_BASE_URL}/finance/report?${params.toString()}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:46: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:62: const response = await fetch(`${BASE_URL}/users`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:90: const response = await fetch(`${BASE_URL}/leave/user/${user.id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:137: const res = await fetch(`${BASE_URL}/leave/${id}/${endpoint}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:6: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:100: const response = await fetch(`${BASE_URL}/leave`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:134: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:149: <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:336: <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\MemoList.jsx:20: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\MemoList.jsx:132: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\MemoList.jsx:493: <a href={`${import.meta.env.VITE_BASE_URL}/memos/download/${selectedMemo.id}/${file.filename}`}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:58: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:238: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Payroll\PayrollList.jsx:104: @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:66: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:224: <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\RequisitionList.jsx:19: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\RequisitionList.jsx:192: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Settings\ChangePassword.jsx:15: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Settings\ChangePassword.jsx:53: const response = await fetch(`${BASE_URL}/change-password`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:7: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:48: const response = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:73: const response = await fetch(`${BASE_URL}/users`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:220: const response = await fetch(`${BASE_URL}/tasks`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:232: const tasksResponse = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:303: const response = await fetch(`${BASE_URL}/tasks/${editingTask.id}/edit`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:313: const tasksResponse = await fetch(`${BASE_URL}/tasks/user/${user.id}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:326: const response = await fetch(`${BASE_URL}/tasks/${id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:352: const response = await fetch(`${BASE_URL}/tasks/${id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:368: const response = await fetch(`${BASE_URL}/tasks/${task.id}/request-report`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Tasks\TaskList.jsx:409: const response = await fetch(`${BASE_URL}/tasks/download/${taskId}/${filename}?userId=${user.id}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:5: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:38: const response = await fetch(`${BASE_URL}/users`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:82: const response = await fetch(`${BASE_URL}/users`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:133: const response = await fetch(`${BASE_URL}/users`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:175: const response = await fetch(`${BASE_URL}/users/${id}/status`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Users\UserList.jsx:197: const response = await fetch(`${BASE_URL}/users/${id}`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:2: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:35: const res = await fetch(`${BASE_URL}/login`, {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\layouts\DashboardLayout.jsx:13: fontLink.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&display=swap';
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\layouts\DashboardLayout.jsx:43: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\layouts\DashboardLayout.jsx:73: const res = await fetch(`${BASE_URL}/notifications/${user.id}`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\layouts\DashboardLayout.jsx:129: fetch(`${BASE_URL}/notifications-mark-read/${note.id}`, { method: "PUT" }).catch(() => {});
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:81: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:98: fetch(`${BASE_URL}/tasks/counts/user/${user.id}`).then(r => r.json()).then(d => d.success && setTaskCount(d.count)),
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:99: fetch(`${BASE_URL}/direct-memos/count/user/${user.id}`).then(r => r.json()).then(d => setDirectMemoCount(d.count || 0)),
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:100: fetch(`${BASE_URL}/requisitions/count/user/${user.id}?role=${user.role}`).then(r => r.json()).then(d => d.success && setRequisitionCount(d.count || 0)),
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:101: fetch(`${BASE_URL}/memos/counts/${user.id}`).then(r => r.json()).then(d => setMemoCount(d.count || 0)),
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\pages\Dashboard.jsx:102: fetch(`${BASE_URL}/leave-requests/count/user/${user.id}`).then(r => r.json()).then(d => d.success && setLeaveCount(d.count || 0)),
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\services\api.js:2: const BASE_URL = import.meta.env.VITE_BASE_URL;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\services\api.js:4: const api = axios.create({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\services\api.js:5: baseURL: `${BASE_URL}`, // <-- Change to your real backend URL
+
+--- CORS ---
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\index.js:17: app.use(cors());
+
+===== 4. UPLOADS =====
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:512: {/* File Upload Section */}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:539: <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:540: <span>Upload files</span>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:542: id="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\DirectMemo\NewDirectMemos.jsx:543: name="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:39: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:109: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:147: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:169: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:210: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:310: to={`/dashboard/files/${clientId}/upload`}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:314: Upload File
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\ClientFileList.jsx:459: Uploaded {new Date(file.created_at).toLocaleDateString()}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\EditClient.jsx:22: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\EditClient.jsx:50: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\EditClient.jsx:71: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:21: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:45: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:135: <p className="text-xs sm:text-sm text-gray-500">Uploaded</p>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:139: <p className="text-xs sm:text-sm text-gray-500">Uploaded By</p>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:140: <p className="text-sm sm:text-base font-medium">User {file.uploaded_by}</p>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:179: onClick={() => navigate(`/dashboard/files/${clientId}/upload`)}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileDetails.jsx:182: Upload New Version
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileList.jsx:22: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileList.jsx:42: localStorage.removeItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\FileList.jsx:43: localStorage.removeItem('user');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\NewClient.jsx:38: Authorization: `Bearer ${localStorage.getItem('token')}`,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:6: FiUpload, FiX, FiChevronRight, FiFile,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:10: const UploadFile = () => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:57: setError('Please select at least one file to upload');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:62: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:75: formData.append('uploaded_by', user.id);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:91: setSuccess(`${files.length} file(s) uploaded successfully!`);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:97: console.error('Upload error:', err);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:99: localStorage.removeItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:105: setError(err.response?.data?.message || 'Failed to upload files');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:126: <span className="ml-2 text-sm font-medium text-gray-500">Upload Files</span>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:132: <h2 className="text-2xl font-light text-gray-800 mb-2">Upload Files</h2>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:182: {/* File Upload Area */}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:189: <FiUpload className="mx-auto h-10 w-10 text-gray-400" />
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:192: htmlFor="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:197: id="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:198: name="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:287: Uploading...
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:291: <FiUpload className="mr-2 h-4 w-4" />
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:292: Upload {files.length} File{files.length !== 1 ? 's' : ''}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Files\UploadFile.jsx:310: export default UploadFile;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Finance\Expenses.jsx:219: localStorage.removeItem('expensesData');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:61: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:88: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\LeaveList.jsx:134: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:39: const handleFileUpload = (e) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:77: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:275: htmlFor="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:278: <span>Upload files</span>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:280: id="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:281: name="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Leave\NewLeave.jsx:285: onChange={handleFileUpload}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:298: {/* File Upload Section */}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:299: {/* File Upload Section */}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:327: <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:328: <span>Upload files</span>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:330: id="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Memo\NewMemo.jsx:331: name="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:380: {/* File Upload Section */}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:408: <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:409: <span>Upload files</span>
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:411: id="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\NewRequisition.jsx:412: name="file-upload"
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Requisition\RequisitionList.jsx:596: <a href={`${BASE_URL}/uploads/${file.filename}`}
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Settings\ChangePassword.jsx:44: const token = localStorage.getItem('token');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\components\Settings\ChangePassword.jsx:45: const user = JSON.parse(localStorage.getItem('user'));
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:15: const savedUser = localStorage.getItem('user')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:21: localStorage.removeItem('user')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:22: localStorage.removeItem('token')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:51: localStorage.setItem('user', JSON.stringify(data.user))
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:52: localStorage.setItem('token', data.token) // Save token if needed for auth headers
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:65: localStorage.removeItem('user')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\context\AuthContext.jsx:66: localStorage.removeItem('token')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\routes\index.jsx:17: import UploadFile from '../components/Files/UploadFile'
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\routes\index.jsx:88: path: 'files/:clientId/upload',
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\src\routes\index.jsx:89: element: <RequireAccess check={hasFilesAccess}><UploadFile /></RequireAccess>,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:174: // Upload file
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:175: exports.uploadFile = async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:177: return res.status(400).json({ success: false, message: 'No file uploaded' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:187: 'INSERT INTO files (client_id, name, description, category, path, type, size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:214: res.status(500).json({ success: false, message: 'Failed to upload file' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:227: if (req.user.role !== 'gmd' && req.user.role !== 'chairman' && files[0].uploaded_by !== req.user.id) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:303: exports.uploadMultipleFiles = async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:305: return res.status(400).json({ success: false, message: 'No files uploaded' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:308: const { client_id, category, uploaded_by } = req.body;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:315: const uploadPromises = req.files.map(async (file, index) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:320: 'INSERT INTO files (client_id, name, description, category, path, type, size, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:329: uploaded_by
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:344: const uploadedFiles = await Promise.all(uploadPromises);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:348: data: uploadedFiles,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:349: message: `${uploadedFiles.length} files uploaded successfully`
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:353: res.status(500).json({ success: false, message: 'Failed to upload files' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Controllers\fileController.js:386: file => file.uploaded_by !== req.user.id
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\index.js:19: app.use('/uploads', express.static('uploads'));
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:1: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:5: // Ensure uploads directory exists
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:6: const uploadDir = path.join(__dirname, '../uploads');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:7: if (!fs.existsSync(uploadDir)) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:8: fs.mkdirSync(uploadDir, { recursive: true });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:11: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:12: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:13: cb(null, uploadDir);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:40: // Create separate upload configurations
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:41: const uploadSingle = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:42: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:47: }).single('file');  // For single file upload
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:49: const uploadMultiple = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:50: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:55: }).array('files');  // For multiple file uploads - note the field name 'files'
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:58: uploadSingle,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Middleware\uploadMiddleware.js:59: uploadMultiple
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:3: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:8: // Configure multer for file uploads
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:9: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:10: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:11: const uploadDir = 'uploads/direct-memos';
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:12: if (!fs.existsSync(uploadDir)) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:13: fs.mkdirSync(uploadDir, { recursive: true });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:15: cb(null, uploadDir);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:47: const upload = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:48: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\directMemos.js:128: router.post('/', upload.array('files'), checkChairmanRecipient, async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\expenses.js:4: const multer = require('multer')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\expenses.js:10: // Configure multer (store in memory)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\expenses.js:11: const upload = multer({ storage: multer.memoryStorage() })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\expenses.js:190: router.post('/import-excel', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\expenses.js:193: return res.status(400).json({ error: 'No file uploaded' })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\files.js:5: const { uploadSingle, uploadMultiple } = require('../Middleware/uploadMiddleware');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\files.js:22: router.post('/files', requireFilesAccess, uploadSingle, fileController.uploadFile);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\files.js:23: router.post('/files/multiple', requireFilesAccess, uploadMultiple, fileController.uploadMultipleFiles);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:2: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:73: // ================= MULTER =================
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:74: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:75: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:76: const uploadDir = path.resolve(process.cwd(), 'uploads/income')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:77: if (!fs.existsSync(uploadDir)) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:78: fs.mkdirSync(uploadDir, { recursive: true })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:80: cb(null, uploadDir)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:88: const upload = multer({ storage })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:274: router.post('/income/import', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:276: return res.status(400).json({ error: 'No Excel file uploaded' })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:634: router.post('/import-excel', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:637: return res.status(400).json({ error: 'No file uploaded' })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:640: // ?? Read Excel from disk (since you're using diskStorage)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:679: // ?? Delete uploaded file after processing
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:886: // router.post('/import-excel', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Finance.js:889: //       return res.status(400).json({ error: 'No file uploaded' })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:3: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:8: // Configure storage for PDF files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:9: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:10: destination: function (req, file, cb) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:11: cb(null, './uploads'); // Make sure this folder exists
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:36: const upload = multer({ storage, fileFilter });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:40: router.post('/leave', upload.single('attachment'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:51: const attachment_url = req.file ? `/uploads/${req.file.filename}` : null;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\leave.js:86: if (err instanceof multer.MulterError || err.message.includes('Only')) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:4: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:9: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:10: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:11: const uploadDir = path.resolve(process.cwd(), 'uploads/memos')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:12: if (!fs.existsSync(uploadDir)) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:13: fs.mkdirSync(uploadDir, { recursive: true })
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:15: cb(null, uploadDir)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:45: // Initialize multer with same limits as frontend (10MB)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:46: const upload = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:47: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:52: // Error handling middleware for multer - ADD THIS FUNCTION
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:53: const handleMulterError = (error, req, res, next) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:54: if (error instanceof multer.MulterError) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:61: // Handle other multer errors
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:64: message: `File upload error: ${error.message}`
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:80: // router.post('/memos', upload.array('files'), handleMulterError, async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:81: //   let uploadedFiles = req.files || [];
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:112: //     // Process uploaded files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:113: //     const fileAttachments = uploadedFiles.map(file => ({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:119: //       uploadedAt: new Date()
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:228: //     // Clean up uploaded files on error
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:229: //     if (uploadedFiles.length > 0) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:230: //       uploadedFiles.forEach(file => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:243: router.post('/memos', upload.array('files'), handleMulterError, async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:244: let uploadedFiles = req.files || [];
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:275: // Process uploaded files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:276: const fileAttachments = uploadedFiles.map(file => ({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:282: uploadedAt: new Date()
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:389: // Clean up uploaded files on error
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:390: if (uploadedFiles.length > 0) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:391: uploadedFiles.forEach(file => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:471: absolutePath: path.join(__dirname, '../../uploads/memos', attachment.filename)
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:550: uploads_directory: path.join(__dirname, '../../uploads/memos')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:558: uploads_base_path: path.join(__dirname, '../../uploads/memos')
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:571: // router.post('/memos', upload.array('files'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:590: //     // Process uploaded files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:629: //     // Clean up uploaded files on error
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:643: // Serve uploaded files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:644: // Serve uploaded files - FIXED VERSION
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:679: // router.get('/uploads/memos/:filename', (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:680: //   const filePath = path.join(__dirname, '../../uploads/memos', req.params.filename);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:693: router.get('/uploads/memos/:filename', (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\memo.js:695: const filePath = path.join(__dirname, 'uploads', 'memos', filename);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:3: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:8: // Configure file upload storage
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:9: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:10: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:11: cb(null, 'uploads/projects/');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:19: const upload = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:20: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:90: JOIN users u ON d.uploaded_by = u.id
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:92: ORDER BY d.uploaded_at DESC
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:108: // Upload document to project
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:109: router.post('/documents', authenticate, upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:112: const uploaded_by = req.user.id;
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:115: return res.status(400).json({ success: false, message: 'No file uploaded' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:119: 'INSERT INTO project_documents (project_id, name, type, path, uploaded_by) VALUES (?, ?, ?, ?, ?)',
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:120: [project_id, name, type, req.file.path, uploaded_by]
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:125: message: 'Document uploaded successfully',
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:130: res.status(500).json({ success: false, message: 'Failed to upload document' });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:149: // Only allow deletion by admin or the uploader
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\projects.js:150: if (req.user.role !== 'admin' && document.uploaded_by !== userId) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\Reprts.js:11: // POST /report - create a report without file uploads
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:4: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:7: // Storage config
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:8: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:9: destination: function (req, file, cb) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:10: cb(null, path.join(__dirname, '../uploads'));
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:39: // Updated multer instance to accept multiple files
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:40: const upload = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:41: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:48: router.post('/requisitions', upload.array('files', 10), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:281: path: `/uploads/${file.filename}`
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:347: path: `/uploads/${file.filename}`
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:369: router.get('/uploads/:filename', (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:371: const filePath = path.join(__dirname, '../uploads', filename);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\requisition.js:522: url: `/uploads/${filename}`
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:3: const multer = require('multer');
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:8: // Configure multer for file uploads
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:9: const storage = multer.diskStorage({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:10: destination: (req, file, cb) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:11: const uploadDir = 'uploads/tasks';
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:12: if (!fs.existsSync(uploadDir)) {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:13: fs.mkdirSync(uploadDir, { recursive: true });
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:15: cb(null, uploadDir);
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:23: const upload = multer({
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:24: storage: storage,
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:49: router.post('/tasks', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:79: // Add file attachment info if file was uploaded
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:351: router.put('/tasks/:taskId/update', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:407: // Add new file if uploaded
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:545: router.put('/tasks/:taskId/edit', upload.single('file'), async (req, res) => {
+C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\Routes\tasks.js:610: // Add new file if uploaded
+
+===== DATABASE SCHEMA / MIGRATIONS =====
+
+===== 5. ENV VARIABLE NAMES ONLY =====
+
+--- C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\erp-project-alt\.env ---
+VITE_BASE_URL
+
+--- C:\Users\PYRICH GROUP LIMITED\Documents\GitHub\erp-project-alt\server_erp\.env ---
+PORT
+DB_HOST
+DB_USER
+DB_PASSWORD
+DB_NAME
+DB_PORT
+JWT_SECRET
+
+===== 6. LOCAL OS =====
+
+
+Caption        : Microsoft Windows 11 Pro
+Version        : 10.0.26200
+OSArchitecture : 64-bit
+
+
+
+

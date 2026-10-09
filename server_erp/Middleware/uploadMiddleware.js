@@ -37,22 +37,34 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Create separate upload configurations
-const uploadSingle = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 500 * 1024 * 1024 
-  }
-}).single('file');  // For single file upload
+// Wrap a multer handler so upload errors return a 400 JSON response
+// instead of falling through to Express's default 500 HTML error page
+const withErrorHandling = (handler) => (req, res, next) => {
+  handler(req, res, (err) => {
+    if (!err) return next();
+    const message = err instanceof multer.MulterError
+      ? (err.code === 'LIMIT_FILE_SIZE' ? 'File too large. Maximum size is 500MB.' : err.message)
+      : err.message;
+    return res.status(400).json({ success: false, message });
+  });
+};
 
-const uploadMultiple = multer({
+// Create separate upload configurations
+const uploadSingle = withErrorHandling(multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 500 * 1024 * 1024 
+    fileSize: 500 * 1024 * 1024
   }
-}).array('files');  // For multiple file uploads - note the field name 'files'
+}).single('file'));  // For single file upload
+
+const uploadMultiple = withErrorHandling(multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 500 * 1024 * 1024
+  }
+}).array('files'));  // For multiple file uploads - note the field name 'files'
 
 module.exports = {
   uploadSingle,
