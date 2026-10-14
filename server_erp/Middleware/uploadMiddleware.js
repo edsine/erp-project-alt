@@ -27,13 +27,19 @@ const fileFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'image/jpeg',
     'image/png',
-    'text/plain'
+    'text/plain',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/x-zip'
   ];
-  
-  if (allowedTypes.includes(file.mimetype)) {
+
+  // Some browsers send zip files as application/octet-stream, so also allow by extension
+  const isZip = path.extname(file.originalname).toLowerCase() === '.zip';
+
+  if (allowedTypes.includes(file.mimetype) || isZip) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, DOC, XLS, JPG, PNG, and TXT files are allowed.'), false);
+    cb(new Error('Invalid file type. Only PDF, DOC, XLS, JPG, PNG, TXT, and ZIP files are allowed.'), false);
   }
 };
 
