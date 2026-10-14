@@ -100,7 +100,7 @@ const UploadFile = () => {
         setError('Session expired. Please login again.');
         navigate('/login');
       } else if (err.response?.data?.message?.includes('File type not allowed')) {
-        setError('Invalid file type. Only PDF, DOC, XLS, JPG, PNG, TXT, and ZIP files are allowed.');
+        setError('Invalid file type. Only PDF, DOC, XLS, PPTX, JPG, PNG, TXT, and ZIP files are allowed.');
       } else {
         setError(err.response?.data?.message || 'Failed to upload files');
       }
@@ -208,7 +208,7 @@ const UploadFile = () => {
                 {files.length > 0 ? (
                   <span className="font-medium text-primary">{files.length} file(s) selected</span>
                 ) : (
-                  'Supports: PDF, DOC, XLS, JPG, PNG, TXT, ZIP (Max 10MB each)'
+                  'Supports: PDF, DOC, XLS, PPTX, JPG, PNG, TXT, ZIP (Max 10MB each)'
                 )}
               </p>
             </div>

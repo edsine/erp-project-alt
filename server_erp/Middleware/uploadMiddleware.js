@@ -30,16 +30,18 @@ const fileFilter = (req, file, cb) => {
     'text/plain',
     'application/zip',
     'application/x-zip-compressed',
-    'application/x-zip'
+    'application/x-zip',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   ];
 
-  // Some browsers send zip files as application/octet-stream, so also allow by extension
-  const isZip = path.extname(file.originalname).toLowerCase() === '.zip';
+  // Some browsers send zip/pptx files as application/octet-stream, so also allow by extension
+  const allowedExtensions = ['.zip', '.pptx'];
+  const hasAllowedExtension = allowedExtensions.includes(path.extname(file.originalname).toLowerCase());
 
-  if (allowedTypes.includes(file.mimetype) || isZip) {
+  if (allowedTypes.includes(file.mimetype) || hasAllowedExtension) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only PDF, DOC, XLS, JPG, PNG, TXT, and ZIP files are allowed.'), false);
+    cb(new Error('Invalid file type. Only PDF, DOC, XLS, PPTX, JPG, PNG, TXT, and ZIP files are allowed.'), false);
   }
 };
 
